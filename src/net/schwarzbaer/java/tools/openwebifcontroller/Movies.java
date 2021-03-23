@@ -1,6 +1,7 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.event.MouseAdapter;
@@ -14,6 +15,7 @@ import java.util.Enumeration;
 import java.util.Vector;
 import java.util.function.Function;
 
+import javax.swing.Icon;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -23,6 +25,7 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTree;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.tree.DefaultTreeModel;
@@ -31,6 +34,7 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
+import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
@@ -42,9 +46,18 @@ import net.schwarzbaer.java.lib.jsonparser.JSON_Data.TraverseException;
 import net.schwarzbaer.java.lib.jsonparser.JSON_Data.Value;
 import net.schwarzbaer.java.lib.jsonparser.JSON_Parser;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings;
+import net.schwarzbaer.system.DateTimeFormatter;
 
 class Movies extends JSplitPane {
 	private static final long serialVersionUID = 3435419463730240276L;
+	
+	private static final DateTimeFormatter dtFormatter = new DateTimeFormatter();
+	
+	private static IconSource.CachedIcons<TreeIcons> TreeIconsIS = IconSource.createCachedIcons(16, 16, "/images/TreeIcons.png", TreeIcons.values());
+	enum TreeIcons {
+		Folder, KnownFolder;
+		Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
+	}
 	
 	private final JTree locationsTree;
 	private final JTable movieTable;
@@ -60,6 +73,7 @@ class Movies extends JSplitPane {
 	private StandardMainWindow mainWindow;
 	
 	Movies(StandardMainWindow mainWindow) {
+		
 		this.mainWindow = mainWindow;
 		locationsRoot = null;
 		locationsTreeModel = null;
@@ -130,7 +144,7 @@ class Movies extends JSplitPane {
 				Movies.MovieList movieList = getMovieList(path);
 				locationsRoot.addLocations(movieList.directory,movieList.bookmarks,locationsTreeModel);
 				movieTable.setModel(movieTableModel = new MovieTableModel(movieList.movies));
-				movieTableModel.setColumnWidths(movieTable);
+				movieTableModel.initializeWith(movieTable);
 			}
 		});
 		
@@ -192,7 +206,8 @@ class Movies extends JSplitPane {
 		ValueListOutput out = new ValueListOutput();
 		out.add(0, "eventname          ", movie.eventname          );
 		out.add(0, "servicename        ", movie.servicename        );
-		out.add(0, "length             ", movie.length             );
+		out.add(0, "length             ", movie.lengthStr          );
+		out.add(0, null                 , movie.length_s           );
 		out.add(0, "begintime          ", movie.begintime          );
 		out.add(0, "recordingtime      ", movie.recordingtime      );
 		out.add(0, "lastseen           ", movie.lastseen           );
@@ -229,7 +244,7 @@ class Movies extends JSplitPane {
 				locationsTree.expandPath(treePath);
 				//locationsTree.setSelectionPath(treePath);
 				movieTable.setModel(movieTableModel = new MovieTableModel(movieList.movies));
-				movieTableModel.setColumnWidths(movieTable);
+				movieTableModel.initializeWith(movieTable);
 			}
 		}
 	}
@@ -464,11 +479,12 @@ class Movies extends JSplitPane {
 			final String filesize_readable;
 			final String fullname;
 			final long lastseen;
-			final String length;
+			final String lengthStr;
 			final long recordingtime;
 			final String servicename;
 			final String serviceref;
 			final String tags;
+			final Integer length_s;
 	
 			/*		
 			    Block "MovieList.<Base>.movies[]" [15]
@@ -498,15 +514,42 @@ class Movies extends JSplitPane {
 				eventname           = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "eventname"          , debugOutputPrefixStr) );
 				filename            = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "filename"           , debugOutputPrefixStr) );
 				filename_stripped   = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "filename_stripped"  , debugOutputPrefixStr) );
-				filesize            =                JSON_Data.getIntegerValue(object, "filesize"           , debugOutputPrefixStr)  ;
+				filesize            =                                    JSON_Data.getIntegerValue(object, "filesize"           , debugOutputPrefixStr)  ;
 				filesize_readable   = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "filesize_readable"  , debugOutputPrefixStr) );
 				fullname            = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "fullname"           , debugOutputPrefixStr) );
-				lastseen            =                JSON_Data.getIntegerValue(object, "lastseen"           , debugOutputPrefixStr)  ;
-				length              = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "length"             , debugOutputPrefixStr) );
-				recordingtime       =                JSON_Data.getIntegerValue(object, "recordingtime"      , debugOutputPrefixStr)  ;
+				lastseen            =                                    JSON_Data.getIntegerValue(object, "lastseen"           , debugOutputPrefixStr)  ;
+				lengthStr           = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "length"             , debugOutputPrefixStr) );
+				recordingtime       =                                    JSON_Data.getIntegerValue(object, "recordingtime"      , debugOutputPrefixStr)  ;
 				servicename         = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "servicename"        , debugOutputPrefixStr) );
 				serviceref          = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "serviceref"         , debugOutputPrefixStr) );
 				tags                = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "tags"               , debugOutputPrefixStr) );
+				
+				length_s = parseLength(lengthStr);
+			}
+
+			private static Integer parseLength(String lengthStr) {
+				if (lengthStr==null) return null;
+				lengthStr = lengthStr.trim();
+				
+				int pos = lengthStr.indexOf(':');
+				if (pos<0) return parseInt(lengthStr);
+				
+				Integer min = parseInt(lengthStr.substring(0, pos));
+				Integer sec = parseInt(lengthStr.substring(pos+1));
+				if (min==null || sec==null) return null;
+				
+				int sign = min<0 ? -1 : 1;
+				return sign * (Math.abs(min)*60 + Math.abs(sec));
+			}
+
+			private static Integer parseInt(String str) {
+				str = str.trim();
+				try {
+					int n = Integer.parseInt(str);
+					String newStr = String.format("%0"+str.length()+"d", n);
+					if (newStr.equals(str)) return n;
+				} catch (NumberFormatException e) {}
+				return null;
 			}
 			
 		}
@@ -515,18 +558,24 @@ class Movies extends JSplitPane {
 	static class MovieTableModel extends Tables.SimplifiedTableModel<MovieTableModel.ColumnID> {
 	
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface {
-			Name   ("Name"   , String.class, 280, m->m.eventname),
-			Length ("Length" , String.class,  60, m->m.length),
-			Station("Station", String.class,  80, m->m.servicename),
-			File   ("File"   , String.class, 450, m->m.filename_stripped),
-			Size   ("Size"   , String.class,  70, m->m.filesize_readable),
+			Name   ("Name"   ,  String.class, 280, m->m.eventname          ),
+			Length ("Length" , Integer.class,  60, m->m.length_s     , m->m.lengthStr),
+			Station("Station",  String.class,  80, m->m.servicename        ),
+			File   ("File"   ,  String.class, 450, m->m.filename_stripped  ),
+			Size   ("Size"   ,    Long.class,  70, m->m.filesize     , m->m.filesize_readable),
+			Time   ("Time"   ,    Long.class, 100, m->m.recordingtime, m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false)),
 			;
 		
 			final SimplifiedColumnConfig cfg;
 			final Function<MovieList.Movie, Object> getValue;
+			final Function<MovieList.Movie, String> getDisplayStr;
 			
 			ColumnID(String name, Class<?> columnClass, int prefWidth, Function<MovieList.Movie,Object> getValue) {
+				this(name, columnClass, prefWidth, getValue, null);
+			}
+			ColumnID(String name, Class<?> columnClass, int prefWidth, Function<MovieList.Movie,Object> getValue, Function<MovieList.Movie,String> getDisplayStr) {
 				this.getValue = getValue;
+				this.getDisplayStr = getDisplayStr;
 				cfg = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
 			}
 			
@@ -537,12 +586,28 @@ class Movies extends JSplitPane {
 		}
 	
 		private final Vector<MovieList.Movie> movies;
+		private final CustomCellRenderer customCellRenderer;
 	
-		protected MovieTableModel(Vector<MovieList.Movie> movies) {
+		private MovieTableModel(Vector<MovieList.Movie> movies) {
 			super(ColumnID.values());
 			this.movies = movies;
+			customCellRenderer = new CustomCellRenderer();
 		}
 	
+		public void initializeWith(JTable table) {
+			setColumnWidths(table);
+			
+			TableColumnModel columnModel = table.getColumnModel();
+			for (int i=0; i<columnModel.getColumnCount(); ++i) {
+				TableColumn column = columnModel.getColumn(i);
+				ColumnID columnID = getColumnID(table.convertColumnIndexToModel(i));
+				if (columnID!=null && columnID.getDisplayStr!=null)
+					column.setCellRenderer(customCellRenderer);
+			}
+			
+			table.setRowSorter( new Tables.SimplifiedRowSorter(this) );
+		}
+
 		@Override public int getRowCount() { return movies.size(); }
 	
 		@Override public Object getValueAt(int rowIndex, int columnIndex, MovieTableModel.ColumnID columnID) {
@@ -555,7 +620,26 @@ class Movies extends JSplitPane {
 			if (rowIndex<0 || rowIndex>=movies.size()) return null;
 			return movies.get(rowIndex);
 		}
-	
+		
+		private class CustomCellRenderer extends DefaultTableCellRenderer {
+			private static final long serialVersionUID = -6595078558558524809L;
+
+			@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV) {
+				Component comp = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, rowV, columnV);
+				
+				int columnM = table.convertColumnIndexToModel(columnV);
+				ColumnID columnID = getColumnID(columnM);
+				
+				if (columnID.getDisplayStr!=null) {
+					int rowM = table.convertRowIndexToModel(rowV);
+					MovieList.Movie movie = getValue(rowM);
+					if (movie!=null) setText(columnID.getDisplayStr.apply(movie));
+				}
+				
+				return comp;
+			}
+		}
+		
 	}
 	
 }

@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
@@ -25,6 +26,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTree;
+import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -37,6 +39,7 @@ import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.IconSource;
+import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
@@ -74,6 +77,10 @@ class Movies extends JSplitPane {
 	private MovieList.Movie clickedMovie;
 
 	private StandardMainWindow mainWindow;
+
+	private TreePath clickedTreePath;
+
+	private LocationTreeNode clickedTreeNode;
 	
 	Movies(StandardMainWindow mainWindow) {
 		
@@ -97,16 +104,11 @@ class Movies extends JSplitPane {
 		JScrollPane tableScrollPane = new JScrollPane(movieTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
-		JMenuItem miReloadTable;
-		ContextMenu contextMenu = new ContextMenu();
-		contextMenu.add(miReloadTable = OpenWebifController.createMenuItem("Reload Table", e->{
-			String path = selectedTreeNode.getDirPath();
-			MovieList movieList = getMovieList(path);
-			locationsRoot.addLocations(movieList,locationsTreeModel);
-			movieTable.setModel(movieTableModel = new MovieTableModel(movieList.movies));
-			movieTableModel.initializeWith(movieTable);
-		}));
-		contextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
+		
+		JMenuItem miReloadTable1;
+		ContextMenu tableContextMenu = new ContextMenu();
+		tableContextMenu.add(miReloadTable1 = OpenWebifController.createMenuItem("Reload Table", e->reloadTreeNode(selectedTreeNode)));
+		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 			TableColumnModel columnModel = movieTable.getColumnModel();
 			if (columnModel==null) return;
 			int[] widths = new int[columnModel.getColumnCount()];
@@ -118,15 +120,32 @@ class Movies extends JSplitPane {
 			System.out.printf("Column Widths: %s%n", Arrays.toString(widths));
 		}));
 		
-		contextMenu.addTo(movieTable);
-		contextMenu.addContextMenuInvokeListener((comp, x, y) -> {
+		tableContextMenu.addTo(movieTable);
+		tableContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
 			clickedMovie = null;
 			int rowV = movieTable.rowAtPoint(new Point(x,y));
 			int rowM = movieTable.convertRowIndexToModel(rowV);
 			if (movieTableModel!=null)
 				clickedMovie = movieTableModel.getValue(rowM);
 			
-			miReloadTable.setEnabled(selectedTreeNode!=null);
+			miReloadTable1.setEnabled(selectedTreeNode!=null);
+		});
+		
+		JMenuItem miReloadTable2;
+		ContextMenu treeContextMenu = new ContextMenu();
+		treeContextMenu.add(miReloadTable2 = OpenWebifController.createMenuItem("Reload Folder", e->reloadTreeNode(clickedTreeNode)));
+		
+		treeContextMenu.addTo(locationsTree);
+		treeContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
+			clickedTreePath = locationsTree.getPathForLocation(x,y);
+			clickedTreeNode = null;
+			if (clickedTreePath!=null) {
+				Object obj = clickedTreePath.getLastPathComponent();
+				if (obj instanceof LocationTreeNode)
+					clickedTreeNode = (LocationTreeNode) obj;
+			}
+			miReloadTable2.setEnabled(clickedTreeNode!=null);
+			miReloadTable2.setText(String.format("%s Folder", clickedTreeNode!=null && clickedTreeNode.movies!=null ? "Reload" : "Load"));
 		});
 		
 		
@@ -174,8 +193,7 @@ class Movies extends JSplitPane {
 					locationsRoot.addLocations(movieList,locationsTreeModel);
 					movies = movieList.movies;
 				}
-				movieTable.setModel(movieTableModel = new MovieTableModel(movies));
-				movieTableModel.initializeWith(movieTable);
+				updateMovieTableModel(movies);
 			}
 		});
 		
@@ -199,6 +217,20 @@ class Movies extends JSplitPane {
 			}
 		});
 		
+	}
+
+	private void updateMovieTableModel(Vector<MovieList.Movie> movies) {
+		movieTable.setModel(movieTableModel = new MovieTableModel(movies));
+		movieTableModel.initializeWith(movieTable);
+	}
+
+	private void reloadTreeNode(LocationTreeNode treeNode) {
+		String path = treeNode.getDirPath();
+		MovieList movieList = getMovieList(path);
+		locationsRoot.addLocations(movieList,locationsTreeModel);
+		locationsTreeModel.nodeChanged(treeNode);
+		if (treeNode==selectedTreeNode)
+			updateMovieTableModel(movieList.movies);
 	}
 
 	private void showMovie(MovieList.Movie movie) {
@@ -263,7 +295,7 @@ class Movies extends JSplitPane {
 		String baseURL = getBaseURL();
 		
 		MovieList movieList = null;
-		if (baseURL!=null) movieList = MovieList.get(baseURL,dir);
+		if (baseURL!=null) movieList = MovieList.get(mainWindow,baseURL,dir);
 		
 		return movieList;
 	}
@@ -279,8 +311,7 @@ class Movies extends JSplitPane {
 				TreePath treePath = locationsRoot.getTreePath(movieList.directory);
 				locationsTree.expandPath(treePath);
 				//locationsTree.setSelectionPath(treePath);
-				movieTable.setModel(movieTableModel = new MovieTableModel(movieList.movies));
-				movieTableModel.initializeWith(movieTable);
+				updateMovieTableModel(movieList.movies);
 			}
 		}
 	}
@@ -471,24 +502,45 @@ class Movies extends JSplitPane {
 
 	private static class MovieList {
 	
-		static MovieList get(String baseURL, String dir) {
-			String urlStr = String.format("%s/api/movielist", baseURL);
-			if (dir!=null) {
-				try { dir = URLEncoder.encode(dir, "UTF-8");
-				} catch (UnsupportedEncodingException e) { System.err.printf("Exception while converting directory name: [UnsupportedEncodingException] %s%n", e.getMessage()); }
-				urlStr = String.format("%s?dirname=%s", urlStr, dir);
-			}
-			System.out.printf("get MovieList: \"%s\"%n", urlStr);
-			
-			String content = OpenWebifController.getContent(urlStr);
-			Value<MovieList.NV, MovieList.V> result = new JSON_Parser<MovieList.NV,MovieList.V>(content,null).parse();
-			
-			try {
-				return new MovieList(result);
-			} catch (TraverseException e) {
-				System.err.printf("Exception while parsing JSON structure: %s%n", e.getMessage());
-				return null;
-			}
+		static MovieList get(Window parent, String baseURL, String dir) {
+			return ProgressDialog.runWithProgressDialog(parent, "Load MovieList", 400, pd->{
+				
+				SwingUtilities.invokeLater(()->{
+					pd.setTaskTitle("Build URL");
+					pd.setIndeterminate(true);
+				});
+				String urlStr = String.format("%s/api/movielist", baseURL);
+				String dir_ = dir;
+				if (dir_!=null) {
+					try { dir_ = URLEncoder.encode(dir_, "UTF-8");
+					} catch (UnsupportedEncodingException e) { System.err.printf("Exception while converting directory name: [UnsupportedEncodingException] %s%n", e.getMessage()); }
+					urlStr = String.format("%s?dirname=%s", urlStr, dir_);
+				}
+				System.out.printf("get MovieList: \"%s\"%n", urlStr);
+				
+				SwingUtilities.invokeLater(()->{
+					pd.setTaskTitle("Read Content from URL");
+					pd.setIndeterminate(true);
+				});
+				String content = OpenWebifController.getContent(urlStr);
+				
+				SwingUtilities.invokeLater(()->{
+					pd.setTaskTitle("Parse Content");
+					pd.setIndeterminate(true);
+				});
+				Value<MovieList.NV, MovieList.V> result = new JSON_Parser<MovieList.NV,MovieList.V>(content,null).parse();
+				
+				SwingUtilities.invokeLater(()->{
+					pd.setTaskTitle("Create MovieList");
+					pd.setIndeterminate(true);
+				});
+				try {
+					return new MovieList(result);
+				} catch (TraverseException e) {
+					System.err.printf("Exception while parsing JSON structure: %s%n", e.getMessage());
+					return null;
+				}
+			});
 		}
 	
 		static class NV extends JSON_Data.NamedValueExtra.Dummy{}
@@ -672,7 +724,7 @@ class Movies extends JSplitPane {
 
 		@Override public int getRowCount() { return movies.size(); }
 	
-		@Override public Object getValueAt(int rowIndex, int columnIndex, MovieTableModel.ColumnID columnID) {
+		@Override public Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID) {
 			MovieList.Movie value = getValue(rowIndex);
 			if (value==null) return null;
 			return columnID.getValue.apply(value);

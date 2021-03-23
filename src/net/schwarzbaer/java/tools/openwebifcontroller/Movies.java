@@ -308,8 +308,14 @@ class Movies extends JSplitPane {
 			locationsTreeModel = new DefaultTreeModel(locationsRoot, true);
 			locationsTree.setModel(locationsTreeModel);
 			if (locationsRoot!=null) {
-				TreePath treePath = locationsRoot.getTreePath(movieList.directory);
-				locationsTree.expandPath(treePath);
+				selectedTreePath = locationsRoot.getTreePath(movieList.directory);
+				selectedTreeNode = null;
+				locationsTree.expandPath(selectedTreePath);
+				if (selectedTreePath!=null) {
+					Object obj = selectedTreePath.getLastPathComponent();
+					if (obj instanceof LocationTreeNode)
+						selectedTreeNode = (LocationTreeNode) obj;
+				}
 				//locationsTree.setSelectionPath(treePath);
 				updateMovieTableModel(movieList.movies);
 			}
@@ -569,13 +575,15 @@ class Movies extends JSplitPane {
 			String debugOutputPrefixStr = "MovieList";
 			JSON_Object<MovieList.NV, MovieList.V> object = JSON_Data.getObjectValue(result, debugOutputPrefixStr);
 			
-			directory = JSON_Data.getStringValue(object, "directory", debugOutputPrefixStr);
+			directory = OpenWebifController.decodeUnicode( JSON_Data.getStringValue(object, "directory", debugOutputPrefixStr) );
 			JSON_Array<MovieList.NV, MovieList.V> bookmarks = JSON_Data.getArrayValue(object, "bookmarks", debugOutputPrefixStr);
 			JSON_Array<MovieList.NV, MovieList.V> movies    = JSON_Data.getArrayValue(object, "movies", debugOutputPrefixStr);
 			
 			this.bookmarks = new Vector<>();
-			for (int i=0; i<bookmarks.size(); i++)
-				this.bookmarks.add(JSON_Data.getStringValue(bookmarks.get(i), debugOutputPrefixStr+".bookmarks["+i+"]"));
+			for (int i=0; i<bookmarks.size(); i++) {
+				String str = JSON_Data.getStringValue(bookmarks.get(i), debugOutputPrefixStr+".bookmarks["+i+"]");
+				this.bookmarks.add( OpenWebifController.decodeUnicode( str ) );
+			}
 			
 			this.movies = new Vector<>();
 			for (int i=0; i<movies.size(); i++)

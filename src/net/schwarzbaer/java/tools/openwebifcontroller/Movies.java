@@ -61,7 +61,8 @@ class Movies extends JSplitPane {
 	
 	private final JTree locationsTree;
 	private final JTable movieTable;
-	private final JTextArea movieInfo;
+	private final JTextArea movieInfo1;
+	private final JTextArea movieInfo2;
 	private Movies.LocationTreeNode locationsRoot;
 	private TreePath selectedTreePath;
 	private Movies.LocationTreeNode selectedTreeNode;
@@ -116,16 +117,27 @@ class Movies extends JSplitPane {
 		});
 		
 		
-		movieInfo = new JTextArea();
-		movieInfo.setEditable(false);
-		movieInfo.setLineWrap(true);
-		movieInfo.setWrapStyleWord(true);
-		JScrollPane movieInfoScrollPane = new JScrollPane(movieInfo);
-		movieInfoScrollPane.setPreferredSize(new Dimension(400,500));
+		movieInfo1 = new JTextArea();
+		movieInfo1.setEditable(false);
+		//movieInfo1.setLineWrap(true);
+		//movieInfo1.setWrapStyleWord(true);
+		JScrollPane movieInfo1ScrollPane = new JScrollPane(movieInfo1);
+		movieInfo1ScrollPane.setPreferredSize(new Dimension(400,330));
+		
+		movieInfo2 = new JTextArea();
+		movieInfo2.setEditable(false);
+		movieInfo2.setLineWrap(true);
+		movieInfo2.setWrapStyleWord(true);
+		JScrollPane movieInfo2ScrollPane = new JScrollPane(movieInfo2);
+		movieInfo2ScrollPane.setPreferredSize(new Dimension(400,300));
+		
+		JPanel movieInfoPanel = new JPanel(new BorderLayout(3,3));
+		movieInfoPanel.add(movieInfo1ScrollPane,BorderLayout.NORTH);
+		movieInfoPanel.add(movieInfo2ScrollPane,BorderLayout.CENTER);
 		
 		JPanel rightPanel = new JPanel(new BorderLayout(3,3));
 		rightPanel.add(tableScrollPane,BorderLayout.CENTER);
-		rightPanel.add(movieInfoScrollPane,BorderLayout.EAST);
+		rightPanel.add(movieInfoPanel,BorderLayout.EAST);
 		
 		setLeftComponent(treeScrollPane);
 		setRightComponent(rightPanel);
@@ -199,7 +211,8 @@ class Movies extends JSplitPane {
 
 	private void showValues(MovieList.Movie movie) {
 		if (movie==null) {
-			movieInfo.setText("");
+			movieInfo1.setText("");
+			movieInfo2.setText("");
 			return;
 		}
 		
@@ -210,6 +223,7 @@ class Movies extends JSplitPane {
 		out.add(0, null                 , movie.length_s           );
 		out.add(0, "begintime          ", movie.begintime          );
 		out.add(0, "recordingtime      ", movie.recordingtime      );
+		out.add(0, null                 , "%s", dtFormatter.getTimeStr(movie.recordingtime*1000, true, true, false, true, false) );
 		out.add(0, "lastseen           ", movie.lastseen           );
 		out.add(0, "filesize           ", movie.filesize           );
 		out.add(0, "filesize_readable  ", movie.filesize_readable  );
@@ -218,9 +232,12 @@ class Movies extends JSplitPane {
 		out.add(0, "filename_stripped  ", movie.filename_stripped  );
 		out.add(0, "fullname           ", movie.fullname           );
 		out.add(0, "serviceref         ", movie.serviceref         );
-		out.add(0, "description        ", movie.description        );
-		out.add(0, "descriptionExtended", movie.descriptionExtended);
-		movieInfo.setText(out.generateOutput());
+		movieInfo1.setText(out.generateOutput());
+		
+		StringBuilder sb = new StringBuilder();
+		sb.append("description:\r\n").append(movie.description.replace(""+((char)0x8a), "\r\n")).append("\r\n");
+		sb.append("\r\nextended description:\r\n").append(movie.descriptionExtended.replace(""+((char)0x8a), "\r\n")).append("\r\n");
+		movieInfo2.setText(sb.toString());
 	}
 
 	private Movies.MovieList getMovieList(String dir) {

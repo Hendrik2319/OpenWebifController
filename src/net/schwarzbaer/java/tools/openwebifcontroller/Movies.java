@@ -17,6 +17,7 @@ import java.util.function.Function;
 
 import javax.swing.Icon;
 import javax.swing.JFileChooser;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -28,6 +29,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
@@ -63,10 +65,10 @@ class Movies extends JSplitPane {
 	private final JTable movieTable;
 	private final JTextArea movieInfo1;
 	private final JTextArea movieInfo2;
-	private Movies.LocationTreeNode locationsRoot;
+	private LocationTreeNode locationsRoot;
 	private TreePath selectedTreePath;
-	private Movies.LocationTreeNode selectedTreeNode;
-	private Movies.MovieTableModel movieTableModel;
+	private LocationTreeNode selectedTreeNode;
+	private MovieTableModel movieTableModel;
 	private DefaultTreeModel locationsTreeModel;
 	@SuppressWarnings("unused")
 	private MovieList.Movie clickedMovie;
@@ -85,6 +87,7 @@ class Movies extends JSplitPane {
 		
 		locationsTree = new JTree(locationsTreeModel);
 		locationsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+		locationsTree.setCellRenderer(new LocationTreeCellRenderer());
 		
 		JScrollPane treeScrollPane = new JScrollPane(locationsTree);
 		treeScrollPane.setPreferredSize(new Dimension(300,500));
@@ -94,7 +97,15 @@ class Movies extends JSplitPane {
 		JScrollPane tableScrollPane = new JScrollPane(movieTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
+		JMenuItem miReloadTable;
 		ContextMenu contextMenu = new ContextMenu();
+		contextMenu.add(miReloadTable = OpenWebifController.createMenuItem("Reload Table", e->{
+			String path = selectedTreeNode.getDirPath();
+			MovieList movieList = getMovieList(path);
+			locationsRoot.addLocations(movieList,locationsTreeModel);
+			movieTable.setModel(movieTableModel = new MovieTableModel(movieList.movies));
+			movieTableModel.initializeWith(movieTable);
+		}));
 		contextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 			TableColumnModel columnModel = movieTable.getColumnModel();
 			if (columnModel==null) return;
@@ -114,6 +125,8 @@ class Movies extends JSplitPane {
 			int rowM = movieTable.convertRowIndexToModel(rowV);
 			if (movieTableModel!=null)
 				clickedMovie = movieTableModel.getValue(rowM);
+			
+			miReloadTable.setEnabled(selectedTreeNode!=null);
 		});
 		
 		
@@ -148,14 +161,20 @@ class Movies extends JSplitPane {
 			selectedTreeNode = null;
 			if (selectedTreePath!=null) {
 				Object lastPathComponent = selectedTreePath.getLastPathComponent();
-				if (lastPathComponent instanceof Movies.LocationTreeNode)
-					selectedTreeNode = (Movies.LocationTreeNode) lastPathComponent;
+				if (lastPathComponent instanceof LocationTreeNode)
+					selectedTreeNode = (LocationTreeNode) lastPathComponent;
 			}
 			if (selectedTreeNode!=null) {
-				String path = selectedTreeNode.getDirPath();
-				Movies.MovieList movieList = getMovieList(path);
-				locationsRoot.addLocations(movieList.directory,movieList.bookmarks,locationsTreeModel);
-				movieTable.setModel(movieTableModel = new MovieTableModel(movieList.movies));
+				Vector<MovieList.Movie> movies;
+				if (selectedTreeNode.movies != null)
+					movies = selectedTreeNode.movies;
+				else {
+					String path = selectedTreeNode.getDirPath();
+					MovieList movieList = getMovieList(path);
+					locationsRoot.addLocations(movieList,locationsTreeModel);
+					movies = movieList.movies;
+				}
+				movieTable.setModel(movieTableModel = new MovieTableModel(movies));
 				movieTableModel.initializeWith(movieTable);
 			}
 		});
@@ -240,20 +259,20 @@ class Movies extends JSplitPane {
 		movieInfo2.setText(sb.toString());
 	}
 
-	private Movies.MovieList getMovieList(String dir) {
+	private MovieList getMovieList(String dir) {
 		String baseURL = getBaseURL();
 		
-		Movies.MovieList movieList = null;
+		MovieList movieList = null;
 		if (baseURL!=null) movieList = MovieList.get(baseURL,dir);
 		
 		return movieList;
 	}
 
 	void readInitialList() {
-		Movies.MovieList movieList = getMovieList(null);
+		MovieList movieList = getMovieList(null);
 		
 		if (movieList!=null) {
-			locationsRoot = LocationTreeNode.create(movieList.directory,movieList.bookmarks);
+			locationsRoot = LocationTreeNode.create(movieList);
 			locationsTreeModel = new DefaultTreeModel(locationsRoot, true);
 			locationsTree.setModel(locationsTreeModel);
 			if (locationsRoot!=null) {
@@ -299,45 +318,75 @@ class Movies extends JSplitPane {
 		}
 		return videoPlayer;
 	}
+	
+	private static class LocationTreeCellRenderer extends DefaultTreeCellRenderer {
+		private static final long serialVersionUID = 5786063818778166574L;
+
+		@Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus) {
+			Component comp = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+			
+			if (value instanceof LocationTreeNode) {
+				LocationTreeNode treeNode = (LocationTreeNode) value;
+				if (treeNode.movies==null) setIcon(TreeIcons.Folder     .getIcon());
+				else                       setIcon(TreeIcons.KnownFolder.getIcon());
+			}
+			
+			return comp;
+		}
+		
+	}
 
 	private static class LocationTreeNode implements TreeNode {
 	
-		private final Movies.LocationTreeNode parent;
+		private final LocationTreeNode parent;
 		private final String name;
-		private final Vector<Movies.LocationTreeNode> children;
+		private final Vector<LocationTreeNode> children;
+		private Vector<MovieList.Movie> movies;
 	
-		static Movies.LocationTreeNode create(String path, Vector<String> children) {
+		LocationTreeNode(LocationTreeNode parent, String name) {
+			this.parent = parent;
+			this.name = name;
+			this.children = new Vector<>();
+			this.movies = null;
+		}
+
+		public static LocationTreeNode create(MovieList movieList) {
+			if (movieList==null) return null;
+			
 			// path: /media/hdd/movie-storage/_unsortiert/
-			String[] names = splitToNames(path);
+			String[] names = splitToNames(movieList.directory);
 			if (names==null) return null;
 			
-			Movies.LocationTreeNode root = new LocationTreeNode(null,names[0]);
-			Movies.LocationTreeNode p = root;
+			LocationTreeNode root = new LocationTreeNode(null,names[0]);
+			LocationTreeNode p = root;
 			for (int i=1; i<names.length; i++) {
-				Movies.LocationTreeNode newNode = new LocationTreeNode(p,names[i]);
+				LocationTreeNode newNode = new LocationTreeNode(p,names[i]);
 				p.addChild(newNode);
 				p = newNode;
 			}
 			
-			if (children!=null)
-				for (String childName:children) {
-					Movies.LocationTreeNode newNode = new LocationTreeNode(p,childName);
+			p.movies = movieList.movies;
+			if (movieList.bookmarks!=null)
+				for (String childName:movieList.bookmarks) {
+					LocationTreeNode newNode = new LocationTreeNode(p,childName);
 					p.addChild(newNode);
 				}
 			
 			return root;
 		}
 	
-		public void addLocations(String path, Vector<String> children, DefaultTreeModel treeModel) {
-			String[] names = splitToNames(path);
+		public void addLocations(MovieList movieList, DefaultTreeModel treeModel) {
+			if (movieList==null) return;
+			
+			String[] names = splitToNames(movieList.directory);
 			if (names==null) return;
 			
 			if (!name.equals(names[0])) return;
-			Movies.LocationTreeNode node = this;
+			LocationTreeNode node = this;
 			
 			for (int i=1; i<names.length; i++) {
 				String name = names[i];
-				Movies.LocationTreeNode childNode = node.getChild(name);
+				LocationTreeNode childNode = node.getChild(name);
 				if (childNode==null) {
 					childNode = new LocationTreeNode(node, name);
 					int index = node.addChild(childNode);
@@ -346,11 +395,13 @@ class Movies extends JSplitPane {
 				node = childNode;
 			}
 			
-			if (children!=null) {
-				int[] newIndexes = new int[children.size()];
+			node.movies = movieList.movies;
+			
+			if (movieList.bookmarks!=null) {
+				int[] newIndexes = new int[movieList.bookmarks.size()];
 				int i=0;
-				for (String childName:children) {
-					Movies.LocationTreeNode childNode = node.getChild(childName);
+				for (String childName:movieList.bookmarks) {
+					LocationTreeNode childNode = node.getChild(childName);
 					if (childNode==null) {
 						childNode = new LocationTreeNode(node, childName);
 						newIndexes[i] = node.addChild(childNode);
@@ -375,19 +426,13 @@ class Movies extends JSplitPane {
 			return path.split("/");
 		}
 		
-		LocationTreeNode(Movies.LocationTreeNode parent, String name) {
-			this.parent = parent;
-			this.name = name;
-			this.children = new Vector<>();
-		}
-	
 		@Override public String toString() { return name; }
 		
 		public TreePath getTreePath(String path) {
 			String[] names = splitToNames(path);
 			if (names==null) return null;
 			
-			Movies.LocationTreeNode node = this;
+			LocationTreeNode node = this;
 			if (!name.equals(names[0])) return null;
 			
 			TreePath treePath = new TreePath(this);
@@ -401,14 +446,14 @@ class Movies extends JSplitPane {
 			return treePath;
 		}
 	
-		private int addChild(Movies.LocationTreeNode child) {
+		private int addChild(LocationTreeNode child) {
 			int index = children.size();
 			children.add(child);
 			return index;
 		}
 	
-		private Movies.LocationTreeNode getChild(String name) {
-			for (Movies.LocationTreeNode child:children)
+		private LocationTreeNode getChild(String name) {
+			for (LocationTreeNode child:children)
 				if (child.name.equals(name))
 					return child;
 			return null;
@@ -426,7 +471,7 @@ class Movies extends JSplitPane {
 
 	private static class MovieList {
 	
-		static Movies.MovieList get(String baseURL, String dir) {
+		static MovieList get(String baseURL, String dir) {
 			String urlStr = String.format("%s/api/movielist", baseURL);
 			if (dir!=null) {
 				try { dir = URLEncoder.encode(dir, "UTF-8");

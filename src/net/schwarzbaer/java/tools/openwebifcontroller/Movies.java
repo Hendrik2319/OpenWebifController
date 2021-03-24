@@ -17,9 +17,7 @@ import java.util.Vector;
 import java.util.function.Function;
 
 import javax.swing.Icon;
-import javax.swing.JFileChooser;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -27,7 +25,6 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
@@ -40,7 +37,6 @@ import javax.swing.tree.TreeSelectionModel;
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
-import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.gui.ValueListOutput;
@@ -50,7 +46,6 @@ import net.schwarzbaer.java.lib.jsonparser.JSON_Data.JSON_Object;
 import net.schwarzbaer.java.lib.jsonparser.JSON_Data.TraverseException;
 import net.schwarzbaer.java.lib.jsonparser.JSON_Data.Value;
 import net.schwarzbaer.java.lib.jsonparser.JSON_Parser;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings;
 import net.schwarzbaer.system.DateTimeFormatter;
 
 class Movies extends JSplitPane {
@@ -63,28 +58,27 @@ class Movies extends JSplitPane {
 		Folder, KnownFolder;
 		Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
 	}
+
+	private final OpenWebifController main;
 	
 	private final JTree locationsTree;
 	private final JTable movieTable;
 	private final JTextArea movieInfo1;
 	private final JTextArea movieInfo2;
+	
 	private LocationTreeNode locationsRoot;
-	private TreePath selectedTreePath;
-	private LocationTreeNode selectedTreeNode;
-	private MovieTableModel movieTableModel;
 	private DefaultTreeModel locationsTreeModel;
-	@SuppressWarnings("unused")
+	private MovieTableModel movieTableModel;
+
+	private TreePath selectedTreePath;
+	private TreePath clickedTreePath;
+	private LocationTreeNode selectedTreeNode;
+	private LocationTreeNode clickedTreeNode;
 	private MovieList.Movie clickedMovie;
 
-	private StandardMainWindow mainWindow;
-
-	private TreePath clickedTreePath;
-
-	private LocationTreeNode clickedTreeNode;
-	
-	Movies(StandardMainWindow mainWindow) {
+	Movies(OpenWebifController main) {
 		
-		this.mainWindow = mainWindow;
+		this.main = main;
 		locationsRoot = null;
 		locationsTreeModel = null;
 		selectedTreePath = null;
@@ -105,8 +99,11 @@ class Movies extends JSplitPane {
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
 		
-		JMenuItem miReloadTable1;
+		JMenuItem miReloadTable1, miOpenVideoPlayer, miOpenBrowser;
 		ContextMenu tableContextMenu = new ContextMenu();
+		tableContextMenu.add(miOpenVideoPlayer = OpenWebifController.createMenuItem("Show in VideoPlayer", e->showMovie(clickedMovie)));
+		tableContextMenu.add(miOpenBrowser     = OpenWebifController.createMenuItem("Show in Browser"    , e->showMovieInBrowser(clickedMovie)));
+		tableContextMenu.addSeparator();
 		tableContextMenu.add(miReloadTable1 = OpenWebifController.createMenuItem("Reload Table", e->reloadTreeNode(selectedTreeNode)));
 		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 			TableColumnModel columnModel = movieTable.getColumnModel();
@@ -129,6 +126,10 @@ class Movies extends JSplitPane {
 				clickedMovie = movieTableModel.getValue(rowM);
 			
 			miReloadTable1.setEnabled(selectedTreeNode!=null);
+			miOpenVideoPlayer.setEnabled(clickedMovie!=null);
+			miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer" : String.format("Show \"%s\" in VideoPlayer", clickedMovie.eventname));
+			miOpenBrowser.setEnabled(clickedMovie!=null);
+			miOpenBrowser.setText(clickedMovie==null ? "Show in Browser" : String.format("Show \"%s\" in Browser", clickedMovie.eventname));
 		});
 		
 		JMenuItem miReloadTable2;
@@ -236,10 +237,10 @@ class Movies extends JSplitPane {
 	private void showMovie(MovieList.Movie movie) {
 		if (movie==null) return;
 		
-		String baseURL = getBaseURL();
+		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
 		
-		File videoPlayer = getVideoPlayer();
+		File videoPlayer = main.getVideoPlayer();
 		if (videoPlayer==null) return;
 		
 		String movieURL = null;
@@ -255,6 +256,32 @@ class Movies extends JSplitPane {
 		try {
 			Process process = Runtime.getRuntime().exec(new String[] {"c:\\Program Files (x86)\\Java\\jre\\bin\\java.exe", "StartSomething", videoPlayer.getAbsolutePath(), url });
 			//Process process = Runtime.getRuntime().exec(new String[] { videoPlayer.getAbsolutePath(), url });
+			System.out.println(OpenWebifController.toString(process));
+		}
+		catch (IOException e) { System.err.printf("IOException while starting movie player: %s%n", e.getMessage()); }
+	}
+
+	private void showMovieInBrowser(MovieList.Movie movie) {
+		if (movie==null) return;
+		
+		String baseURL = main.getBaseURL();
+		if (baseURL==null) return;
+		
+		File browser = main.getBrowser();
+		if (browser==null) return;
+		
+		String movieURL = null;
+		try { movieURL = URLEncoder.encode(movie.filename, "UTF-8");
+		} catch (UnsupportedEncodingException e) { System.err.printf("Exception while creating movie URL: [UnsupportedEncodingException] %s%n", e.getMessage()); }
+		
+		String url = baseURL+"/file?file="+movieURL;
+		
+		System.out.printf("show movie:%n");
+		System.out.printf("   browser : \"%s\"%n", browser.getAbsolutePath());
+		System.out.printf("   url     : \"%s\"%n", url);
+		
+		try {
+			Process process = Runtime.getRuntime().exec(new String[] { browser.getAbsolutePath(), url });
 			System.out.println(OpenWebifController.toString(process));
 		}
 		catch (IOException e) { System.err.printf("IOException while starting movie player: %s%n", e.getMessage()); }
@@ -292,10 +319,10 @@ class Movies extends JSplitPane {
 	}
 
 	private MovieList getMovieList(String dir) {
-		String baseURL = getBaseURL();
+		String baseURL = main.getBaseURL();
 		
 		MovieList movieList = null;
-		if (baseURL!=null) movieList = MovieList.get(mainWindow,baseURL,dir);
+		if (baseURL!=null) movieList = MovieList.get(main.mainWindow,baseURL,dir);
 		
 		return movieList;
 	}
@@ -320,40 +347,6 @@ class Movies extends JSplitPane {
 				updateMovieTableModel(movieList.movies);
 			}
 		}
-	}
-
-	private String getBaseURL() {
-		if (!OpenWebifController.settings.contains(AppSettings.ValueKey.BaseURL))
-			return askUserForBaseURL();
-		return OpenWebifController.settings.getString(AppSettings.ValueKey.BaseURL, null);
-	}
-
-	String askUserForBaseURL() {
-		String baseURL = JOptionPane.showInputDialog(mainWindow, "Set BaseURL:", "Set BaseURL", JOptionPane.QUESTION_MESSAGE);
-		if (baseURL!=null)
-			OpenWebifController.settings.putString(AppSettings.ValueKey.BaseURL, baseURL);
-		return baseURL;
-	}
-
-	private File getVideoPlayer() {
-		if (!OpenWebifController.settings.contains(AppSettings.ValueKey.VideoPlayer))
-			return askUserForVideoPlayer();
-		return OpenWebifController.settings.getFile(AppSettings.ValueKey.VideoPlayer, null);
-	}
-
-	File askUserForVideoPlayer() {
-		JFileChooser exeFileChooser = new JFileChooser("./");
-		exeFileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-		exeFileChooser.setMultiSelectionEnabled(false);
-		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
-		exeFileChooser.setDialogTitle("Select VideoPlayer");
-	
-		File videoPlayer = null;
-		if (exeFileChooser.showOpenDialog(mainWindow)==JFileChooser.APPROVE_OPTION) {
-			videoPlayer = exeFileChooser.getSelectedFile();
-			OpenWebifController.settings.putFile(AppSettings.ValueKey.VideoPlayer, videoPlayer);
-		}
-		return videoPlayer;
 	}
 	
 	private static class LocationTreeCellRenderer extends DefaultTreeCellRenderer {
@@ -509,7 +502,7 @@ class Movies extends JSplitPane {
 	private static class MovieList {
 	
 		static MovieList get(Window parent, String baseURL, String dir) {
-			return ProgressDialog.runWithProgressDialog(parent, "Load MovieList", 400, pd->{
+			return ProgressDialog.runWithProgressDialogRV(parent, "Load MovieList", 400, pd->{
 				
 				SwingUtilities.invokeLater(()->{
 					pd.setTaskTitle("Build URL");

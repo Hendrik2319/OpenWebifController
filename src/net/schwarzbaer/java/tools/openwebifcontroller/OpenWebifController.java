@@ -13,12 +13,15 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 
+import javax.swing.JFileChooser;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JTabbedPane;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
@@ -39,7 +42,7 @@ public class OpenWebifController {
 	
 	static class AppSettings extends Settings<AppSettings.ValueGroup,AppSettings.ValueKey> {
 		enum ValueKey {
-			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL,
+			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {
@@ -61,26 +64,35 @@ public class OpenWebifController {
 		
 	}
 
-	private final StandardMainWindow mainWindow;
+	final StandardMainWindow mainWindow;
 	private final Movies movies;
+	private final JFileChooser exeFileChooser;
 
 	OpenWebifController() {
+		exeFileChooser = new JFileChooser("./");
+		exeFileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+		exeFileChooser.setMultiSelectionEnabled(false);
+		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
 		
 		mainWindow = new StandardMainWindow("OpenWebif Controller");
-		movies = new Movies(mainWindow);
+		movies = new Movies(this);
 		
 		JTabbedPane contentPane = new JTabbedPane();
 		contentPane.addTab("Movies", movies);
 		
 		JMenuBar menuBar = new JMenuBar();
 		JMenu settingsMenu = menuBar.add(createMenu("Settings"));
+		
 		settingsMenu.add(createMenuItem("Set Path to VideoPlayer", e->{
-			File videoPlayer = movies.askUserForVideoPlayer();
-			if (videoPlayer!=null)
-				System.out.printf("Set VideoPlayer to \"%s\"%n", videoPlayer.getAbsolutePath());
+			File file = askUserForVideoPlayer();
+			if (file!=null) System.out.printf("Set VideoPlayer to \"%s\"%n", file.getAbsolutePath());
+		}));
+		settingsMenu.add(createMenuItem("Set Path to Browser", e->{
+			File file = askUserForBrowser();
+			if (file!=null) System.out.printf("Set VideoPlayer to \"%s\"%n", file.getAbsolutePath());
 		}));
 		settingsMenu.add(createMenuItem("Set Base URL", e->{
-			String baseURL = movies.askUserForBaseURL();
+			String baseURL = askUserForBaseURL();
 			if (baseURL!=null)
 				System.out.printf("Set Base URL to \"%s\"%n", baseURL);
 		}));
@@ -165,5 +177,40 @@ public class OpenWebifController {
 		}
 		
 		return new String(storage.toByteArray());
+	}
+
+	String getBaseURL() {
+		if (!settings.contains(AppSettings.ValueKey.BaseURL))
+			return askUserForBaseURL();
+		return settings.getString(AppSettings.ValueKey.BaseURL, null);
+	}
+
+	private String askUserForBaseURL() {
+		String baseURL = JOptionPane.showInputDialog(mainWindow, "Set BaseURL:", "Set BaseURL", JOptionPane.QUESTION_MESSAGE);
+		if (baseURL!=null)
+			settings.putString(AppSettings.ValueKey.BaseURL, baseURL);
+		return baseURL;
+	}
+
+	File getVideoPlayer() { return getExecutable(AppSettings.ValueKey.VideoPlayer, "Select VideoPlayer"); }
+	File getBrowser    () { return getExecutable(AppSettings.ValueKey.Browser    , "Select Browser"    ); }
+	private File askUserForVideoPlayer() { return askUserForExecutable(AppSettings.ValueKey.VideoPlayer, "Select VideoPlayer"); }
+	private File askUserForBrowser    () { return askUserForExecutable(AppSettings.ValueKey.Browser    , "Select Browser"    ); }
+
+	private File getExecutable(AppSettings.ValueKey valueKey, String dialogTitle) {
+		if (!settings.contains(valueKey))
+			return askUserForExecutable(valueKey, dialogTitle);
+		return settings.getFile(valueKey, null);
+	}
+
+	private File askUserForExecutable(AppSettings.ValueKey valueKey, String dialogTitle) {
+		exeFileChooser.setDialogTitle(dialogTitle);
+	
+		File executable = null;
+		if (exeFileChooser.showOpenDialog(mainWindow)==JFileChooser.APPROVE_OPTION) {
+			executable = exeFileChooser.getSelectedFile();
+			settings.putFile(valueKey, executable);
+		}
+		return executable;
 	}
 }

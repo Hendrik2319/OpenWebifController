@@ -4,13 +4,10 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
-import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Vector;
@@ -40,6 +37,9 @@ import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.openwebif.MovieList;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MovieListReadInterface;
 import net.schwarzbaer.system.DateTimeFormatter;
 
 class Movies extends JSplitPane {
@@ -237,11 +237,7 @@ class Movies extends JSplitPane {
 		File videoPlayer = main.getVideoPlayer();
 		if (videoPlayer==null) return;
 		
-		String movieURL = null;
-		try { movieURL = URLEncoder.encode(movie.filename, "UTF-8");
-		} catch (UnsupportedEncodingException e) { System.err.printf("Exception while creating movie URL: [UnsupportedEncodingException] %s%n", e.getMessage()); }
-		
-		String url = baseURL+"/file?file="+movieURL;
+		String url = OpenWebifTools.getMovieURL(baseURL, movie);
 		
 		System.out.printf("show movie:%n");
 		System.out.printf("   videoPlayer : \"%s\"%n", videoPlayer.getAbsolutePath());
@@ -264,11 +260,7 @@ class Movies extends JSplitPane {
 		File browser = main.getBrowser();
 		if (browser==null) return;
 		
-		String movieURL = null;
-		try { movieURL = URLEncoder.encode(movie.filename, "UTF-8");
-		} catch (UnsupportedEncodingException e) { System.err.printf("Exception while creating movie URL: [UnsupportedEncodingException] %s%n", e.getMessage()); }
-		
-		String url = baseURL+"/file?file="+movieURL;
+		String url = OpenWebifTools.getMovieURL(baseURL, movie);
 		
 		System.out.printf("show movie:%n");
 		System.out.printf("   browser : \"%s\"%n", browser.getAbsolutePath());
@@ -314,11 +306,19 @@ class Movies extends JSplitPane {
 
 	private MovieList getMovieList(String dir) {
 		String baseURL = main.getBaseURL();
+		if (baseURL==null) return null;
 		
-		MovieList movieList = null;
-		if (baseURL!=null) movieList = getMovieList(main.mainWindow,baseURL,dir);
-		
-		return movieList;
+		return ProgressDialog.runWithProgressDialogRV(main.mainWindow, "Load MovieList", 400, pd->{
+			return OpenWebifTools.readMovieList(baseURL, dir, new MovieListReadInterface() {
+				@Override public void setIndeterminateProgressTask(String taskTitle) {
+					SwingUtilities.invokeLater(()->{
+						pd.setTaskTitle(taskTitle);
+						pd.setIndeterminate(true);
+					});
+				}
+				
+			});
+		});
 	}
 
 	void readInitialList() {
@@ -493,26 +493,6 @@ class Movies extends JSplitPane {
 		@Override public Enumeration children() { return children.elements(); }
 	}
 
-	static MovieList getMovieList(Window parent, String baseURL, String dir) {
-		return ProgressDialog.runWithProgressDialogRV(parent, "Load MovieList", 400, pd->{
-			return MovieList.readMovieList(baseURL, dir, new MovieList.MovieListReadInterface() {
-				@Override public void setIndeterminateProgressTask(String taskTitle) {
-					SwingUtilities.invokeLater(()->{
-						pd.setTaskTitle(taskTitle);
-						pd.setIndeterminate(true);
-					});
-				}
-				
-			});
-		});
-	}
-	
-	// TODO
-	
-	
-
-	// TODO
-	
 	static class MovieTableModel extends Tables.SimplifiedTableModel<MovieTableModel.ColumnID> {
 	
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface {

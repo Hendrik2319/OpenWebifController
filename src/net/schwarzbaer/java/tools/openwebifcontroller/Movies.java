@@ -40,12 +40,6 @@ import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.jsonparser.JSON_Data;
-import net.schwarzbaer.java.lib.jsonparser.JSON_Data.JSON_Array;
-import net.schwarzbaer.java.lib.jsonparser.JSON_Data.JSON_Object;
-import net.schwarzbaer.java.lib.jsonparser.JSON_Data.TraverseException;
-import net.schwarzbaer.java.lib.jsonparser.JSON_Data.Value;
-import net.schwarzbaer.java.lib.jsonparser.JSON_Parser;
 import net.schwarzbaer.system.DateTimeFormatter;
 
 class Movies extends JSplitPane {
@@ -322,7 +316,7 @@ class Movies extends JSplitPane {
 		String baseURL = main.getBaseURL();
 		
 		MovieList movieList = null;
-		if (baseURL!=null) movieList = MovieList.get(main.mainWindow,baseURL,dir);
+		if (baseURL!=null) movieList = getMovieList(main.mainWindow,baseURL,dir);
 		
 		return movieList;
 	}
@@ -499,177 +493,26 @@ class Movies extends JSplitPane {
 		@Override public Enumeration children() { return children.elements(); }
 	}
 
-	private static class MovieList {
-	
-		static MovieList get(Window parent, String baseURL, String dir) {
-			return ProgressDialog.runWithProgressDialogRV(parent, "Load MovieList", 400, pd->{
-				
-				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle("Build URL");
-					pd.setIndeterminate(true);
-				});
-				String urlStr = String.format("%s/api/movielist", baseURL);
-				String dir_ = dir;
-				if (dir_!=null) {
-					try { dir_ = URLEncoder.encode(dir_, "UTF-8");
-					} catch (UnsupportedEncodingException e) { System.err.printf("Exception while converting directory name: [UnsupportedEncodingException] %s%n", e.getMessage()); }
-					urlStr = String.format("%s?dirname=%s", urlStr, dir_);
+	static MovieList getMovieList(Window parent, String baseURL, String dir) {
+		return ProgressDialog.runWithProgressDialogRV(parent, "Load MovieList", 400, pd->{
+			return MovieList.readMovieList(baseURL, dir, new MovieList.MovieListReadInterface() {
+				@Override public void setIndeterminateProgressTask(String taskTitle) {
+					SwingUtilities.invokeLater(()->{
+						pd.setTaskTitle(taskTitle);
+						pd.setIndeterminate(true);
+					});
 				}
-				System.out.printf("get MovieList: \"%s\"%n", urlStr);
 				
-				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle("Read Content from URL");
-					pd.setIndeterminate(true);
-				});
-				String content = OpenWebifController.getContent(urlStr);
-				
-				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle("Parse Content");
-					pd.setIndeterminate(true);
-				});
-				Value<MovieList.NV, MovieList.V> result = new JSON_Parser<MovieList.NV,MovieList.V>(content,null).parse();
-				
-				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle("Create MovieList");
-					pd.setIndeterminate(true);
-				});
-				try {
-					return new MovieList(result);
-				} catch (TraverseException e) {
-					System.err.printf("Exception while parsing JSON structure: %s%n", e.getMessage());
-					return null;
-				}
 			});
-		}
-	
-		static class NV extends JSON_Data.NamedValueExtra.Dummy{}
-		static class V extends JSON_Data.ValueExtra.Dummy{}
-		
-		/*
-		    Block "MovieList" [0]
-		        <Base>:Object
-		    Block "MovieList.<Base>" [3]
-		        bookmarks:Array
-		        bookmarks[]:String
-		        directory:String
-		        movies:Array
-		        movies[]:Object
-		 */
-	
-		final String directory;
-		final Vector<String> bookmarks;
-		final Vector<MovieList.Movie> movies;
-		
-		public MovieList(Value<MovieList.NV, MovieList.V> result) throws TraverseException {
-			//JSON_Helper.OptionalValues<NV, V> optionalValueScan = new JSON_Helper.OptionalValues<NV,V>();
-			//optionalValueScan.scan(result, "MovieList");
-			//optionalValueScan.show(System.out);
-			
-			String debugOutputPrefixStr = "MovieList";
-			JSON_Object<MovieList.NV, MovieList.V> object = JSON_Data.getObjectValue(result, debugOutputPrefixStr);
-			
-			directory = OpenWebifController.decodeUnicode( JSON_Data.getStringValue(object, "directory", debugOutputPrefixStr) );
-			JSON_Array<MovieList.NV, MovieList.V> bookmarks = JSON_Data.getArrayValue(object, "bookmarks", debugOutputPrefixStr);
-			JSON_Array<MovieList.NV, MovieList.V> movies    = JSON_Data.getArrayValue(object, "movies", debugOutputPrefixStr);
-			
-			this.bookmarks = new Vector<>();
-			for (int i=0; i<bookmarks.size(); i++) {
-				String str = JSON_Data.getStringValue(bookmarks.get(i), debugOutputPrefixStr+".bookmarks["+i+"]");
-				this.bookmarks.add( OpenWebifController.decodeUnicode( str ) );
-			}
-			
-			this.movies = new Vector<>();
-			for (int i=0; i<movies.size(); i++)
-				this.movies.add(new Movie(movies.get(i), debugOutputPrefixStr+".movies["+i+"]"));
-		}
-		
-		private static class Movie {
-			final String begintime;
-			final String description;
-			final String descriptionExtended;
-			final String eventname;
-			final String filename;
-			final String filename_stripped;
-			final long filesize;
-			final String filesize_readable;
-			final String fullname;
-			final long lastseen;
-			final String lengthStr;
-			final long recordingtime;
-			final String servicename;
-			final String serviceref;
-			final String tags;
-			final Integer length_s;
-	
-			/*		
-			    Block "MovieList.<Base>.movies[]" [15]
-			        begintime:String
-			        description:String
-			        descriptionExtended:String
-			        eventname:String
-			        filename:String
-			        filename_stripped:String
-			        filesize:Integer
-			        filesize_readable:String
-			        fullname:String
-			        lastseen:Integer
-			        length:String
-			        recordingtime:Integer
-			        servicename:String
-			        serviceref:String
-			        tags:String
-			 */
-	
-			public Movie(Value<MovieList.NV, MovieList.V> value, String debugOutputPrefixStr) throws TraverseException {
-				JSON_Object<MovieList.NV, MovieList.V> object = JSON_Data.getObjectValue(value, debugOutputPrefixStr);
-				
-				begintime           = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "begintime"          , debugOutputPrefixStr) ); 
-				description         = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "description"        , debugOutputPrefixStr) );
-				descriptionExtended = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "descriptionExtended", debugOutputPrefixStr) );
-				eventname           = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "eventname"          , debugOutputPrefixStr) );
-				filename            = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "filename"           , debugOutputPrefixStr) );
-				filename_stripped   = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "filename_stripped"  , debugOutputPrefixStr) );
-				filesize            =                                    JSON_Data.getIntegerValue(object, "filesize"           , debugOutputPrefixStr)  ;
-				filesize_readable   = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "filesize_readable"  , debugOutputPrefixStr) );
-				fullname            = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "fullname"           , debugOutputPrefixStr) );
-				lastseen            =                                    JSON_Data.getIntegerValue(object, "lastseen"           , debugOutputPrefixStr)  ;
-				lengthStr           = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "length"             , debugOutputPrefixStr) );
-				recordingtime       =                                    JSON_Data.getIntegerValue(object, "recordingtime"      , debugOutputPrefixStr)  ;
-				servicename         = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "servicename"        , debugOutputPrefixStr) );
-				serviceref          = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "serviceref"         , debugOutputPrefixStr) );
-				tags                = OpenWebifController.decodeUnicode( JSON_Data.getStringValue (object, "tags"               , debugOutputPrefixStr) );
-				
-				length_s = parseLength(lengthStr);
-			}
-
-			private static Integer parseLength(String lengthStr) {
-				if (lengthStr==null) return null;
-				lengthStr = lengthStr.trim();
-				
-				int pos = lengthStr.indexOf(':');
-				if (pos<0) return parseInt(lengthStr);
-				
-				Integer min = parseInt(lengthStr.substring(0, pos));
-				Integer sec = parseInt(lengthStr.substring(pos+1));
-				if (min==null || sec==null) return null;
-				
-				int sign = min<0 ? -1 : 1;
-				return sign * (Math.abs(min)*60 + Math.abs(sec));
-			}
-
-			private static Integer parseInt(String str) {
-				str = str.trim();
-				try {
-					int n = Integer.parseInt(str);
-					String newStr = String.format("%0"+str.length()+"d", n);
-					if (newStr.equals(str)) return n;
-				} catch (NumberFormatException e) {}
-				return null;
-			}
-			
-		}
+		});
 	}
+	
+	// TODO
+	
+	
 
+	// TODO
+	
 	static class MovieTableModel extends Tables.SimplifiedTableModel<MovieTableModel.ColumnID> {
 	
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface {

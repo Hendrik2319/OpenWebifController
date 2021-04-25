@@ -6,5 +6,6 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/CommonLib_gui_essentials"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/JavaLib_JSON_Parser"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/CommonLib_Dialogs"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/JavaLib_OpenWebif"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

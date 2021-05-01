@@ -6,6 +6,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
 
 import javax.swing.Icon;
 import javax.swing.JFileChooser;
@@ -35,6 +37,19 @@ public class OpenWebifController {
 	static AppSettings settings;
 
 	public static void main(String[] args) {
+		if (args.length>0) {
+			if (args[0].equals("-start") && args.length>1) {
+				String[] parameters = Arrays.copyOfRange(args, 1, args.length);
+				System.out.printf("start something:%n");
+				System.out.printf("   parameters : %s%n", Arrays.toString(parameters));
+				
+				try { Runtime.getRuntime().exec(parameters); }
+				catch (IOException ex) { System.err.printf("IOException while starting: %s%n", ex.getMessage()); }
+				
+				return;
+			}
+		}
+		
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
 		
@@ -45,7 +60,7 @@ public class OpenWebifController {
 	
 	static class AppSettings extends Settings<AppSettings.ValueGroup,AppSettings.ValueKey> {
 		enum ValueKey {
-			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser,
+			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser, JavaVM,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {
@@ -93,6 +108,10 @@ public class OpenWebifController {
 		settingsMenu.add(createMenuItem("Set Path to VideoPlayer", e->{
 			File file = askUserForVideoPlayer();
 			if (file!=null) System.out.printf("Set VideoPlayer to \"%s\"%n", file.getAbsolutePath());
+		}));
+		settingsMenu.add(createMenuItem("Set Path to Java VM", e->{
+			File file = askUserForJavaVM();
+			if (file!=null) System.out.printf("Set Java VM to \"%s\"%n", file.getAbsolutePath());
 		}));
 		settingsMenu.add(createMenuItem("Set Path to Browser", e->{
 			File file = askUserForBrowser();
@@ -161,8 +180,10 @@ public class OpenWebifController {
 		return baseURL;
 	}
 
+	File getJavaVM     () { return getExecutable(AppSettings.ValueKey.JavaVM     , "Select Java VM"); }
 	File getVideoPlayer() { return getExecutable(AppSettings.ValueKey.VideoPlayer, "Select VideoPlayer"); }
 	File getBrowser    () { return getExecutable(AppSettings.ValueKey.Browser    , "Select Browser"    ); }
+	private File askUserForJavaVM     () { return askUserForExecutable(AppSettings.ValueKey.JavaVM     , "Select Java VM"    ); }
 	private File askUserForVideoPlayer() { return askUserForExecutable(AppSettings.ValueKey.VideoPlayer, "Select VideoPlayer"); }
 	private File askUserForBrowser    () { return askUserForExecutable(AppSettings.ValueKey.Browser    , "Select Browser"    ); }
 

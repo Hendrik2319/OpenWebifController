@@ -6,6 +6,8 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -39,7 +41,6 @@ class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
 	private static final PiconLoader PICON_LOADER = new PiconLoader();
 	
-	@SuppressWarnings("unused")
 	private final OpenWebifController main;
 	private final JTree bsTree;
 	private final JLabel statusLine;
@@ -97,9 +98,7 @@ class BouquetsNStations extends JPanel {
 		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e->{
 			// TODO
 		}));
-		treeContextMenu.add(miStreamStation = OpenWebifController.createMenuItem("Stream Station", e->{
-			// TODO
-		}));
+		treeContextMenu.add(miStreamStation = OpenWebifController.createMenuItem("Stream Station", e->streamStation(clickedStationNode.getStationID())));
 		
 		treeContextMenu.addTo(bsTree);
 		treeContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
@@ -145,6 +144,29 @@ class BouquetsNStations extends JPanel {
 	
 	void clearPiconCache() {
 		PICON_LOADER.clearPiconCache();
+	}
+
+	private void streamStation(StationID stationID) {
+		if (stationID==null) return;
+		
+		String baseURL = main.getBaseURL();
+		if (baseURL==null) return;
+		
+		File videoPlayer = main.getVideoPlayer();
+		if (videoPlayer==null) return;
+		
+		File javaVM = main.getJavaVM();
+		if (javaVM==null) return;
+		
+		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
+		
+		System.out.printf("stream station: %s%n", stationID.toIDStr());
+		System.out.printf("   java VM      : \"%s\"%n", javaVM.getAbsolutePath());
+		System.out.printf("   video player : \"%s\"%n", videoPlayer.getAbsolutePath());
+		System.out.printf("   url          : \"%s\"%n", url);
+		
+		try { Runtime.getRuntime().exec(new String[] {javaVM.getAbsolutePath(), "-jar", "OpenWebifController.jar", "-start", videoPlayer.getAbsolutePath(), url }); }
+		catch (IOException ex) { System.err.printf("IOException while starting video player: %s%n", ex.getMessage()); }
 	}
 
 	private static class PiconLoader {
@@ -387,11 +409,15 @@ class BouquetsNStations extends JPanel {
 				this.subservice = subservice;
 				//aquirePicon(); // only on demand
 			}
-			
+
 			@Override public boolean getAllowsChildren() { return subservice==null; }
 		
 			private void aquirePicon() {
-				PICON_LOADER.addTask(this,subservice.service.stationID);
+				PICON_LOADER.addTask(this,getStationID());
+			}
+
+			StationID getStationID() {
+				return subservice.service.stationID;
 			}
 		
 			private void setPicon(BufferedImage piconImage) {

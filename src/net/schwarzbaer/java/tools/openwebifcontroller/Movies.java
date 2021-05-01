@@ -230,18 +230,25 @@ class Movies extends JSplitPane {
 		File videoPlayer = main.getVideoPlayer();
 		if (videoPlayer==null) return;
 		
+		File javaVM = main.getJavaVM();
+		if (javaVM==null) return;
+		
 		String url = OpenWebifTools.getMovieURL(baseURL, movie);
 		
 		System.out.printf("show movie:%n");
-		System.out.printf("   videoPlayer : \"%s\"%n", videoPlayer.getAbsolutePath());
-		System.out.printf("   url         : \"%s\"%n", url);
+		System.out.printf("   java VM      : \"%s\"%n", javaVM.getAbsolutePath());
+		System.out.printf("   video player : \"%s\"%n", videoPlayer.getAbsolutePath());
+		System.out.printf("   url          : \"%s\"%n", url);
 		
-		try {
-			Process process = Runtime.getRuntime().exec(new String[] {"c:\\Program Files (x86)\\Java\\jre\\bin\\java.exe", "StartSomething", videoPlayer.getAbsolutePath(), url });
-			//Process process = Runtime.getRuntime().exec(new String[] { videoPlayer.getAbsolutePath(), url });
-			System.out.println(OpenWebifController.toString(process));
-		}
-		catch (IOException e) { System.err.printf("IOException while starting movie player: %s%n", e.getMessage()); }
+		try { Runtime.getRuntime().exec(new String[] {javaVM.getAbsolutePath(), "-jar", "OpenWebifController.jar", "-start", videoPlayer.getAbsolutePath(), url }); }
+		catch (IOException ex) { System.err.printf("IOException while starting video player: %s%n", ex.getMessage()); }
+		
+		//try {
+		//	Process process = Runtime.getRuntime().exec(new String[] {"c:\\Program Files (x86)\\Java\\jre\\bin\\java.exe", "StartSomething", videoPlayer.getAbsolutePath(), url });
+		//	//Process process = Runtime.getRuntime().exec(new String[] { videoPlayer.getAbsolutePath(), url });
+		//	System.out.println(OpenWebifController.toString(process));
+		//}
+		//catch (IOException e) { System.err.printf("IOException while starting movie player: %s%n", e.getMessage()); }
 	}
 
 	private void showMovieInBrowser(MovieList.Movie movie) {

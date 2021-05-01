@@ -21,6 +21,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTextArea;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -30,10 +31,13 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
+import net.schwarzbaer.gui.ImageView;
 import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.ResponseMessage;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
 
@@ -44,6 +48,8 @@ class BouquetsNStations extends JPanel {
 	private final OpenWebifController main;
 	private final JTree bsTree;
 	private final JLabel statusLine;
+	private final ImageView imageView;
+	private final JTextArea infoPanel;
 	
 	private BSTreeNode.RootNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
@@ -52,6 +58,7 @@ class BouquetsNStations extends JPanel {
 	private BSTreeNode.RootNode    clickedRootNode;
 	private BSTreeNode.BouquetNode clickedBouquetNode;
 	private BSTreeNode.StationNode clickedStationNode;
+	private TreePath selectedTreePath;
 
 	BouquetsNStations(OpenWebifController main) {
 		super(new BorderLayout());
@@ -69,11 +76,22 @@ class BouquetsNStations extends JPanel {
 		bsTree = new JTree(bsTreeModel);
 		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		bsTree.setCellRenderer(new BSTreeCellRenderer());
+		bsTree.setRowHeight(BSTreeNode.ROW_HEIGHT);
 		
 		JScrollPane treeScrollPane = new JScrollPane(bsTree);
 		treeScrollPane.setPreferredSize(new Dimension(300,500));
 		
-		JPanel rightPanel = new JPanel(new BorderLayout(3,3));
+		imageView = new ImageView(400,500);
+		imageView.setBgColor(Color.BLACK);
+		imageView.reset();
+		
+		infoPanel = new JTextArea();
+		infoPanel.setEditable(false);
+		
+		JScrollPane infoPanelScrollPane = new JScrollPane(infoPanel);
+		infoPanelScrollPane.setPreferredSize(new Dimension(400,500));
+		
+		JSplitPane rightPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,imageView,infoPanelScrollPane);
 		rightPanel.setPreferredSize(new Dimension(300,500));
 		
 		statusLine = new JLabel();
@@ -96,7 +114,10 @@ class BouquetsNStations extends JPanel {
 			}
 		}));
 		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e->{
-			// TODO
+			String baseURL = main.getBaseURL();
+			if (baseURL==null) return;
+			ResponseMessage response = OpenWebifTools.zapToStation(baseURL, clickedStationNode.getStationID());
+			if (response!=null) response.printTo(System.out);
 		}));
 		treeContextMenu.add(miStreamStation = OpenWebifController.createMenuItem("Stream Station", e->streamStation(clickedStationNode.getStationID())));
 		
@@ -120,8 +141,84 @@ class BouquetsNStations extends JPanel {
 			miSwitchToStation.setText(clickedStationNode!=null ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
 			miStreamStation  .setText(clickedStationNode!=null ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
 		});
+		
+		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+		bsTree.addTreeSelectionListener(e->{
+			selectedTreePath = bsTree.getSelectionPath();
+			showValues();
+			//if (selectedTreePath!=null) {
+			//	Object obj = clickedTreePath.getLastPathComponent();
+			//	if (obj instanceof BSTreeNode.RootNode   ) clickedRootNode    = (BSTreeNode.RootNode   ) obj;
+			//	if (obj instanceof BSTreeNode.BouquetNode) clickedBouquetNode = (BSTreeNode.BouquetNode) obj;
+			//	if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
+			//}
+		});
 	}
 	
+	private void showValues() {
+		if (selectedTreePath != null) {
+			Object obj = selectedTreePath.getLastPathComponent();
+			
+			if (obj instanceof BSTreeNode.RootNode) {
+				BSTreeNode.RootNode rootNode = (BSTreeNode.RootNode) obj;
+				
+				imageView.setImage(null);
+				imageView.reset();
+				
+				ValueListOutput out = new ValueListOutput();
+				out.add(0, "Bouquets", rootNode.bouquetData.bouquets.size());
+				
+				infoPanel.setText(out.generateOutput());
+				return;
+			}
+			
+			if (obj instanceof BSTreeNode.BouquetNode) {
+				BSTreeNode.BouquetNode bouquetNode = (BSTreeNode.BouquetNode) obj;
+				
+				imageView.setImage(null);
+				imageView.reset();
+				
+				ValueListOutput out = new ValueListOutput();
+				out.add(0, "Name"             , bouquetNode.bouquet.name);
+				out.add(0, "Service Reference", bouquetNode.bouquet.servicereference);
+				out.add(0, "SubServices"      , bouquetNode.bouquet.subservices.size());
+				
+				infoPanel.setText(out.generateOutput());
+				return;
+			}
+			
+			if (obj instanceof BSTreeNode.StationNode) {
+				BSTreeNode.StationNode stationNode = (BSTreeNode.StationNode) obj;
+				
+				imageView.setImage(stationNode.piconImage);
+				imageView.reset();
+				
+				ValueListOutput out = new ValueListOutput();
+				out.add(0, "Name"             , stationNode.subservice.name);
+				out.add(0, "Position"         , stationNode.subservice.pos);
+				out.add(0, "Program"          , stationNode.subservice.program);
+				out.add(0, "Service Reference", stationNode.subservice.servicereference);
+				
+				if (stationNode.piconImage==null)
+					out.add(0, "Picon Image", "%s", "none");
+				else
+					out.add(0, "Picon Image", "%d x %d", stationNode.piconImage.getWidth(), stationNode.piconImage.getHeight());
+				
+				if (stationNode.icon==null)
+					out.add(0, "Icon", "%s", "none");
+				else
+					out.add(0, "Icon", "%d x %d", stationNode.icon.getIconWidth(), stationNode.icon.getIconHeight());
+				
+				infoPanel.setText(out.generateOutput());
+				return;
+			}
+		}
+		
+		imageView.setImage(null);
+		imageView.reset();
+		infoPanel.setText("");
+	}
+
 	void readData(String baseURL, ProgressDialog pd) {
 		if (baseURL==null) return;
 		
@@ -186,6 +283,7 @@ class BouquetsNStations extends JPanel {
 				System.out.println("PiconLoader.start");
 				while (performTask());
 				System.out.println("PiconLoader.end");
+				SwingUtilities.invokeLater(()->statusLine.setText(" "));
 			});
 			taskThread.start();
 		}
@@ -349,6 +447,7 @@ class BouquetsNStations extends JPanel {
 	
 	private static class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implements TreeNode {
 		
+		static final int ROW_HEIGHT = 20;
 		final ParentType parent;
 		final String name;
 		final Vector<ChildType> children;
@@ -374,7 +473,6 @@ class BouquetsNStations extends JPanel {
 		
 		private static class RootNode extends BSTreeNode<RootNode, BouquetNode> {
 			
-			@SuppressWarnings("unused")
 			final BouquetData bouquetData;
 
 			RootNode(BouquetData bouquetData) {
@@ -421,8 +519,8 @@ class BouquetsNStations extends JPanel {
 			}
 		
 			private void setPicon(BufferedImage piconImage) {
-				BufferedImage picon16 = scaleImage(piconImage,16,Color.BLACK);
-				ImageIcon icon = picon16==null ? null : new ImageIcon(picon16);
+				BufferedImage scaledImage = scaleImage(piconImage,ROW_HEIGHT,Color.BLACK);
+				ImageIcon icon = scaledImage==null ? null : new ImageIcon(scaledImage);
 				setPicon(piconImage, icon);
 			}
 		

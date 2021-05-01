@@ -1,15 +1,19 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Vector;
 
+import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -26,17 +30,21 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 
-class BouquetsNStations extends JSplitPane {
+class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
 	private static final PiconLoader PICON_LOADER = new PiconLoader();
 	
+	@SuppressWarnings("unused")
 	private final OpenWebifController main;
 	private final JTree bsTree;
+	private final JLabel statusLine;
 	
 	private BSTreeNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
 
 	BouquetsNStations(OpenWebifController main) {
+		super(new BorderLayout());
+		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		this.main = main;
 		bsTreeRoot = null;
@@ -53,8 +61,13 @@ class BouquetsNStations extends JSplitPane {
 		JPanel rightPanel = new JPanel(new BorderLayout(3,3));
 		rightPanel.setPreferredSize(new Dimension(300,500));
 		
-		setLeftComponent(treeScrollPane);
-		setRightComponent(rightPanel);
+		statusLine = new JLabel();
+		statusLine.setBorder(BorderFactory.createEtchedBorder());
+		PICON_LOADER.setStatusOutput(statusLine);
+		
+		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,treeScrollPane,rightPanel);
+		add(centerPanel,BorderLayout.CENTER);
+		add(statusLine,BorderLayout.SOUTH);
 	}
 	
 	private static class PiconLoader {
@@ -64,6 +77,8 @@ class BouquetsNStations extends JSplitPane {
 		private DefaultTreeModel treeModel = null;
 		private Thread taskThread = null;
 		private String baseURL = null;
+		private final PiconCache piconCache = new PiconCache();
+		private JLabel statusLine = null;
 
 		private synchronized void startTasks() {
 			if (taskThread!=null)
@@ -77,6 +92,11 @@ class BouquetsNStations extends JSplitPane {
 		}
 
 		private boolean performTask() {
+			synchronized (this) {
+				String msg = String.format("Picon Loader : %d pending tasks, %d tree nodes to update, %d picons cached", tasks.size(), solvedTasks.size(), piconCache.size());
+				SwingUtilities.invokeLater(()->statusLine.setText(msg));
+			}
+			
 			Task task = null;
 			DefaultTreeModel localTreeModel = null;
 			synchronized (this) {
@@ -99,7 +119,7 @@ class BouquetsNStations extends JSplitPane {
 				
 			}
 			if (task!=null) {
-				task.readImage(localBaseURL);
+				task.readImage(localBaseURL, piconCache);
 				synchronized (this) { if (treeModel!=null) localTreeModel = treeModel; }
 				
 				if (localTreeModel!=null)
@@ -116,7 +136,7 @@ class BouquetsNStations extends JSplitPane {
 					taskThread = null;
 			}
 			
-			return isEverythingDone;
+			return !isEverythingDone;
 		}
 
 		synchronized void clear() {
@@ -124,6 +144,11 @@ class BouquetsNStations extends JSplitPane {
 			baseURL = null;
 			tasks.clear();
 			solvedTasks.clear();
+			piconCache.clear();
+		}
+
+		synchronized void setStatusOutput(JLabel statusLine) {
+			this.statusLine = statusLine;
 		}
 
 		synchronized void setBaseURL(String baseURL) {
@@ -140,6 +165,40 @@ class BouquetsNStations extends JSplitPane {
 			startTasks();
 		}
 		
+		@SuppressWarnings("unused")
+		private static class PiconCache {
+			
+			private final HashMap<String,CachedPicon> cache;
+			
+			PiconCache() {
+				cache = new HashMap<>();
+			}
+			int size() {
+				return cache.size();
+			}
+			void clear() {
+				cache.clear();
+			}
+			CachedPicon get(StationID stationID) {
+				return cache.get(stationID.toIDStr());
+			}
+			void put(StationID stationID, BufferedImage piconImage, ImageIcon icon) {
+				cache.put(stationID.toIDStr(), new CachedPicon(piconImage, icon));
+			}
+			
+			private static class CachedPicon {
+				final BufferedImage piconImage;
+				final ImageIcon icon;
+				CachedPicon(BufferedImage piconImage, ImageIcon icon) {
+					this.piconImage = piconImage;
+					this.icon = icon;
+				}
+				boolean isEmpty() {
+					return piconImage==null && icon==null;
+				}
+			}
+		}
+		
 		private static class Task {
 			private final BSTreeNode bsTreeNode;
 			private final StationID stationID;
@@ -149,12 +208,16 @@ class BouquetsNStations extends JSplitPane {
 				this.stationID = stationID;
 			}
 			
-			void readImage(String baseURL) {
+			void readImage(String baseURL, PiconCache piconCache) {
 				if (baseURL==null || stationID==null || bsTreeNode==null) return;
-				BufferedImage picon = OpenWebifTools.getPicon(baseURL, stationID);
-				// TODO: add image caching
-				// TODO: suppress "Can't get input stream from URL!"
-				bsTreeNode.setPicon(picon);
+				PiconCache.CachedPicon cachedPicon = piconCache.get(stationID);
+				if (cachedPicon==null) {
+					BufferedImage piconImage = OpenWebifTools.getPicon(baseURL, stationID);
+					bsTreeNode.setPicon(piconImage);
+					piconCache.put(stationID, bsTreeNode.piconImage, bsTreeNode.icon);
+				} else {
+					bsTreeNode.setPicon(cachedPicon.piconImage, cachedPicon.icon);
+				}
 			}
 			
 			void updateTreeNode(DefaultTreeModel treeModel) {
@@ -203,7 +266,7 @@ class BouquetsNStations extends JSplitPane {
 			
 			if (value instanceof BSTreeNode) {
 				BSTreeNode treeNode = (BSTreeNode) value;
-				setIcon(treeNode.picon16);
+				setIcon(treeNode.icon);
 			}
 			
 			return comp;
@@ -222,16 +285,15 @@ class BouquetsNStations extends JSplitPane {
 		private final String name;
 		private final Vector<BSTreeNode> children;
 		private final Bouquet.SubService subservice;
-		@SuppressWarnings("unused")
-		private BufferedImage picon;
-		private ImageIcon picon16;
+		private BufferedImage piconImage;
+		private ImageIcon icon;
 	
 		private BSTreeNode(BSTreeNode parent, String name, Bouquet.SubService subservice) {
 			this.parent = parent;
 			this.name = name;
 			this.subservice = subservice;
 			this.children = new Vector<>();
-			picon = null;
+			piconImage = null;
 		}
 		
 		private BSTreeNode(Vector<Bouquet> bouquets) {
@@ -248,16 +310,26 @@ class BouquetsNStations extends JSplitPane {
 
 		private BSTreeNode(BSTreeNode parent, Bouquet.SubService subservice) {
 			this(parent,!subservice.isMarker() ? String.format("[%d] %s", subservice.pos, subservice.name) : subservice.name, subservice);
+			//aquirePicon(); // only on demand
+		}
+
+		@SuppressWarnings("unused")
+		private void aquirePicon() {
 			PICON_LOADER.addTask(this,subservice.service.stationID);
 		}
 
-		private void setPicon(BufferedImage picon) {
-			this.picon = picon;
-			BufferedImage picon16 = scaleImage(picon,16);
-			this.picon16 = picon16==null ? null : new ImageIcon(picon16);
+		private void setPicon(BufferedImage piconImage) {
+			BufferedImage picon16 = scaleImage(piconImage,16,Color.BLACK);
+			ImageIcon icon = picon16==null ? null : new ImageIcon(picon16);
+			setPicon(piconImage, icon);
 		}
 
-		private BufferedImage scaleImage(BufferedImage img, int newHeight) { // TODO: set background to black
+		private void setPicon(BufferedImage piconImage, ImageIcon icon) {
+			this.piconImage = piconImage;
+			this.icon = icon;
+		}
+
+		private BufferedImage scaleImage(BufferedImage img, int newHeight, Color bgColor) {
 			if (img==null) return null;
 			int h = img.getHeight();
 			int w = img.getWidth();
@@ -265,7 +337,7 @@ class BouquetsNStations extends JSplitPane {
 			BufferedImage newImg = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
 			Graphics2D g2 = newImg.createGraphics();
 			//g2.setRenderingHint(RenderingHints., hintValue);
-			g2.drawImage(img, 0,0, newWidth,newHeight, null);
+			g2.drawImage(img, 0,0, newWidth,newHeight, bgColor, null);
 			return newImg;
 		}
 

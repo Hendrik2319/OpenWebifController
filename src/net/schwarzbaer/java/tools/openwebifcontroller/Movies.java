@@ -305,24 +305,27 @@ class Movies extends JSplitPane {
 	}
 
 	private MovieList getMovieList(String dir) {
-		String baseURL = main.getBaseURL();
-		if (baseURL==null) return null;
-		
 		return ProgressDialog.runWithProgressDialogRV(main.mainWindow, "Load MovieList", 400, pd->{
-			return OpenWebifTools.readMovieList(baseURL, dir, new MovieListReadInterface() {
-				@Override public void setIndeterminateProgressTask(String taskTitle) {
-					SwingUtilities.invokeLater(()->{
-						pd.setTaskTitle(taskTitle);
-						pd.setIndeterminate(true);
-					});
-				}
-				
-			});
+			String baseURL = main.getBaseURL();
+			return getMovieList(baseURL, dir, pd);
 		});
 	}
 
-	void readInitialList() {
-		MovieList movieList = getMovieList(null);
+	private MovieList getMovieList(String baseURL, String dir, ProgressDialog pd) {
+		if (baseURL==null) return null;
+		
+		return OpenWebifTools.readMovieList(baseURL, dir, new MovieListReadInterface() {
+			@Override public void setIndeterminateProgressTask(String taskTitle) {
+				SwingUtilities.invokeLater(()->{
+					pd.setTaskTitle(taskTitle);
+					pd.setIndeterminate(true);
+				});
+			}
+		});
+	}
+
+	void readInitialMovieList(String baseURL, ProgressDialog pd) {
+		MovieList movieList = getMovieList(baseURL, null, pd);
 		
 		if (movieList!=null) {
 			locationsRoot = LocationTreeNode.create(movieList);

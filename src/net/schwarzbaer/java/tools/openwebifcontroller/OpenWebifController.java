@@ -17,6 +17,7 @@ import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.system.Settings;
@@ -61,6 +62,7 @@ public class OpenWebifController {
 	final StandardMainWindow mainWindow;
 	private final Movies movies;
 	private final JFileChooser exeFileChooser;
+	private final BouquetsNStations bouquetsNStations;
 
 	OpenWebifController() {
 		exeFileChooser = new JFileChooser("./");
@@ -70,9 +72,11 @@ public class OpenWebifController {
 		
 		mainWindow = new StandardMainWindow("OpenWebif Controller");
 		movies = new Movies(this);
+		bouquetsNStations = new BouquetsNStations(this);
 		
 		JTabbedPane contentPane = new JTabbedPane();
 		contentPane.addTab("Movies", movies);
+		contentPane.addTab("Bouquets 'n' Stations", bouquetsNStations);
 		
 		JMenuBar menuBar = new JMenuBar();
 		JMenu settingsMenu = menuBar.add(createMenu("Settings"));
@@ -105,7 +109,13 @@ public class OpenWebifController {
 	}
 	
 	private void initialize() {
-		movies.readInitialList();
+		ProgressDialog.runWithProgressDialog(mainWindow, "Initialize", 400, pd->{
+			String baseURL = getBaseURL();
+			if (baseURL==null) return;
+			
+			movies.readInitialMovieList(baseURL,pd);
+			bouquetsNStations.readData(baseURL,pd);
+		});
 	}
 
 	static JMenuItem createMenuItem(String title, ActionListener al) {

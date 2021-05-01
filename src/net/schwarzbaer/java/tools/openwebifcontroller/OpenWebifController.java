@@ -7,6 +7,7 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.io.File;
 
+import javax.swing.Icon;
 import javax.swing.JFileChooser;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -17,12 +18,19 @@ import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.system.Settings;
 
 public class OpenWebifController {
+	
+	private static IconSource.CachedIcons<TreeIcons> TreeIconsIS = IconSource.createCachedIcons(16, 16, "/images/TreeIcons.png", TreeIcons.values());
+	enum TreeIcons {
+		Folder, GreenFolder;
+		Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
+	}
 	
 	static AppSettings settings;
 
@@ -77,6 +85,7 @@ public class OpenWebifController {
 		JTabbedPane contentPane = new JTabbedPane();
 		contentPane.addTab("Movies", movies);
 		contentPane.addTab("Bouquets 'n' Stations", bouquetsNStations);
+		contentPane.setSelectedIndex(1);
 		
 		JMenuBar menuBar = new JMenuBar();
 		JMenu settingsMenu = menuBar.add(createMenu("Settings"));

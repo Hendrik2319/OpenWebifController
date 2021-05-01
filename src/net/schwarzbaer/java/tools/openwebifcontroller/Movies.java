@@ -13,7 +13,6 @@ import java.util.Enumeration;
 import java.util.Vector;
 import java.util.function.Function;
 
-import javax.swing.Icon;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -32,7 +31,6 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
-import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
@@ -40,18 +38,13 @@ import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MovieListReadInterface;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
 import net.schwarzbaer.system.DateTimeFormatter;
 
 class Movies extends JSplitPane {
 	private static final long serialVersionUID = 3435419463730240276L;
 	
 	private static final DateTimeFormatter dtFormatter = new DateTimeFormatter();
-	
-	private static IconSource.CachedIcons<TreeIcons> TreeIconsIS = IconSource.createCachedIcons(16, 16, "/images/TreeIcons.png", TreeIcons.values());
-	enum TreeIcons {
-		Folder, KnownFolder;
-		Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
-	}
 
 	private final OpenWebifController main;
 	
@@ -355,7 +348,7 @@ class Movies extends JSplitPane {
 			if (value instanceof LocationTreeNode) {
 				LocationTreeNode treeNode = (LocationTreeNode) value;
 				if (treeNode.movies==null) setIcon(TreeIcons.Folder     .getIcon());
-				else                       setIcon(TreeIcons.KnownFolder.getIcon());
+				else                       setIcon(TreeIcons.GreenFolder.getIcon());
 			}
 			
 			return comp;

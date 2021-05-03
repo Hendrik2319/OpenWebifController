@@ -317,7 +317,7 @@ class Movies extends JSplitPane {
 		return OpenWebifTools.readMovieList(baseURL, dir, new MovieListReadInterface() {
 			@Override public void setIndeterminateProgressTask(String taskTitle) {
 				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle(taskTitle);
+					pd.setTaskTitle("Movies: "+taskTitle);
 					pd.setIndeterminate(true);
 				});
 			}

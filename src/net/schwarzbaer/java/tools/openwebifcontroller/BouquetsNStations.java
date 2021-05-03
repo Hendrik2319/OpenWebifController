@@ -7,15 +7,21 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.IOException;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Vector;
+import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -31,6 +37,7 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
+import net.schwarzbaer.gui.FileChooser;
 import net.schwarzbaer.gui.ImageView;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.ValueListOutput;
@@ -40,6 +47,7 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.ResponseMessage;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
+import net.schwarzbaer.system.DateTimeFormatter;
 
 class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
@@ -48,8 +56,8 @@ class BouquetsNStations extends JPanel {
 	private final OpenWebifController main;
 	private final JTree bsTree;
 	private final JLabel statusLine;
-	private final ImageView imageView;
-	private final JTextArea infoPanel;
+	private final ValuePanel valuePanel;
+	private final FileChooser m3uFileChooser;
 	
 	private BSTreeNode.RootNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
@@ -73,6 +81,8 @@ class BouquetsNStations extends JPanel {
 		clickedBouquetNode = null;
 		clickedStationNode = null;
 		
+		m3uFileChooser = new FileChooser("Playlist", "m3u");
+		
 		bsTree = new JTree(bsTreeModel);
 		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		bsTree.setCellRenderer(new BSTreeCellRenderer());
@@ -81,40 +91,45 @@ class BouquetsNStations extends JPanel {
 		JScrollPane treeScrollPane = new JScrollPane(bsTree);
 		treeScrollPane.setPreferredSize(new Dimension(300,500));
 		
-		imageView = new ImageView(400,500);
-		imageView.setBgColor(Color.BLACK);
-		imageView.reset();
-		
-		infoPanel = new JTextArea();
-		infoPanel.setEditable(false);
-		
-		JScrollPane infoPanelScrollPane = new JScrollPane(infoPanel);
-		infoPanelScrollPane.setPreferredSize(new Dimension(400,500));
-		
-		JSplitPane rightPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,imageView,infoPanelScrollPane);
-		rightPanel.setPreferredSize(new Dimension(300,500));
+		valuePanel = new ValuePanel(this.main::getBaseURL);
 		
 		statusLine = new JLabel();
 		statusLine.setBorder(BorderFactory.createEtchedBorder());
 		PICON_LOADER.setStatusOutput(statusLine);
 		
-		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,treeScrollPane,rightPanel);
+		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,treeScrollPane,valuePanel.panel);
 		add(centerPanel,BorderLayout.CENTER);
 		add(statusLine,BorderLayout.SOUTH);
 		
-		JMenuItem miLoadPicons,miSwitchToStation,miStreamStation;
+		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U;
 		ContextMenu treeContextMenu = new ContextMenu();
+		
+		treeContextMenu.add(miWriteStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", e->{
+			if (clickedBouquetNode==null) return;
+			
+			String baseURL = this.main.getBaseURL();
+			if (baseURL==null) return;
+			
+			if (m3uFileChooser.showSaveDialog(this.main.mainWindow)!=FileChooser.APPROVE_OPTION) return;
+			File m3uFile = m3uFileChooser.getSelectedFile();
+			
+			writeStreamsToM3U(clickedBouquetNode.bouquet,baseURL,m3uFile);
+			main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Bouquet: %s", clickedBouquetNode.bouquet.name));
+		}));
+		
+		treeContextMenu.addSeparator();
+		
 		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", e->{
 			if (clickedBouquetNode!=null) {
-				PICON_LOADER.setBaseURL(main.getBaseURL());
+				PICON_LOADER.setBaseURL(this.main.getBaseURL());
 				clickedBouquetNode.children.forEach(BSTreeNode.StationNode::aquirePicon);
 			} else if (clickedStationNode!=null) {
-				PICON_LOADER.setBaseURL(main.getBaseURL());
+				PICON_LOADER.setBaseURL(this.main.getBaseURL());
 				clickedStationNode.aquirePicon();
 			}
 		}));
 		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e->{
-			String baseURL = main.getBaseURL();
+			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
 			ResponseMessage response = OpenWebifTools.zapToStation(baseURL, clickedStationNode.getStationID());
 			if (response!=null) response.printTo(System.out);
@@ -140,12 +155,15 @@ class BouquetsNStations extends JPanel {
 			miStreamStation  .setEnabled(clickedStationNode!=null);
 			miSwitchToStation.setText(clickedStationNode!=null ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
 			miStreamStation  .setText(clickedStationNode!=null ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
+			
+			miWriteStreamsToM3U.setEnabled(clickedBouquetNode!=null);
+			miWriteStreamsToM3U.setText(clickedBouquetNode!=null ? String.format("Write Streams of Bouquet \"%s\" to M3U-File", clickedBouquetNode.bouquet.name) : "Write Streams of Bouquet to M3U-File");
 		});
 		
 		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		bsTree.addTreeSelectionListener(e->{
 			selectedTreePath = bsTree.getSelectionPath();
-			showValues();
+			valuePanel.showValues(selectedTreePath);
 			//if (selectedTreePath!=null) {
 			//	Object obj = clickedTreePath.getLastPathComponent();
 			//	if (obj instanceof BSTreeNode.RootNode   ) clickedRootNode    = (BSTreeNode.RootNode   ) obj;
@@ -154,77 +172,13 @@ class BouquetsNStations extends JPanel {
 			//}
 		});
 	}
-	
-	private void showValues() {
-		if (selectedTreePath != null) {
-			Object obj = selectedTreePath.getLastPathComponent();
-			
-			if (obj instanceof BSTreeNode.RootNode) {
-				BSTreeNode.RootNode rootNode = (BSTreeNode.RootNode) obj;
-				
-				imageView.setImage(null);
-				imageView.reset();
-				
-				ValueListOutput out = new ValueListOutput();
-				out.add(0, "Bouquets", rootNode.bouquetData.bouquets.size());
-				
-				infoPanel.setText(out.generateOutput());
-				return;
-			}
-			
-			if (obj instanceof BSTreeNode.BouquetNode) {
-				BSTreeNode.BouquetNode bouquetNode = (BSTreeNode.BouquetNode) obj;
-				
-				imageView.setImage(null);
-				imageView.reset();
-				
-				ValueListOutput out = new ValueListOutput();
-				out.add(0, "Name"             , bouquetNode.bouquet.name);
-				out.add(0, "Service Reference", bouquetNode.bouquet.servicereference);
-				out.add(0, "SubServices"      , bouquetNode.bouquet.subservices.size());
-				
-				infoPanel.setText(out.generateOutput());
-				return;
-			}
-			
-			if (obj instanceof BSTreeNode.StationNode) {
-				BSTreeNode.StationNode stationNode = (BSTreeNode.StationNode) obj;
-				
-				imageView.setImage(stationNode.piconImage);
-				imageView.reset();
-				
-				ValueListOutput out = new ValueListOutput();
-				out.add(0, "Name"             , stationNode.subservice.name);
-				out.add(0, "Position"         , stationNode.subservice.pos);
-				out.add(0, "Program"          , stationNode.subservice.program);
-				out.add(0, "Service Reference", stationNode.subservice.servicereference);
-				
-				if (stationNode.piconImage==null)
-					out.add(0, "Picon Image", "%s", "none");
-				else
-					out.add(0, "Picon Image", "%d x %d", stationNode.piconImage.getWidth(), stationNode.piconImage.getHeight());
-				
-				if (stationNode.icon==null)
-					out.add(0, "Icon", "%s", "none");
-				else
-					out.add(0, "Icon", "%d x %d", stationNode.icon.getIconWidth(), stationNode.icon.getIconHeight());
-				
-				infoPanel.setText(out.generateOutput());
-				return;
-			}
-		}
-		
-		imageView.setImage(null);
-		imageView.reset();
-		infoPanel.setText("");
-	}
 
 	void readData(String baseURL, ProgressDialog pd) {
 		if (baseURL==null) return;
 		
 		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle->{
 			SwingUtilities.invokeLater(()->{
-				pd.setTaskTitle(taskTitle);
+				pd.setTaskTitle("Bouquets 'n' Stations: "+taskTitle);
 				pd.setIndeterminate(true);
 			});
 		});
@@ -243,27 +197,256 @@ class BouquetsNStations extends JPanel {
 		PICON_LOADER.clearPiconCache();
 	}
 
+	private void writeStreamsToM3U(Bouquet bouquet, String baseURL, File m3uFile) {
+		try (PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(m3uFile), StandardCharsets.UTF_8))) {
+			
+			out.println("#EXTM3U");
+			for (Bouquet.SubService subservice:bouquet.subservices) {
+				if (subservice.isMarker()) continue;
+				// #EXTINF:0,SPORT1
+				// http://et7x00:8001/1:0:1:384:21:85:C00000:0:0:0:
+				out.printf("#EXTINF:0,%s%n", subservice.name);
+				out.println(OpenWebifTools.getStationStreamURL(baseURL, subservice.service.stationID));
+			}
+			
+		}
+		catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		
+	}
+
 	private void streamStation(StationID stationID) {
 		if (stationID==null) return;
 		
 		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
 		
-		File videoPlayer = main.getVideoPlayer();
-		if (videoPlayer==null) return;
-		
-		File javaVM = main.getJavaVM();
-		if (javaVM==null) return;
-		
 		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
+		main.openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
+	}
+
+	private static class ValuePanel {
+		private final Supplier<String> getBaseURL;
+		private final ImageView imageView;
+		private final JTextArea textView;
+		private final JSplitPane panel;
+		private TextUpdateTask runningTask;
+		private boolean updateEPGAlways;
+		private BSTreeNode.RootNode shownRootNode;
+		private BSTreeNode.BouquetNode shownBouquetNode;
+		private BSTreeNode.StationNode shownStationNode;
 		
-		System.out.printf("stream station: %s%n", stationID.toIDStr());
-		System.out.printf("   java VM      : \"%s\"%n", javaVM.getAbsolutePath());
-		System.out.printf("   video player : \"%s\"%n", videoPlayer.getAbsolutePath());
-		System.out.printf("   url          : \"%s\"%n", url);
+		ValuePanel(Supplier<String> getBaseURL) {
+			this.getBaseURL = getBaseURL;
+			
+			runningTask = null;
+			shownRootNode = null;
+			shownBouquetNode = null;
+			shownStationNode = null;
+			
+			imageView = new ImageView(400,500);
+			imageView.setBgColor(Color.BLACK);
+			imageView.reset();
+			
+			textView = new JTextArea();
+			textView.setEditable(false);
+			
+			JScrollPane textViewScrollPane = new JScrollPane(textView);
+			textViewScrollPane.setPreferredSize(new Dimension(400,500));
+			
+			panel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,imageView,textViewScrollPane);
+			panel.setPreferredSize(new Dimension(300,500));
+			
+			ContextMenu textViewContextMenu = new ContextMenu();
+			textViewContextMenu.addTo(textView);
+			
+			JMenuItem miUpdateEPG;
+			JCheckBoxMenuItem miUpdateEPGAlways;
+			
+			updateEPGAlways = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateEPGAlways, false);
+			textViewContextMenu.add(miUpdateEPGAlways = OpenWebifController.createCheckBoxMenuItem("Update EPG everytime on Select", updateEPGAlways, isChecked->{
+				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateEPGAlways, updateEPGAlways = isChecked);
+			}) );
+			
+			textViewContextMenu.add(miUpdateEPG = OpenWebifController.createMenuItem("Update EPG Now", e->{
+				if (shownStationNode != null)
+					startEpgUpdate(shownStationNode, this.getBaseURL.get());
+			}) );
+			
+			textViewContextMenu.addSeparator();
+			
+			boolean textViewLineWrap = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_TextViewLineWrap, false);
+			textView.setLineWrap(textViewLineWrap);
+			textView.setWrapStyleWord(textViewLineWrap);
+			textViewContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Line Wrap", textViewLineWrap, isChecked->{
+				textView.setLineWrap(isChecked);
+				textView.setWrapStyleWord(isChecked);
+				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_TextViewLineWrap, isChecked);
+			}) );
+			
+			textViewContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
+				miUpdateEPG      .setEnabled(shownStationNode != null);
+				miUpdateEPGAlways.setEnabled(shownStationNode != null);
+			});
+
+		}
 		
-		try { Runtime.getRuntime().exec(new String[] {javaVM.getAbsolutePath(), "-jar", "OpenWebifController.jar", "-start", videoPlayer.getAbsolutePath(), url }); }
-		catch (IOException ex) { System.err.printf("IOException while starting video player: %s%n", ex.getMessage()); }
+		private void showValues(TreePath selectedTreePath) {
+			clearTextUpdateTask();
+			shownRootNode = null;
+			shownBouquetNode = null;
+			shownStationNode = null;
+			
+			if (selectedTreePath != null) {
+				Object obj = selectedTreePath.getLastPathComponent();
+				
+				if (obj instanceof BSTreeNode.RootNode) {
+					shownRootNode = (BSTreeNode.RootNode) obj;
+					
+					imageView.setImage(null);
+					imageView.reset();
+					
+					textView.setText(generateOutput(shownRootNode));
+					return;
+				}
+				
+				if (obj instanceof BSTreeNode.BouquetNode) {
+					shownBouquetNode = (BSTreeNode.BouquetNode) obj;
+					
+					imageView.setImage(null);
+					imageView.reset();
+					
+					textView.setText(generateOutput(shownBouquetNode));
+					return;
+				}
+				
+				if (obj instanceof BSTreeNode.StationNode) {
+					shownStationNode = (BSTreeNode.StationNode) obj;
+					
+					imageView.setImage(shownStationNode.piconImage);
+					imageView.reset();
+					
+					textView.setText(generateOutput(shownStationNode));
+					if (shownStationNode.epg==null || updateEPGAlways)
+						startEpgUpdate(shownStationNode, getBaseURL.get());
+					
+					return;
+				}
+			}
+			
+			imageView.setImage(null);
+			imageView.reset();
+			textView.setText("");
+		}
+
+		private String generateOutput(BSTreeNode.RootNode rootNode) {
+			ValueListOutput out = new ValueListOutput();
+			out.add(0, "Bouquets", rootNode.bouquetData.bouquets.size());
+			
+			String output = out.generateOutput();
+			return output;
+		}
+
+		private String generateOutput(BSTreeNode.BouquetNode bouquetNode) {
+			ValueListOutput out = new ValueListOutput();
+			out.add(0, "Name"             , bouquetNode.bouquet.name);
+			out.add(0, "Service Reference", bouquetNode.bouquet.servicereference);
+			out.add(0, "SubServices"      , bouquetNode.bouquet.subservices.size());
+			
+			String output = out.generateOutput();
+			return output;
+		}
+
+		private String generateOutput(BSTreeNode.StationNode stationNode) {
+			ValueListOutput out = new ValueListOutput();
+			out.add(0, "Name"             , stationNode.subservice.name);
+			out.add(0, "Position"         , stationNode.subservice.pos);
+			out.add(0, "Program"          , stationNode.subservice.program);
+			out.add(0, "Service Reference", stationNode.subservice.servicereference);
+			
+			if (stationNode.piconImage==null)
+				out.add(0, "Picon Image", "%s", "none");
+			else
+				out.add(0, "Picon Image", "%d x %d", stationNode.piconImage.getWidth(), stationNode.piconImage.getHeight());
+			
+			if (stationNode.icon==null)
+				out.add(0, "Icon", "%s", "none");
+			else
+				out.add(0, "Icon", "%d x %d", stationNode.icon.getIconWidth(), stationNode.icon.getIconHeight());
+			
+			String output = out.generateOutput();
+			
+			if (stationNode.epg!=null) {
+				output += "\r\n";
+				if (stationNode.epg.result!=true)
+					output += "No Current EGP Event\r\n";
+				else {
+					out.clear();
+					out.add(0, "Current EGP Event");
+					if (stationNode.epg.events.isEmpty())
+						out.add(1, "No Events");
+					else {
+						int level = stationNode.epg.events.size()==1 ? 1 : 2;
+						for (int i=0; i<stationNode.epg.events.size(); i++) {
+							OpenWebifTools.CurrentEPGevent.EPGevent event = stationNode.epg.events.get(i);
+							if (level==2) out.add(1, String.format("Event[%d]", i+1));
+							out.add(level, "Station"   , event.station_name);
+							out.add(level, "SRef"      , event.sref);
+							out.add(level, "Title"     , event.title);
+							out.add(level, "Genre"     , "[%d] \"%s\"", event.genreid, event.genre);
+							out.add(level, "ID"        , event.id);
+							out.add(level, "Begin"     , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
+							out.add(level, "Now"       , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
+							out.add(level, "Duration"  , "%s", DateTimeFormatter.getDurationStr(event.duration_sec));
+							out.add(level, "Remaining" , "%s", DateTimeFormatter.getDurationStr(event.remaining));
+							out.add(level, "Description");
+							out.add(level+1, "", event.shortdesc);
+							out.add(level+1, "", event.longdesc );
+						}
+					}
+					
+					output += out.generateOutput();
+				}
+			}
+			
+			return output;
+		}
+		
+		private synchronized void clearTextUpdateTask() {
+			runningTask = null;
+		}
+		
+		private synchronized void startEpgUpdate(BSTreeNode.StationNode stationNode, String baseURL) {
+			runningTask = new TextUpdateTask(()->{
+				stationNode.updateEPG(baseURL);
+				return generateOutput(stationNode);
+			});
+			runningTask.start();
+		}
+
+		private synchronized void setUpdateResult(String str, TextUpdateTask textUpdateTask) {
+			if (runningTask==textUpdateTask) {
+				textView.setText(str);
+				clearTextUpdateTask();
+			}
+		}
+
+		private class TextUpdateTask {
+			
+			private final Supplier<String> generateText;
+
+			TextUpdateTask(Supplier<String> generateText) {
+				this.generateText = generateText;
+			}
+			
+			void start() {
+				new Thread(()->{
+					String str = generateText.get();
+					setUpdateResult(str, this);
+				}).start();
+			}
+		}
 	}
 
 	private static class PiconLoader {
@@ -499,6 +682,7 @@ class BouquetsNStations extends JPanel {
 		
 		private static class StationNode extends BSTreeNode<BouquetNode, StationNode> {
 			
+			public OpenWebifTools.CurrentEPGevent epg;
 			final Bouquet.SubService subservice;
 			BufferedImage piconImage;
 		
@@ -506,6 +690,10 @@ class BouquetsNStations extends JPanel {
 				super(parent, !subservice.isMarker() ? String.format("[%d] %s", subservice.pos, subservice.name) : subservice.name);
 				this.subservice = subservice;
 				//aquirePicon(); // only on demand
+			}
+
+			public void updateEPG(String baseURL) {
+				epg = OpenWebifTools.getCurrentEPGevent(baseURL, getStationID());
 			}
 
 			@Override public boolean getAllowsChildren() { return subservice==null; }

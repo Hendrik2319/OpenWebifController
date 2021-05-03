@@ -8,8 +8,10 @@ import java.awt.event.ComponentListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.function.Consumer;
 
 import javax.swing.Icon;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFileChooser;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -24,6 +26,7 @@ import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.system.DateTimeFormatter;
 import net.schwarzbaer.system.Settings;
 
 public class OpenWebifController {
@@ -35,6 +38,7 @@ public class OpenWebifController {
 	}
 	
 	static AppSettings settings;
+	static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();
 
 	public static void main(String[] args) {
 		if (args.length>0) {
@@ -60,7 +64,7 @@ public class OpenWebifController {
 	
 	static class AppSettings extends Settings<AppSettings.ValueGroup,AppSettings.ValueKey> {
 		enum ValueKey {
-			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser, JavaVM,
+			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser, JavaVM, BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {
@@ -123,6 +127,7 @@ public class OpenWebifController {
 				System.out.printf("Set Base URL to \"%s\"%n", baseURL);
 		}));
 		
+		mainWindow.setIconImagesFromResource("/AppIcons/AppIcon","16.png","24.png","32.png","48.png","64.png");
 		mainWindow.startGUI(contentPane, menuBar);
 		
 		if (settings.isSet(AppSettings.ValueGroup.WindowPos )) mainWindow.setLocation(settings.getWindowPos ());
@@ -146,6 +151,12 @@ public class OpenWebifController {
 		});
 	}
 
+	static JCheckBoxMenuItem createCheckBoxMenuItem(String title, boolean isChecked, Consumer<Boolean> setValue) {
+		JCheckBoxMenuItem comp = new JCheckBoxMenuItem(title,isChecked);
+		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
+		return comp;
+	}
+
 	static JMenuItem createMenuItem(String title, ActionListener al) {
 		JMenuItem comp = new JMenuItem(title);
 		if (al!=null) comp.addActionListener(al);
@@ -165,6 +176,25 @@ public class OpenWebifController {
 		out.add(0, "Is Alive"  , process.isAlive());
 		out.add(0, "Class"     , "%s", process.getClass());
 		return out.generateOutput();
+	}
+
+	void openUrlInVideoPlayer(String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL", url); }
+	void openFileInVideoPlayer(File file, String taskLabel) { openInVideoPlayer(taskLabel, "File", file.getAbsolutePath()); }
+
+	private void openInVideoPlayer(String taskLabel, String targetLabel, String target) {
+		File videoPlayer = getVideoPlayer();
+		if (videoPlayer==null) return;
+		
+		File javaVM = getJavaVM();
+		if (javaVM==null) return;
+		
+		System.out.printf("%s%n", taskLabel);
+		System.out.printf("   Java VM      : \"%s\"%n", javaVM.getAbsolutePath());
+		System.out.printf("   Video Player : \"%s\"%n", videoPlayer.getAbsolutePath());
+		System.out.printf("   %12s"     +" : \"%s\"%n", targetLabel, target);
+		
+		try { Runtime.getRuntime().exec(new String[] {javaVM.getAbsolutePath(), "-jar", "OpenWebifController.jar", "-start", videoPlayer.getAbsolutePath(), target }); }
+		catch (IOException ex) { System.err.printf("IOException while starting video player: %s%n", ex.getMessage()); }
 	}
 
 	String getBaseURL() {

@@ -44,6 +44,7 @@ import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.ResponseMessage;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
@@ -328,7 +329,7 @@ class BouquetsNStations extends JPanel {
 					imageView.reset();
 					
 					textView.setText(generateOutput(shownStationNode));
-					if (shownStationNode.epg==null || updateEPGAlways)
+					if (shownStationNode.epgEvents==null || updateEPGAlways)
 						startEpgUpdate(shownStationNode, getBaseURL.get());
 					
 					return;
@@ -377,37 +378,33 @@ class BouquetsNStations extends JPanel {
 			
 			String output = out.generateOutput();
 			
-			if (stationNode.epg!=null) {
+			if (stationNode.epgEvents!=null) {
 				output += "\r\n";
-				if (stationNode.epg.result!=true)
-					output += "No Current EGP Event\r\n";
+				out.clear();
+				out.add(0, "Current EGP Event");
+				if (stationNode.epgEvents.isEmpty())
+					out.add(1, "No Events");
 				else {
-					out.clear();
-					out.add(0, "Current EGP Event");
-					if (stationNode.epg.events.isEmpty())
-						out.add(1, "No Events");
-					else {
-						int level = stationNode.epg.events.size()==1 ? 1 : 2;
-						for (int i=0; i<stationNode.epg.events.size(); i++) {
-							OpenWebifTools.CurrentEPGevent.EPGevent event = stationNode.epg.events.get(i);
-							if (level==2) out.add(1, String.format("Event[%d]", i+1));
-							out.add(level, "Station"   , event.station_name);
-							out.add(level, "SRef"      , event.sref);
-							out.add(level, "Title"     , event.title);
-							out.add(level, "Genre"     , "[%d] \"%s\"", event.genreid, event.genre);
-							out.add(level, "ID"        , event.id);
-							out.add(level, "Begin"     , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
-							out.add(level, "Now"       , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
-							out.add(level, "Duration"  , "%s", DateTimeFormatter.getDurationStr(event.duration_sec));
-							out.add(level, "Remaining" , "%s", DateTimeFormatter.getDurationStr(event.remaining));
-							out.add(level, "Description");
-							out.add(level+1, "", event.shortdesc);
-							out.add(level+1, "", event.longdesc );
-						}
+					int level = stationNode.epgEvents.size()==1 ? 1 : 2;
+					for (int i=0; i<stationNode.epgEvents.size(); i++) {
+						OpenWebifTools.EPGevent event = stationNode.epgEvents.get(i);
+						if (level==2) out.add(1, String.format("Event[%d]", i+1));
+						out.add(level, "Station"   , event.station_name);
+						out.add(level, "SRef"      , event.sref);
+						out.add(level, "Title"     , event.title);
+						out.add(level, "Genre"     , "[%d] \"%s\"", event.genreid, event.genre);
+						out.add(level, "ID"        , event.id);
+						out.add(level, "Begin"     , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
+						out.add(level, "Now"       , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
+						out.add(level, "Duration"  , "%s", DateTimeFormatter.getDurationStr(event.duration_sec));
+						out.add(level, "Remaining" , "%s", DateTimeFormatter.getDurationStr(event.remaining));
+						out.add(level, "Description");
+						out.add(level+1, "", event.shortdesc);
+						out.add(level+1, "", event.longdesc );
 					}
-					
-					output += out.generateOutput();
 				}
+				
+				output += out.generateOutput();
 			}
 			
 			return output;
@@ -682,18 +679,19 @@ class BouquetsNStations extends JPanel {
 		
 		private static class StationNode extends BSTreeNode<BouquetNode, StationNode> {
 			
-			public OpenWebifTools.CurrentEPGevent epg;
+			public Vector<EPGevent> epgEvents;
 			final Bouquet.SubService subservice;
 			BufferedImage piconImage;
 		
 			private StationNode(BouquetNode parent, Bouquet.SubService subservice) {
 				super(parent, !subservice.isMarker() ? String.format("[%d] %s", subservice.pos, subservice.name) : subservice.name);
 				this.subservice = subservice;
+				this.epgEvents = null;
 				//aquirePicon(); // only on demand
 			}
 
 			public void updateEPG(String baseURL) {
-				epg = OpenWebifTools.getCurrentEPGevent(baseURL, getStationID());
+				epgEvents = OpenWebifTools.getCurrentEPGevent(baseURL, getStationID());
 			}
 
 			@Override public boolean getAllowsChildren() { return subservice==null; }

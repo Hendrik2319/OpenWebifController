@@ -163,7 +163,7 @@ class BouquetsNStations extends JPanel {
 			File m3uFile = m3uFileChooser.getSelectedFile();
 			
 			writeStreamsToM3U(clickedBouquetNode.bouquet,baseURL,m3uFile);
-			main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Bouquet: %s", clickedBouquetNode.bouquet.name));
+			this.main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Bouquet: %s", clickedBouquetNode.bouquet.name));
 		}));
 		
 		treeContextMenu.addSeparator();
@@ -304,7 +304,7 @@ class BouquetsNStations extends JPanel {
 			bsTreeRoot = new BSTreeNode.RootNode(bouquetData);
 			bsTreeModel = new DefaultTreeModel(bsTreeRoot, true);
 			bsTree.setModel(bsTreeModel);
-			PICON_LOADER.setTreeModel(bsTreeModel);
+			PICON_LOADER.setTreeModel(bsTreeModel,bsTreeRoot);
 		}
 	}
 	
@@ -569,10 +569,11 @@ class BouquetsNStations extends JPanel {
 
 		private final ArrayDeque<Task> solvedTasks = new ArrayDeque<>();
 		private final ArrayDeque<Task> tasks = new ArrayDeque<>();
+		private final PiconCache piconCache = new PiconCache();
 		private DefaultTreeModel treeModel = null;
+		private BSTreeNode.RootNode rootNode = null;
 		private Thread taskThread = null;
 		private String baseURL = null;
-		private final PiconCache piconCache = new PiconCache();
 		private JLabel statusLine = null;
 
 		private synchronized void startTasks() {
@@ -597,14 +598,16 @@ class BouquetsNStations extends JPanel {
 			
 			Task task = null;
 			DefaultTreeModel localTreeModel = null;
+			BSTreeNode.RootNode localRootNode = null;
 			synchronized (this) {
-				if (treeModel!=null && !solvedTasks.isEmpty()) {
+				if (treeModel!=null && rootNode!=null && !solvedTasks.isEmpty()) {
 					task = solvedTasks.pollFirst();
 					localTreeModel = treeModel;
+					localRootNode  = rootNode;
 				}
 			}
 			if (task!=null) {
-				task.updateTreeNode(localTreeModel);
+				task.updateTreeNode(localTreeModel, localRootNode, piconCache);
 				return true;
 			}
 			
@@ -618,10 +621,13 @@ class BouquetsNStations extends JPanel {
 			}
 			if (task!=null) {
 				task.readImage(localBaseURL, piconCache);
-				synchronized (this) { if (treeModel!=null) localTreeModel = treeModel; }
+				synchronized (this) {
+					localTreeModel = treeModel;
+					localRootNode  = rootNode;
+				}
 				
 				if (localTreeModel!=null)
-					task.updateTreeNode(treeModel);
+					task.updateTreeNode(localTreeModel, localRootNode, piconCache);
 				else
 					synchronized (this) { solvedTasks.addLast(task); }
 				return true;
@@ -639,6 +645,7 @@ class BouquetsNStations extends JPanel {
 
 		synchronized void clear() {
 			treeModel = null;
+			rootNode = null;
 			baseURL = null;
 			tasks.clear();
 			solvedTasks.clear();
@@ -657,17 +664,17 @@ class BouquetsNStations extends JPanel {
 			this.baseURL = baseURL;
 		}
 
-		synchronized void addTask(BSTreeNode.StationNode bsTreeNode, StationID stationID) {
-			tasks.add(new Task(bsTreeNode, stationID));
+		synchronized void addTask(StationID stationID) {
+			tasks.add(new Task(stationID));
 			startTasks();
 		}
 
-		synchronized void setTreeModel(DefaultTreeModel treeModel) {
+		synchronized void setTreeModel(DefaultTreeModel treeModel, BSTreeNode.RootNode rootNode) {
 			this.treeModel = treeModel;
+			this.rootNode = rootNode;
 			startTasks();
 		}
 		
-		@SuppressWarnings("unused")
 		private static class PiconCache {
 			
 			private final HashMap<String,CachedPicon> cache;
@@ -675,16 +682,19 @@ class BouquetsNStations extends JPanel {
 			PiconCache() {
 				cache = new HashMap<>();
 			}
-			int size() {
+			synchronized int size() {
 				return cache.size();
 			}
-			void clear() {
+			synchronized void clear() {
 				cache.clear();
 			}
-			CachedPicon get(StationID stationID) {
+			synchronized CachedPicon get(StationID stationID) {
 				return cache.get(stationID.toIDStr());
 			}
-			void put(StationID stationID, BufferedImage piconImage, Icon icon) {
+			synchronized boolean contains(StationID stationID) {
+				return cache.containsKey(stationID.toIDStr());
+			}
+			synchronized void put(StationID stationID, BufferedImage piconImage, Icon icon) {
 				cache.put(stationID.toIDStr(), new CachedPicon(piconImage, icon));
 			}
 			
@@ -695,6 +705,7 @@ class BouquetsNStations extends JPanel {
 					this.piconImage = piconImage;
 					this.icon = icon;
 				}
+				@SuppressWarnings("unused")
 				boolean isEmpty() {
 					return piconImage==null && icon==null;
 				}
@@ -702,28 +713,33 @@ class BouquetsNStations extends JPanel {
 		}
 		
 		private static class Task {
-			private final BSTreeNode.StationNode treeNode;
 			private final StationID stationID;
 			
-			Task(BSTreeNode.StationNode treeNode, StationID stationID) {
-				this.treeNode = treeNode;
+			Task(StationID stationID) {
 				this.stationID = stationID;
 			}
 			
 			void readImage(String baseURL, PiconCache piconCache) {
-				if (baseURL==null || stationID==null || treeNode==null) return;
-				PiconCache.CachedPicon cachedPicon = piconCache.get(stationID);
-				if (cachedPicon==null) {
+				if (baseURL==null || stationID==null) return;
+				if (!piconCache.contains(stationID)) {
 					BufferedImage piconImage = OpenWebifTools.getPicon(baseURL, stationID);
-					treeNode.setPicon(piconImage);
-					piconCache.put(stationID, treeNode.piconImage, treeNode.icon);
-				} else {
-					treeNode.setPicon(cachedPicon.piconImage, cachedPicon.icon);
+					Icon icon = BSTreeNode.StationNode.getIcon(piconImage);
+					piconCache.put(stationID, piconImage, icon);
 				}
 			}
 			
-			void updateTreeNode(DefaultTreeModel treeModel) {
-				SwingUtilities.invokeLater(()->treeModel.nodeChanged(treeNode));
+			void updateTreeNode(DefaultTreeModel treeModel, BSTreeNode.RootNode rootNode, PiconCache piconCache) {
+				Vector<BSTreeNode.StationNode> stations = rootNode.stations.get(stationID);
+				if (stations!=null && !stations.isEmpty()) {
+					PiconCache.CachedPicon cachedPicon = piconCache.get(stationID);
+					if (cachedPicon!=null)
+						for (BSTreeNode.StationNode treeNode:stations)
+							treeNode.setPicon(cachedPicon.piconImage, cachedPicon.icon);
+					SwingUtilities.invokeLater(()->{
+						for (BSTreeNode.StationNode treeNode:stations)
+							treeModel.nodeChanged(treeNode);
+					});
+				}
 			}
 		}
 	}
@@ -796,11 +812,15 @@ class BouquetsNStations extends JPanel {
 			private final HashMap<String,Vector<StationNode>> stations;
 			StationList() { stations = new HashMap<>(); }
 
-			public void add(String idStr, StationNode stationNode) {
-				Vector<StationNode> stationsWithID = stations.get(idStr);
+			public void add(StationID stationID, StationNode stationNode) {
+				Vector<StationNode> stationsWithID = get(stationID);
 				if (stationsWithID==null)
-					stations.put(idStr,stationsWithID = new Vector<>());
+					stations.put(stationID.toIDStr(),stationsWithID = new Vector<>());
 				stationsWithID.add(stationNode);
+			}
+
+			public Vector<StationNode> get(StationID stationID) {
+				return stations.get(stationID.toIDStr());
 			}
 		}
 		
@@ -846,7 +866,7 @@ class BouquetsNStations extends JPanel {
 				this.epgEvents = null;
 				this.isServicePlayable = null;
 				//aquirePicon(); // only on demand
-				stations.add(getStationID().toIDStr(),this);
+				stations.add(getStationID(),this);
 			}
 
 			void updateEPG(String baseURL) {
@@ -864,25 +884,29 @@ class BouquetsNStations extends JPanel {
 			@Override public boolean getAllowsChildren() { return subservice==null; }
 		
 			void aquirePicon() {
-				PICON_LOADER.addTask(this,getStationID());
+				PICON_LOADER.addTask(getStationID());
 			}
 
 			StationID getStationID() {
 				return subservice.service.stationID;
 			}
 		
+			@SuppressWarnings("unused")
 			void setPicon(BufferedImage piconImage) {
-				BufferedImage scaledImage = scaleImage(piconImage,ROW_HEIGHT,Color.BLACK);
-				ImageIcon icon = scaledImage==null ? null : new ImageIcon(scaledImage);
-				setPicon(piconImage, icon);
+				setPicon(piconImage, getIcon(piconImage));
 			}
-		
+
 			void setPicon(BufferedImage piconImage, Icon icon) {
 				this.piconImage = piconImage;
 				this.icon = icon;
 			}
 		
-			private BufferedImage scaleImage(BufferedImage img, int newHeight, Color bgColor) {
+			static Icon getIcon(BufferedImage piconImage) {
+				BufferedImage scaledImage = scaleImage(piconImage,ROW_HEIGHT,Color.BLACK);
+				return scaledImage==null ? null : new ImageIcon(scaledImage);
+			}
+
+			private static BufferedImage scaleImage(BufferedImage img, int newHeight, Color bgColor) {
 				if (img==null) return null;
 				int h = img.getHeight();
 				int w = img.getWidth();

@@ -8,6 +8,10 @@ import java.awt.event.ComponentListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import javax.swing.Icon;
@@ -84,6 +88,48 @@ public class OpenWebifController {
 		public void      setWindowPos (Point location) {        putPoint(ValueKey.WindowX,ValueKey.WindowY,location); }
 		public Dimension getWindowSize(              ) { return getDimension(ValueKey.WindowWidth,ValueKey.WindowHeight); }
 		public void      setWindowSize(Dimension size) {        putDimension(ValueKey.WindowWidth,ValueKey.WindowHeight,size); }
+		
+	}
+
+	static class Updater {
+		private final ScheduledExecutorService scheduler;
+		private ScheduledFuture<?> taskHandle;
+		private final long interval_sec;
+		private final Runnable task;
+	
+		@SuppressWarnings("unused")
+		Updater(long interval_sec, Runnable task) {
+			this.interval_sec = interval_sec;
+			this.task = task;
+			
+			int prio;
+			if      (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-2) prio = Thread.NORM_PRIORITY-2;
+			else if (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-1) prio = Thread.NORM_PRIORITY-1;
+			else prio = Thread.NORM_PRIORITY;
+			
+			scheduler = Executors.newSingleThreadScheduledExecutor(run->{
+				Thread thread = new Thread(run);
+				thread.setPriority(prio);
+				return thread;
+			});
+		}
+	
+		public void runOnce() {
+			scheduler.execute(task);
+		}
+	
+		public void runOnce(Runnable task) {
+			scheduler.execute(task);
+		}
+	
+		public void start() {
+			taskHandle = scheduler.scheduleWithFixedDelay(task, 0, interval_sec, TimeUnit.SECONDS);
+		}
+	
+		public void stop() {
+			taskHandle.cancel(false);
+			taskHandle = null;
+		}
 		
 	}
 

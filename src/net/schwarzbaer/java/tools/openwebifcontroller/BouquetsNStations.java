@@ -16,10 +16,6 @@ import java.util.ArrayDeque;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Vector;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -65,7 +61,7 @@ class BouquetsNStations extends JPanel {
 	private final JLabel statusLine;
 	private final ValuePanel valuePanel;
 	private final FileChooser m3uFileChooser;
-	private final Updater playableStatesUpdater;
+	private final OpenWebifController.Updater playableStatesUpdater;
 	
 	private BSTreeNode.RootNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
@@ -122,7 +118,7 @@ class BouquetsNStations extends JPanel {
 			});
 		}));
 		
-		playableStatesUpdater = new Updater(10,()->{
+		playableStatesUpdater = new OpenWebifController.Updater(10,()->{
 			String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
 			System.out.printf("PlayableStatesUpdater[0x%08X]: started (%s)%n", Thread.currentThread().hashCode(), timeStr);
 			updatePlayableStates();
@@ -291,49 +287,6 @@ class BouquetsNStations extends JPanel {
 		main.openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
 	}
 	
-	private static class Updater {
-		private final ScheduledExecutorService scheduler;
-		private ScheduledFuture<?> taskHandle;
-		private final long interval_sec;
-		private final Runnable task;
-
-		@SuppressWarnings("unused")
-		Updater(long interval_sec, Runnable task) {
-			this.interval_sec = interval_sec;
-			this.task = task;
-			
-			int prio;
-			if      (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-2) prio = Thread.NORM_PRIORITY-2;
-			else if (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-1) prio = Thread.NORM_PRIORITY-1;
-			else prio = Thread.NORM_PRIORITY;
-			
-			scheduler = Executors.newSingleThreadScheduledExecutor(run->{
-				Thread thread = new Thread(run);
-				thread.setPriority(prio);
-				return thread;
-			});
-		}
-
-		public void runOnce() {
-			scheduler.execute(task);
-		}
-
-		@SuppressWarnings("unused")
-		public void runOnce(Runnable task) {
-			scheduler.execute(task);
-		}
-
-		public void start() {
-			taskHandle = scheduler.scheduleWithFixedDelay(task, 0, interval_sec, TimeUnit.SECONDS);
-		}
-
-		public void stop() {
-			taskHandle.cancel(false);
-			taskHandle = null;
-		}
-		
-	}
-
 	private static class ValuePanel {
 		private final Supplier<String> getBaseURL;
 		private final ImageView imageView;

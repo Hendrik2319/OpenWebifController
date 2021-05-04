@@ -16,6 +16,12 @@ import java.util.ArrayDeque;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Vector;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
@@ -59,6 +65,7 @@ class BouquetsNStations extends JPanel {
 	private final JLabel statusLine;
 	private final ValuePanel valuePanel;
 	private final FileChooser m3uFileChooser;
+	private final Updater playableStatesUpdater;
 	
 	private BSTreeNode.RootNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
@@ -68,6 +75,7 @@ class BouquetsNStations extends JPanel {
 	private BSTreeNode.BouquetNode clickedBouquetNode;
 	private BSTreeNode.StationNode clickedStationNode;
 	private TreePath selectedTreePath;
+	private boolean updatePlayableStatesPeriodically;
 
 	BouquetsNStations(OpenWebifController main) {
 		super(new BorderLayout());
@@ -102,8 +110,39 @@ class BouquetsNStations extends JPanel {
 		add(centerPanel,BorderLayout.CENTER);
 		add(statusLine,BorderLayout.SOUTH);
 		
-		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U;
+		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U, miUpdatePlayableStatesNow;
 		ContextMenu treeContextMenu = new ContextMenu();
+		
+		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", e->{
+			ProgressDialog.runWithProgressDialog(this.main.mainWindow, "Reload Bouquets", 400, pd->{
+				String baseURL = this.main.getBaseURL();
+				if (baseURL==null) return;
+				
+				readData(baseURL,pd);
+			});
+		}));
+		
+		playableStatesUpdater = new Updater(10,()->{
+			String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
+			System.out.printf("PlayableStatesUpdater[0x%08X]: started (%s)%n", Thread.currentThread().hashCode(), timeStr);
+			updatePlayableStates();
+			System.out.printf("PlayableStatesUpdater[0x%08X]: finished (%s -> %s)%n", Thread.currentThread().hashCode(), timeStr, OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
+		});
+		updatePlayableStatesPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, false);
+		treeContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Update 'Is Playable' States Periodically", updatePlayableStatesPeriodically, isChecked->{
+			System.out.printf("PlayableStatesUpdater[0x%08X]: GUI action%n", Thread.currentThread().hashCode());
+			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, updatePlayableStatesPeriodically=isChecked);
+			if (updatePlayableStatesPeriodically)
+				playableStatesUpdater.start();
+			else
+				playableStatesUpdater.stop();
+		}));
+		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", e->{
+			System.out.printf("PlayableStatesUpdater[0x%08X]: GUI action%n", Thread.currentThread().hashCode());
+			playableStatesUpdater.runOnce();
+		}));
+		
+		treeContextMenu.addSeparator();
 		
 		treeContextMenu.add(miWriteStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", e->{
 			if (clickedBouquetNode==null) return;
@@ -159,6 +198,8 @@ class BouquetsNStations extends JPanel {
 			
 			miWriteStreamsToM3U.setEnabled(clickedBouquetNode!=null);
 			miWriteStreamsToM3U.setText(clickedBouquetNode!=null ? String.format("Write Streams of Bouquet \"%s\" to M3U-File", clickedBouquetNode.bouquet.name) : "Write Streams of Bouquet to M3U-File");
+			
+			miUpdatePlayableStatesNow.setEnabled(!updatePlayableStatesPeriodically);
 		});
 		
 		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
@@ -171,6 +212,29 @@ class BouquetsNStations extends JPanel {
 			//	if (obj instanceof BSTreeNode.BouquetNode) clickedBouquetNode = (BSTreeNode.BouquetNode) obj;
 			//	if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
 			//}
+		});
+		
+		if (updatePlayableStatesPeriodically)
+			playableStatesUpdater.start();
+	}
+
+	private void updatePlayableStates() {
+		if (bsTreeRoot==null) return;
+		String baseURL = main.getBaseURL(false);
+		if (baseURL==null) return;
+		bsTreeRoot.forEachChild((bouquetNode,treepath)->{
+			if (bsTree.isExpanded(treepath)) {
+				int[] indices = new int[bouquetNode.children.size()];
+				for (int i=0; i<bouquetNode.children.size(); i++) {
+					indices[i] = i;
+					BSTreeNode.StationNode stationNode = bouquetNode.children.get(i);
+					stationNode.updatePlayableState(baseURL);
+				}
+				SwingUtilities.invokeLater(()->{
+					if (bsTreeModel!=null)
+						bsTreeModel.nodesChanged(bouquetNode, indices);
+				});
+			}
 		});
 	}
 
@@ -225,6 +289,49 @@ class BouquetsNStations extends JPanel {
 		
 		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
 		main.openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
+	}
+	
+	private static class Updater {
+		private final ScheduledExecutorService scheduler;
+		private ScheduledFuture<?> taskHandle;
+		private final long interval_sec;
+		private final Runnable task;
+
+		@SuppressWarnings("unused")
+		Updater(long interval_sec, Runnable task) {
+			this.interval_sec = interval_sec;
+			this.task = task;
+			
+			int prio;
+			if      (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-2) prio = Thread.NORM_PRIORITY-2;
+			else if (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-1) prio = Thread.NORM_PRIORITY-1;
+			else prio = Thread.NORM_PRIORITY;
+			
+			scheduler = Executors.newSingleThreadScheduledExecutor(run->{
+				Thread thread = new Thread(run);
+				thread.setPriority(prio);
+				return thread;
+			});
+		}
+
+		public void runOnce() {
+			scheduler.execute(task);
+		}
+
+		@SuppressWarnings("unused")
+		public void runOnce(Runnable task) {
+			scheduler.execute(task);
+		}
+
+		public void start() {
+			taskHandle = scheduler.scheduleWithFixedDelay(task, 0, interval_sec, TimeUnit.SECONDS);
+		}
+
+		public void stop() {
+			taskHandle.cancel(false);
+			taskHandle = null;
+		}
+		
 	}
 
 	private static class ValuePanel {
@@ -375,6 +482,11 @@ class BouquetsNStations extends JPanel {
 				out.add(0, "Icon", "%s", "none");
 			else
 				out.add(0, "Icon", "%d x %d", stationNode.icon.getIconWidth(), stationNode.icon.getIconHeight());
+			
+			if (stationNode.isServicePlayable==null)
+				out.add(0, "Is Playable", "%s", "undefined");
+			else
+				out.add(0, "Is Playable", stationNode.isServicePlayable);
 			
 			String output = out.generateOutput();
 			
@@ -612,13 +724,26 @@ class BouquetsNStations extends JPanel {
 	private static class BSTreeCellRenderer extends DefaultTreeCellRenderer {
 		private static final long serialVersionUID = 8843157059053309466L;
 
-		@Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus) {
-			Component comp = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+		@Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean isSelected, boolean isExpanded, boolean isLeaf, int row, boolean hasFocus) {
+			Component comp = super.getTreeCellRendererComponent(tree, value, isSelected, isExpanded, isLeaf, row, hasFocus);
 			
 			if (value instanceof BSTreeNode) {
 				BSTreeNode<?,?> treeNode = (BSTreeNode<?,?>) value;
 				setIcon(treeNode.icon);
 			}
+			if (value instanceof BSTreeNode.StationNode) {
+				BSTreeNode.StationNode stationNode = (BSTreeNode.StationNode) value;
+				if (stationNode.isMarker()) {
+					if (!isSelected) setForeground(Color.BLACK);
+					
+				} else if (stationNode.isServicePlayable==null) {
+					if (!isSelected) setForeground(Color.MAGENTA);
+					
+				} else {
+					if (!isSelected) setForeground(stationNode.isServicePlayable ? Color.BLACK : Color.GRAY);
+				}
+			} else
+				if (!isSelected) setForeground(Color.BLACK);
 			
 			return comp;
 		}
@@ -638,6 +763,15 @@ class BouquetsNStations extends JPanel {
 			this.name = name;
 			this.children = new Vector<>();
 			icon = null;
+		}
+
+		public void forEachChild(Consumer<ChildType> action) { children.forEach(action); }
+		public void forEachChild(BiConsumer<ChildType,TreePath> action) { forEachChild(null, action); }
+		public void forEachChild(TreePath myPath, BiConsumer<ChildType,TreePath> action) {
+			TreePath myPath_;
+			if (myPath==null) myPath_ = new TreePath(this);
+			else              myPath_ = myPath;
+			forEachChild(child->action.accept(child, myPath_.pathByAddingChild(child))); 
 		}
 
 		@Override public String toString() { return name; }
@@ -679,24 +813,34 @@ class BouquetsNStations extends JPanel {
 		
 		private static class StationNode extends BSTreeNode<BouquetNode, StationNode> {
 			
-			public Vector<EPGevent> epgEvents;
 			final Bouquet.SubService subservice;
+			Vector<EPGevent> epgEvents;
 			BufferedImage piconImage;
+			Boolean isServicePlayable;
 		
 			private StationNode(BouquetNode parent, Bouquet.SubService subservice) {
 				super(parent, !subservice.isMarker() ? String.format("[%d] %s", subservice.pos, subservice.name) : subservice.name);
 				this.subservice = subservice;
 				this.epgEvents = null;
+				this.isServicePlayable = null;
 				//aquirePicon(); // only on demand
 			}
 
-			public void updateEPG(String baseURL) {
+			void updateEPG(String baseURL) {
 				epgEvents = OpenWebifTools.getCurrentEPGevent(baseURL, getStationID());
+			}
+			void updatePlayableState(String baseURL) {
+				if (isMarker()) return;
+				isServicePlayable = OpenWebifTools.getIsServicePlayable(baseURL, getStationID());
+			}
+
+			boolean isMarker() {
+				return subservice.isMarker();
 			}
 
 			@Override public boolean getAllowsChildren() { return subservice==null; }
 		
-			private void aquirePicon() {
+			void aquirePicon() {
 				PICON_LOADER.addTask(this,getStationID());
 			}
 
@@ -704,13 +848,13 @@ class BouquetsNStations extends JPanel {
 				return subservice.service.stationID;
 			}
 		
-			private void setPicon(BufferedImage piconImage) {
+			void setPicon(BufferedImage piconImage) {
 				BufferedImage scaledImage = scaleImage(piconImage,ROW_HEIGHT,Color.BLACK);
 				ImageIcon icon = scaledImage==null ? null : new ImageIcon(scaledImage);
 				setPicon(piconImage, icon);
 			}
 		
-			private void setPicon(BufferedImage piconImage, Icon icon) {
+			void setPicon(BufferedImage piconImage, Icon icon) {
 				this.piconImage = piconImage;
 				this.icon = icon;
 			}

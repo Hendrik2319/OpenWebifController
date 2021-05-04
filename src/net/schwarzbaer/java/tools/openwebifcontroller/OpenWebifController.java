@@ -64,7 +64,8 @@ public class OpenWebifController {
 	
 	static class AppSettings extends Settings<AppSettings.ValueGroup,AppSettings.ValueKey> {
 		enum ValueKey {
-			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser, JavaVM, BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap,
+			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser, JavaVM,
+			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {
@@ -109,6 +110,12 @@ public class OpenWebifController {
 		JMenuBar menuBar = new JMenuBar();
 		JMenu settingsMenu = menuBar.add(createMenu("Settings"));
 		
+		settingsMenu.add(createMenuItem("Set Base URL", e->{
+			String baseURL = askUserForBaseURL();
+			if (baseURL!=null)
+				System.out.printf("Set Base URL to \"%s\"%n", baseURL);
+		}));
+		settingsMenu.addSeparator();
 		settingsMenu.add(createMenuItem("Set Path to VideoPlayer", e->{
 			File file = askUserForVideoPlayer();
 			if (file!=null) System.out.printf("Set VideoPlayer to \"%s\"%n", file.getAbsolutePath());
@@ -119,12 +126,7 @@ public class OpenWebifController {
 		}));
 		settingsMenu.add(createMenuItem("Set Path to Browser", e->{
 			File file = askUserForBrowser();
-			if (file!=null) System.out.printf("Set VideoPlayer to \"%s\"%n", file.getAbsolutePath());
-		}));
-		settingsMenu.add(createMenuItem("Set Base URL", e->{
-			String baseURL = askUserForBaseURL();
-			if (baseURL!=null)
-				System.out.printf("Set Base URL to \"%s\"%n", baseURL);
+			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		
 		mainWindow.setIconImagesFromResource("/AppIcons/AppIcon","16.png","24.png","32.png","48.png","64.png");
@@ -198,7 +200,10 @@ public class OpenWebifController {
 	}
 
 	String getBaseURL() {
-		if (!settings.contains(AppSettings.ValueKey.BaseURL))
+		return getBaseURL(true);
+	}
+	String getBaseURL(boolean askUser) {
+		if (!settings.contains(AppSettings.ValueKey.BaseURL) && askUser)
 			return askUserForBaseURL();
 		return settings.getString(AppSettings.ValueKey.BaseURL, null);
 	}

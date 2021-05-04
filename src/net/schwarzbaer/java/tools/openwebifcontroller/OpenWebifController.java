@@ -97,37 +97,37 @@ public class OpenWebifController {
 		private final long interval_sec;
 		private final Runnable task;
 	
-		@SuppressWarnings("unused")
 		Updater(long interval_sec, Runnable task) {
 			this.interval_sec = interval_sec;
 			this.task = task;
+			scheduler = Executors.newSingleThreadScheduledExecutor();
 			
-			int prio;
-			if      (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-2) prio = Thread.NORM_PRIORITY-2;
-			else if (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-1) prio = Thread.NORM_PRIORITY-1;
-			else prio = Thread.NORM_PRIORITY;
-			
-			scheduler = Executors.newSingleThreadScheduledExecutor(run->{
-				Thread thread = new Thread(run);
-				thread.setPriority(prio);
-				return thread;
-			});
+			//int prio;
+			//if      (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-2) prio = Thread.NORM_PRIORITY-2;
+			//else if (Thread.MIN_PRIORITY<Thread.NORM_PRIORITY-1) prio = Thread.NORM_PRIORITY-1;
+			//else prio = Thread.NORM_PRIORITY;
+			//
+			//scheduler = Executors.newSingleThreadScheduledExecutor(run->{
+			//	Thread thread = new Thread(run);
+			//	thread.setPriority(prio);
+			//	return thread;
+			//});
 		}
 	
 		public void runOnce() {
-			System.out.printf("[0x%08X|%s] Updater.runOnce()%n"         , Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
 			runOnce(task);
-			System.out.printf("[0x%08X|%s] Updater.runOnce() finished%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
 		}
 	
 		public void runOnce(Runnable task) {
+			//System.out.printf("[0x%08X|%s] Updater.runOnce()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
 			scheduler.execute(task);
+			//System.out.printf("[0x%08X|%s] Updater.runOnce() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 		}
 	
 		public void start() {
-			System.out.printf("[0x%08X|%s] Updater.start()%n"         , Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
+			//System.out.printf("[0x%08X|%s] Updater.start()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
 			taskHandle = scheduler.scheduleWithFixedDelay(task, 0, interval_sec, TimeUnit.SECONDS);
-			System.out.printf("[0x%08X|%s] Updater.start() finished%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
+			//System.out.printf("[0x%08X|%s] Updater.start() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 		}
 	
 		public void stop() {
@@ -201,6 +201,10 @@ public class OpenWebifController {
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
 		});
+	}
+
+	static String getCurrentTimeStr() {
+		return dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
 	}
 
 	static JCheckBoxMenuItem createCheckBoxMenuItem(String title, boolean isChecked, Consumer<Boolean> setValue) {

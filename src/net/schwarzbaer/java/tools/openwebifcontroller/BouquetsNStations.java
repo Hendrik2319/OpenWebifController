@@ -792,45 +792,61 @@ class BouquetsNStations extends JPanel {
 		@SuppressWarnings("rawtypes")
 		@Override public Enumeration children() { return children.elements(); }
 		
-		private static class RootNode extends BSTreeNode<RootNode, BouquetNode> {
+		static class StationList {
+			private final HashMap<String,Vector<StationNode>> stations;
+			StationList() { stations = new HashMap<>(); }
+
+			public void add(String idStr, StationNode stationNode) {
+				Vector<StationNode> stationsWithID = stations.get(idStr);
+				if (stationsWithID==null)
+					stations.put(idStr,stationsWithID = new Vector<>());
+				stationsWithID.add(stationNode);
+			}
+		}
+		
+		static class RootNode extends BSTreeNode<RootNode, BouquetNode> {
 			
 			final BouquetData bouquetData;
+			final StationList stations;
 
 			RootNode(BouquetData bouquetData) {
 				super(null, "Bouquets");
 				this.bouquetData = bouquetData;
+				this.stations = new StationList();
+				
 				for (Bouquet bouquet:bouquetData.bouquets)
-					children.add(new BouquetNode(this,bouquet));
+					children.add(new BouquetNode(this,bouquet,stations));
 				icon = TreeIcons.Folder.getIcon();
 			}
 		}
 		
-		private static class BouquetNode extends BSTreeNode<RootNode, StationNode> {
+		static class BouquetNode extends BSTreeNode<RootNode, StationNode> {
 		
 			final Bouquet bouquet;
 
-			private BouquetNode(RootNode parent, Bouquet bouquet) {
+			private BouquetNode(RootNode parent, Bouquet bouquet, StationList stations) {
 				super(parent,bouquet.name);
 				this.bouquet = bouquet;
 				for (Bouquet.SubService subservice:this.bouquet.subservices)
-					children.add(new StationNode(this,subservice));
+					children.add(new StationNode(this,subservice,stations));
 				icon = TreeIcons.Folder.getIcon();
 			}
 		}
 		
-		private static class StationNode extends BSTreeNode<BouquetNode, StationNode> {
+		static class StationNode extends BSTreeNode<BouquetNode, StationNode> {
 			
 			final Bouquet.SubService subservice;
 			Vector<EPGevent> epgEvents;
 			BufferedImage piconImage;
 			Boolean isServicePlayable;
 		
-			private StationNode(BouquetNode parent, Bouquet.SubService subservice) {
+			private StationNode(BouquetNode parent, Bouquet.SubService subservice, StationList stations) {
 				super(parent, !subservice.isMarker() ? String.format("[%d] %s", subservice.pos, subservice.name) : subservice.name);
 				this.subservice = subservice;
 				this.epgEvents = null;
 				this.isServicePlayable = null;
 				//aquirePicon(); // only on demand
+				stations.add(getStationID().toIDStr(),this);
 			}
 
 			void updateEPG(String baseURL) {

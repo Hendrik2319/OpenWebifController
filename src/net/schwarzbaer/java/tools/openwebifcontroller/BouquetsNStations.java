@@ -11,10 +11,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Vector;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -106,7 +109,7 @@ class BouquetsNStations extends JPanel {
 		add(centerPanel,BorderLayout.CENTER);
 		add(statusLine,BorderLayout.SOUTH);
 		
-		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U, miUpdatePlayableStatesNow;
+		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U, miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet;
 		ContextMenu treeContextMenu = new ContextMenu();
 		
 		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", e->{
@@ -119,7 +122,7 @@ class BouquetsNStations extends JPanel {
 		}));
 		
 		playableStatesUpdater = new OpenWebifController.Updater(10,()->{
-			String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
+			String timeStr = getCurrentTimeStr();
 			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: started%n", Thread.currentThread().hashCode(), timeStr);
 			//new Thread(()->{
 			//	String timeStr1 = OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
@@ -127,11 +130,11 @@ class BouquetsNStations extends JPanel {
 				updatePlayableStates();
 			//	System.out.printf("[0x%08X|%s] updatePlayableStates(): finished (%s started)%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false), timeStr1);
 			//}).start();
-			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: finished (%s started)%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false), timeStr);
+			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: finished (%s started)%n", Thread.currentThread().hashCode(), getCurrentTimeStr(), timeStr);
 		});
 		updatePlayableStatesPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, false);
 		treeContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Update 'Is Playable' States Periodically", updatePlayableStatesPeriodically, isChecked->{
-			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
+			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, updatePlayableStatesPeriodically=isChecked);
 			if (updatePlayableStatesPeriodically)
 				playableStatesUpdater.start();
@@ -139,11 +142,25 @@ class BouquetsNStations extends JPanel {
 				playableStatesUpdater.stop();
 		}));
 		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", e->{
-			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
+			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 			playableStatesUpdater.runOnce();
 		}));
 		
 		treeContextMenu.addSeparator();
+		
+		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", e->{
+			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+			String baseURL = this.main.getBaseURL();
+			if (baseURL==null) return;
+			Runnable task = ()->{
+				String timeStr = getCurrentTimeStr();
+				System.out.printf("[0x%08X|%s] updatePlayableStates(BouquetNode): started%n", Thread.currentThread().hashCode(), timeStr);
+				updatePlayableStates(baseURL, clickedBouquetNode);
+				System.out.printf("[0x%08X|%s] updatePlayableStates(BouquetNode): finished (%s started)%n", Thread.currentThread().hashCode(), getCurrentTimeStr(), timeStr);
+			};
+			//new Thread( task ).start();
+			playableStatesUpdater.runOnce( task );
+		}));
 		
 		treeContextMenu.add(miWriteStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", e->{
 			if (clickedBouquetNode==null) return;
@@ -190,15 +207,31 @@ class BouquetsNStations extends JPanel {
 				if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
 			}
 			miLoadPicons.setEnabled(clickedBouquetNode!=null || clickedStationNode!=null);
-			miLoadPicons.setText(clickedBouquetNode!=null ? "Load Picons of Stations" : clickedStationNode!=null ? String.format("Load Picon of \"%s\"", clickedStationNode.subservice.name) : "Load Picons");
+			miLoadPicons.setText(
+					clickedBouquetNode!=null ?
+							String.format("Load Picons of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
+							clickedStationNode!=null ?
+									String.format("Load Picon of \"%s\"", clickedStationNode.subservice.name) :
+									"Load Picons"
+			);
 			
 			miSwitchToStation.setEnabled(clickedStationNode!=null);
 			miStreamStation  .setEnabled(clickedStationNode!=null);
 			miSwitchToStation.setText(clickedStationNode!=null ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
 			miStreamStation  .setText(clickedStationNode!=null ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
 			
-			miWriteStreamsToM3U.setEnabled(clickedBouquetNode!=null);
-			miWriteStreamsToM3U.setText(clickedBouquetNode!=null ? String.format("Write Streams of Bouquet \"%s\" to M3U-File", clickedBouquetNode.bouquet.name) : "Write Streams of Bouquet to M3U-File");
+			miUpdatePlayableStatesBouquet.setEnabled(clickedBouquetNode!=null);
+			miWriteStreamsToM3U          .setEnabled(clickedBouquetNode!=null);
+			miUpdatePlayableStatesBouquet.setText(
+					clickedBouquetNode!=null ?
+							String.format("Update 'Is Playable' States of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
+							"Update 'Is Playable' States of Bouquet"
+			);
+			miWriteStreamsToM3U.setText(
+					clickedBouquetNode!=null ?
+							String.format("Write Streams of Bouquet \"%s\" to M3U-File", clickedBouquetNode.bouquet.name) :
+							"Write Streams of Bouquet to M3U-File"
+			);
 			
 			miUpdatePlayableStatesNow.setEnabled(!updatePlayableStatesPeriodically);
 		});
@@ -219,24 +252,79 @@ class BouquetsNStations extends JPanel {
 			playableStatesUpdater.start();
 	}
 
-	private void updatePlayableStates() { // TODO: Warum blockiert die GUI während diese Methode läuft?
+	private void updatePlayableStates(String baseURL, BSTreeNode.BouquetNode bouquetNode) {
+		int[] indices = new int[bouquetNode.children.size()];
+		for (int i=0; i<bouquetNode.children.size(); i++) {
+			indices[i] = i;
+			BSTreeNode.StationNode stationNode = bouquetNode.children.get(i);
+			stationNode.updatePlayableState(baseURL);
+			SwingUtilities.invokeLater(()->{ if (bsTreeModel!=null) bsTreeModel.nodeChanged(stationNode); });
+		}
+	}
+
+	private void updatePlayableStates() {
 		if (bsTreeRoot==null) return;
 		String baseURL = main.getBaseURL(false);
 		if (baseURL==null) return;
+		
 		bsTreeRoot.forEachChild((bouquetNode,treepath)->{
-			if (bsTree.isExpanded(treepath)) {
-				int[] indices = new int[bouquetNode.children.size()];
-				for (int i=0; i<bouquetNode.children.size(); i++) {
-					indices[i] = i;
-					BSTreeNode.StationNode stationNode = bouquetNode.children.get(i);
-					stationNode.updatePlayableState(baseURL);
-				}
-				SwingUtilities.invokeLater(()->{
-					if (bsTreeModel!=null)
-						bsTreeModel.nodesChanged(bouquetNode, indices);
-				});
+			if (isExpanded(bouquetNode.name,treepath)) {
+				updatePlayableStates(baseURL, bouquetNode);
 			}
 		});
+	}
+	
+	private static class ValueContainer<ValueType> {
+		ValueType value;
+		boolean isUnset;
+		ValueContainer() {
+			isUnset = true;
+		}
+		void set(ValueType value) {
+			this.value = value;
+			isUnset = false;
+		}
+	}
+
+	private boolean isExpanded(String nodeLabel, TreePath treepath) {
+		System.out.printf("[0x%08X|%s] isExpanded( \"%s\", %s )%n", Thread.currentThread().hashCode(), getCurrentTimeStr(), nodeLabel, toString(treepath));
+		ValueContainer<Boolean> isExpanded = new ValueContainer<>();
+		invokeAndWait(String.format("JTree.isExpanded(\"%s\")",nodeLabel),()->isExpanded.set(bsTree.isExpanded(treepath)));
+		if (isExpanded.isUnset) return false;
+		return isExpanded.value.booleanValue();
+	}
+
+	private String toString(TreePath treepath) {
+		if (treepath==null) return "null";
+		Iterator<String> it = Arrays.stream(treepath.getPath()).map(obj->{
+			if (obj instanceof BSTreeNode) {
+				BSTreeNode<?,?> bsTreeNode = (BSTreeNode<?,?>) obj;
+				return String.format("\"%s\"", bsTreeNode.name);
+			}
+			return obj==null ? "null" : obj.toString();
+		}).iterator();
+		Iterable<String> iterable = ()->it;
+		return String.join(", ", iterable);
+	}
+
+	private void invokeAndWait(String taskLabel, Runnable task) {
+		String timeStr = getCurrentTimeStr();
+		System.out.printf("[0x%08X|%s] invokeAndWait(Runnable[%s]): started%n", Thread.currentThread().hashCode(), timeStr, taskLabel);
+		try {
+			SwingUtilities.invokeAndWait(()->{
+				String timeStr1 = getCurrentTimeStr();
+				System.out.printf("[0x%08X|%s] invokeAndWait(Runnable[%s]).task: started%n", Thread.currentThread().hashCode(), timeStr1, taskLabel);
+				task.run();
+				System.out.printf("[0x%08X|%s] invokeAndWait(Runnable[%s]).task: finished (%s started)%n", Thread.currentThread().hashCode(), getCurrentTimeStr(), taskLabel, timeStr1);
+			});
+		} catch (InvocationTargetException | InterruptedException e) {
+			System.err.printf("%s while executing SwingUtilities.invokeAndWait: %s%n", e.getClass().getName(), e);
+		}
+		System.out.printf("[0x%08X|%s] invokeAndWait(Runnable[%s]): finished (%s started)%n", Thread.currentThread().hashCode(), getCurrentTimeStr(), taskLabel, timeStr);
+	}
+
+	private String getCurrentTimeStr() {
+		return OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
 	}
 
 	void readData(String baseURL, ProgressDialog pd) {
@@ -722,8 +810,8 @@ class BouquetsNStations extends JPanel {
 			this.children = new Vector<>();
 			icon = null;
 		}
-
-		public void forEachChild(Consumer<ChildType> action) { children.forEach(action); }
+		
+		public void forEachChild(Consumer<ChildType> action) { for (ChildType child:children) action.accept(child); }
 		public void forEachChild(BiConsumer<ChildType,TreePath> action) { forEachChild(null, action); }
 		public void forEachChild(TreePath myPath, BiConsumer<ChildType,TreePath> action) {
 			TreePath myPath_;

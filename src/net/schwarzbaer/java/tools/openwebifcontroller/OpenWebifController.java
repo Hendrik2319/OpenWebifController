@@ -30,19 +30,20 @@ import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.system.DateTimeFormatter;
 import net.schwarzbaer.system.Settings;
 
 public class OpenWebifController {
 	
 	private static IconSource.CachedIcons<TreeIcons> TreeIconsIS = IconSource.createCachedIcons(16, 16, "/images/TreeIcons.png", TreeIcons.values());
-	enum TreeIcons {
+	public enum TreeIcons {
 		Folder, GreenFolder;
-		Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
+		public Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
 	}
 	
-	static AppSettings settings;
-	static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();
+	public static AppSettings settings;
+	public static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();
 
 	public static void main(String[] args) {
 		if (args.length>0) {
@@ -66,8 +67,8 @@ public class OpenWebifController {
 			.initialize();
 	}
 	
-	static class AppSettings extends Settings<AppSettings.ValueGroup,AppSettings.ValueKey> {
-		enum ValueKey {
+	public static class AppSettings extends Settings<AppSettings.ValueGroup,AppSettings.ValueKey> {
+		public enum ValueKey {
 			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser, JavaVM,
 			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates,
 		}
@@ -91,13 +92,13 @@ public class OpenWebifController {
 		
 	}
 
-	static class Updater {
+	public static class Updater {
 		private final ScheduledExecutorService scheduler;
 		private ScheduledFuture<?> taskHandle;
 		private final long interval_sec;
 		private final Runnable task;
 	
-		Updater(long interval_sec, Runnable task) {
+		public Updater(long interval_sec, Runnable task) {
 			this.interval_sec = interval_sec;
 			this.task = task;
 			scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -137,7 +138,7 @@ public class OpenWebifController {
 		
 	}
 
-	final StandardMainWindow mainWindow;
+	public final StandardMainWindow mainWindow;
 	private final Movies movies;
 	private final JFileChooser exeFileChooser;
 	private final BouquetsNStations bouquetsNStations;
@@ -207,13 +208,13 @@ public class OpenWebifController {
 		return dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
 	}
 
-	static JCheckBoxMenuItem createCheckBoxMenuItem(String title, boolean isChecked, Consumer<Boolean> setValue) {
+	public static JCheckBoxMenuItem createCheckBoxMenuItem(String title, boolean isChecked, Consumer<Boolean> setValue) {
 		JCheckBoxMenuItem comp = new JCheckBoxMenuItem(title,isChecked);
 		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
 		return comp;
 	}
 
-	static JMenuItem createMenuItem(String title, ActionListener al) {
+	public static JMenuItem createMenuItem(String title, ActionListener al) {
 		JMenuItem comp = new JMenuItem(title);
 		if (al!=null) comp.addActionListener(al);
 		return comp;
@@ -234,8 +235,8 @@ public class OpenWebifController {
 		return out.generateOutput();
 	}
 
-	void openUrlInVideoPlayer(String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL", url); }
-	void openFileInVideoPlayer(File file, String taskLabel) { openInVideoPlayer(taskLabel, "File", file.getAbsolutePath()); }
+	public void openUrlInVideoPlayer(String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL", url); }
+	public void openFileInVideoPlayer(File file, String taskLabel) { openInVideoPlayer(taskLabel, "File", file.getAbsolutePath()); }
 
 	private void openInVideoPlayer(String taskLabel, String targetLabel, String target) {
 		File videoPlayer = getVideoPlayer();
@@ -253,10 +254,10 @@ public class OpenWebifController {
 		catch (IOException ex) { System.err.printf("IOException while starting video player: %s%n", ex.getMessage()); }
 	}
 
-	String getBaseURL() {
+	public String getBaseURL() {
 		return getBaseURL(true);
 	}
-	String getBaseURL(boolean askUser) {
+	public String getBaseURL(boolean askUser) {
 		if (!settings.contains(AppSettings.ValueKey.BaseURL) && askUser)
 			return askUserForBaseURL();
 		return settings.getString(AppSettings.ValueKey.BaseURL, null);

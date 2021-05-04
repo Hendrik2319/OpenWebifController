@@ -130,10 +130,6 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 		}
 
 		@Override public boolean getAllowsChildren() { return subservice==null; }
-	
-		void aquirePicon() {
-			BouquetsNStations.PICON_LOADER.addTask(getStationID());
-		}
 
 		StationID getStationID() {
 			return subservice.service.stationID;

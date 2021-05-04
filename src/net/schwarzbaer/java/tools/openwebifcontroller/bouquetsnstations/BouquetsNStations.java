@@ -155,11 +155,16 @@ public class BouquetsNStations extends JPanel {
 		
 		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", e->{
 			if (clickedBouquetNode!=null) {
-				PICON_LOADER.setBaseURL(this.main.getBaseURL());
-				clickedBouquetNode.children.forEach(BSTreeNode.StationNode::aquirePicon);
+				String baseURL = this.main.getBaseURL();
+				if (baseURL==null) return;
+				PICON_LOADER.setBaseURL(baseURL);
+				for (BSTreeNode.StationNode stationNode:clickedBouquetNode.children)
+					PICON_LOADER.addTask(stationNode.getStationID());
 			} else if (clickedStationNode!=null) {
-				PICON_LOADER.setBaseURL(this.main.getBaseURL());
-				clickedStationNode.aquirePicon();
+				String baseURL = this.main.getBaseURL();
+				if (baseURL==null) return;
+				PICON_LOADER.setBaseURL(baseURL);
+				PICON_LOADER.addTask(clickedStationNode.getStationID());
 			}
 		}));
 		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e->{

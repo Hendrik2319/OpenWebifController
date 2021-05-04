@@ -125,7 +125,7 @@ class PiconLoader {
 	
 	private static class PiconCache {
 		
-		private final HashMap<String,PiconCache.CachedPicon> cache;
+		private final HashMap<String,CachedPicon> cache;
 		
 		PiconCache() {
 			cache = new HashMap<>();
@@ -136,7 +136,7 @@ class PiconLoader {
 		synchronized void clear() {
 			cache.clear();
 		}
-		synchronized PiconCache.CachedPicon get(StationID stationID) {
+		synchronized CachedPicon get(StationID stationID) {
 			return cache.get(stationID.toIDStr());
 		}
 		synchronized boolean contains(StationID stationID) {

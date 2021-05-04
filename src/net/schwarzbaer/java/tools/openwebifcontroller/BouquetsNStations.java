@@ -120,13 +120,18 @@ class BouquetsNStations extends JPanel {
 		
 		playableStatesUpdater = new OpenWebifController.Updater(10,()->{
 			String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
-			System.out.printf("PlayableStatesUpdater[0x%08X]: started (%s)%n", Thread.currentThread().hashCode(), timeStr);
-			updatePlayableStates();
-			System.out.printf("PlayableStatesUpdater[0x%08X]: finished (%s -> %s)%n", Thread.currentThread().hashCode(), timeStr, OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
+			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: started%n", Thread.currentThread().hashCode(), timeStr);
+			//new Thread(()->{
+			//	String timeStr1 = OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
+			//	System.out.printf("[0x%08X|%s] updatePlayableStates(): started%n", Thread.currentThread().hashCode(), timeStr1);
+				updatePlayableStates();
+			//	System.out.printf("[0x%08X|%s] updatePlayableStates(): finished (%s started)%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false), timeStr1);
+			//}).start();
+			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: finished (%s started)%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false), timeStr);
 		});
 		updatePlayableStatesPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, false);
 		treeContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Update 'Is Playable' States Periodically", updatePlayableStatesPeriodically, isChecked->{
-			System.out.printf("PlayableStatesUpdater[0x%08X]: GUI action%n", Thread.currentThread().hashCode());
+			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, updatePlayableStatesPeriodically=isChecked);
 			if (updatePlayableStatesPeriodically)
 				playableStatesUpdater.start();
@@ -134,7 +139,7 @@ class BouquetsNStations extends JPanel {
 				playableStatesUpdater.stop();
 		}));
 		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", e->{
-			System.out.printf("PlayableStatesUpdater[0x%08X]: GUI action%n", Thread.currentThread().hashCode());
+			System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
 			playableStatesUpdater.runOnce();
 		}));
 		
@@ -214,7 +219,7 @@ class BouquetsNStations extends JPanel {
 			playableStatesUpdater.start();
 	}
 
-	private void updatePlayableStates() {
+	private void updatePlayableStates() { // TODO: Warum blockiert die GUI während diese Methode läuft?
 		if (bsTreeRoot==null) return;
 		String baseURL = main.getBaseURL(false);
 		if (baseURL==null) return;

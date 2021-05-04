@@ -115,7 +115,9 @@ public class OpenWebifController {
 		}
 	
 		public void runOnce() {
-			scheduler.execute(task);
+			System.out.printf("[0x%08X|%s] Updater.runOnce()%n"         , Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
+			runOnce(task);
+			System.out.printf("[0x%08X|%s] Updater.runOnce() finished%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
 		}
 	
 		public void runOnce(Runnable task) {
@@ -123,7 +125,9 @@ public class OpenWebifController {
 		}
 	
 		public void start() {
+			System.out.printf("[0x%08X|%s] Updater.start()%n"         , Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
 			taskHandle = scheduler.scheduleWithFixedDelay(task, 0, interval_sec, TimeUnit.SECONDS);
+			System.out.printf("[0x%08X|%s] Updater.start() finished%n", Thread.currentThread().hashCode(), OpenWebifController.dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false));
 		}
 	
 		public void stop() {

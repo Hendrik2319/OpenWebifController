@@ -32,6 +32,7 @@ import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.gui.ValueListOutput;
@@ -47,6 +48,7 @@ class Movies extends JSplitPane {
 	private static final DateTimeFormatter dtFormatter = new DateTimeFormatter();
 
 	private final OpenWebifController main;
+	private final StandardMainWindow mainWindow;
 	
 	private final JTree locationsTree;
 	private final JTable movieTable;
@@ -63,9 +65,10 @@ class Movies extends JSplitPane {
 	private LocationTreeNode clickedTreeNode;
 	private MovieList.Movie clickedMovie;
 
-	Movies(OpenWebifController main) {
+	Movies(OpenWebifController main, StandardMainWindow mainWindow) {
 		
 		this.main = main;
+		this.mainWindow = mainWindow;
 		locationsRoot = null;
 		locationsTreeModel = null;
 		selectedTreePath = null;
@@ -305,7 +308,7 @@ class Movies extends JSplitPane {
 	}
 
 	private MovieList getMovieList(String dir) {
-		return ProgressDialog.runWithProgressDialogRV(main.mainWindow, "Load MovieList", 400, pd->{
+		return ProgressDialog.runWithProgressDialogRV(mainWindow, "Load MovieList", 400, pd->{
 			String baseURL = main.getBaseURL();
 			return getMovieList(baseURL, dir, pd);
 		});

@@ -4,8 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Graphics2D;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -13,16 +11,8 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Vector;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -32,27 +22,26 @@ import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.FileChooser;
 import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.ResponseMessage;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
 
 public class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
-	private static final PiconLoader PICON_LOADER = new PiconLoader();
+	static final PiconLoader PICON_LOADER = new PiconLoader();
 	
 	private final OpenWebifController main;
+	private final StandardMainWindow mainWindow;
 	private final JTree bsTree;
 	private final JLabel statusLine;
 	private final ValuePanel valuePanel;
@@ -69,11 +58,12 @@ public class BouquetsNStations extends JPanel {
 	private TreePath selectedTreePath;
 	private boolean updatePlayableStatesPeriodically;
 
-	public BouquetsNStations(OpenWebifController main) {
+	public BouquetsNStations(OpenWebifController main, StandardMainWindow mainWindow) {
 		super(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		this.main = main;
+		this.mainWindow = mainWindow;
 		bsTreeRoot = null;
 		bsTreeModel = null;
 		PICON_LOADER.clear();
@@ -106,7 +96,7 @@ public class BouquetsNStations extends JPanel {
 		ContextMenu treeContextMenu = new ContextMenu();
 		
 		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", e->{
-			ProgressDialog.runWithProgressDialog(this.main.mainWindow, "Reload Bouquets", 400, pd->{
+			ProgressDialog.runWithProgressDialog(this.mainWindow, "Reload Bouquets", 400, pd->{
 				String baseURL = this.main.getBaseURL();
 				if (baseURL==null) return;
 				
@@ -154,7 +144,7 @@ public class BouquetsNStations extends JPanel {
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
 			
-			if (m3uFileChooser.showSaveDialog(this.main.mainWindow)!=FileChooser.APPROVE_OPTION) return;
+			if (m3uFileChooser.showSaveDialog(this.mainWindow)!=FileChooser.APPROVE_OPTION) return;
 			File m3uFile = m3uFileChooser.getSelectedFile();
 			
 			writeStreamsToM3U(clickedBouquetNode.bouquet,baseURL,m3uFile);
@@ -336,185 +326,6 @@ public class BouquetsNStations extends JPanel {
 		main.openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
 	}
 	
-	private static class PiconLoader {
-
-		private final ArrayDeque<Task> solvedTasks = new ArrayDeque<>();
-		private final ArrayDeque<Task> tasks = new ArrayDeque<>();
-		private final PiconCache piconCache = new PiconCache();
-		private DefaultTreeModel treeModel = null;
-		private BSTreeNode.RootNode rootNode = null;
-		private Thread taskThread = null;
-		private String baseURL = null;
-		private JLabel statusLine = null;
-
-		private synchronized void startTasks() {
-			if (taskThread!=null)
-				return;
-			taskThread = new Thread(()->{
-				System.out.println("PiconLoader.start");
-				while (performTask());
-				System.out.println("PiconLoader.end");
-				SwingUtilities.invokeLater(()->statusLine.setText(" "));
-			});
-			taskThread.start();
-		}
-
-		private synchronized void updateStatus() {
-			String msg = String.format("Picon Loader : %d pending tasks, %d tree nodes to update, %d picons cached", tasks.size(), solvedTasks.size(), piconCache.size());
-			SwingUtilities.invokeLater(()->statusLine.setText(msg));
-		}
-
-		private boolean performTask() {
-			updateStatus();
-			
-			Task task = null;
-			DefaultTreeModel localTreeModel = null;
-			BSTreeNode.RootNode localRootNode = null;
-			synchronized (this) {
-				if (treeModel!=null && rootNode!=null && !solvedTasks.isEmpty()) {
-					task = solvedTasks.pollFirst();
-					localTreeModel = treeModel;
-					localRootNode  = rootNode;
-				}
-			}
-			if (task!=null) {
-				task.updateTreeNode(localTreeModel, localRootNode, piconCache);
-				return true;
-			}
-			
-			String localBaseURL = null;
-			synchronized (this) {
-				if (baseURL!=null && !tasks.isEmpty()) {
-					task = tasks.pollFirst();
-					localBaseURL = baseURL;
-				}
-				
-			}
-			if (task!=null) {
-				task.readImage(localBaseURL, piconCache);
-				synchronized (this) {
-					localTreeModel = treeModel;
-					localRootNode  = rootNode;
-				}
-				
-				if (localTreeModel!=null)
-					task.updateTreeNode(localTreeModel, localRootNode, piconCache);
-				else
-					synchronized (this) { solvedTasks.addLast(task); }
-				return true;
-			}
-			
-			boolean isEverythingDone = false;
-			synchronized (this) {
-				isEverythingDone = solvedTasks.isEmpty() && tasks.isEmpty();
-				if (isEverythingDone)
-					taskThread = null;
-			}
-			
-			return !isEverythingDone;
-		}
-
-		synchronized void clear() {
-			treeModel = null;
-			rootNode = null;
-			baseURL = null;
-			tasks.clear();
-			solvedTasks.clear();
-			clearPiconCache();
-		}
-
-		synchronized void clearPiconCache() {
-			piconCache.clear();
-		}
-
-		synchronized void setStatusOutput(JLabel statusLine) {
-			this.statusLine = statusLine;
-		}
-
-		synchronized void setBaseURL(String baseURL) {
-			this.baseURL = baseURL;
-		}
-
-		synchronized void addTask(StationID stationID) {
-			tasks.add(new Task(stationID));
-			startTasks();
-		}
-
-		synchronized void setTreeModel(DefaultTreeModel treeModel, BSTreeNode.RootNode rootNode) {
-			this.treeModel = treeModel;
-			this.rootNode = rootNode;
-			startTasks();
-		}
-		
-		private static class PiconCache {
-			
-			private final HashMap<String,CachedPicon> cache;
-			
-			PiconCache() {
-				cache = new HashMap<>();
-			}
-			synchronized int size() {
-				return cache.size();
-			}
-			synchronized void clear() {
-				cache.clear();
-			}
-			synchronized CachedPicon get(StationID stationID) {
-				return cache.get(stationID.toIDStr());
-			}
-			synchronized boolean contains(StationID stationID) {
-				return cache.containsKey(stationID.toIDStr());
-			}
-			synchronized void put(StationID stationID, BufferedImage piconImage, Icon icon) {
-				cache.put(stationID.toIDStr(), new CachedPicon(piconImage, icon));
-			}
-			
-			private static class CachedPicon {
-				final BufferedImage piconImage;
-				final Icon icon;
-				CachedPicon(BufferedImage piconImage, Icon icon) {
-					this.piconImage = piconImage;
-					this.icon = icon;
-				}
-				@SuppressWarnings("unused")
-				boolean isEmpty() {
-					return piconImage==null && icon==null;
-				}
-			}
-		}
-		
-		private static class Task {
-			private final StationID stationID;
-			
-			Task(StationID stationID) {
-				this.stationID = stationID;
-			}
-			
-			void readImage(String baseURL, PiconCache piconCache) {
-				if (baseURL==null || stationID==null) return;
-				if (!piconCache.contains(stationID)) {
-					BufferedImage piconImage = OpenWebifTools.getPicon(baseURL, stationID);
-					Icon icon = BSTreeNode.StationNode.getIcon(piconImage);
-					piconCache.put(stationID, piconImage, icon);
-				}
-			}
-			
-			void updateTreeNode(DefaultTreeModel treeModel, BSTreeNode.RootNode rootNode, PiconCache piconCache) {
-				Vector<BSTreeNode.StationNode> stations = rootNode.stations.get(stationID);
-				if (stations!=null && !stations.isEmpty()) {
-					PiconCache.CachedPicon cachedPicon = piconCache.get(stationID);
-					if (cachedPicon!=null)
-						for (BSTreeNode.StationNode treeNode:stations)
-							treeNode.setPicon(cachedPicon.piconImage, cachedPicon.icon);
-					SwingUtilities.invokeLater(()->{
-						for (BSTreeNode.StationNode treeNode:stations)
-							treeModel.nodeChanged(treeNode);
-					});
-				}
-			}
-		}
-	}
-
 	private static class BSTreeCellRenderer extends DefaultTreeCellRenderer {
 		private static final long serialVersionUID = 8843157059053309466L;
 
@@ -542,152 +353,6 @@ public class BouquetsNStations extends JPanel {
 			return comp;
 		}
 		
-	}
-	
-	static class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implements TreeNode {
-		
-		static final int ROW_HEIGHT = 20;
-		final ParentType parent;
-		final String name;
-		final Vector<ChildType> children;
-		Icon icon;
-	
-		private BSTreeNode(ParentType parent, String name) {
-			this.parent = parent;
-			this.name = name;
-			this.children = new Vector<>();
-			icon = null;
-		}
-		
-		public void forEachChild(Consumer<ChildType> action) { for (ChildType child:children) action.accept(child); }
-		public void forEachChild(BiConsumer<ChildType,TreePath> action) { forEachChild(null, action); }
-		public void forEachChild(TreePath myPath, BiConsumer<ChildType,TreePath> action) {
-			TreePath myPath_;
-			if (myPath==null) myPath_ = new TreePath(this);
-			else              myPath_ = myPath;
-			forEachChild(child->action.accept(child, myPath_.pathByAddingChild(child))); 
-		}
-
-		@Override public String toString() { return name; }
-
-		@Override public TreeNode getParent() { return parent; }
-		@Override public int getChildCount() { return children.size(); }
-		@Override public TreeNode getChildAt(int childIndex) { return children.get(childIndex); }
-		@Override public int getIndex(TreeNode node) { return children.indexOf(node); }
-		@Override public boolean getAllowsChildren() { return true; }
-		@Override public boolean isLeaf() { return children.isEmpty(); }
-		@SuppressWarnings("rawtypes")
-		@Override public Enumeration children() { return children.elements(); }
-		
-		static class StationList {
-			private final HashMap<String,Vector<StationNode>> stations;
-			StationList() { stations = new HashMap<>(); }
-
-			public void add(StationID stationID, StationNode stationNode) {
-				Vector<StationNode> stationsWithID = get(stationID);
-				if (stationsWithID==null)
-					stations.put(stationID.toIDStr(),stationsWithID = new Vector<>());
-				stationsWithID.add(stationNode);
-			}
-
-			public Vector<StationNode> get(StationID stationID) {
-				return stations.get(stationID.toIDStr());
-			}
-		}
-		
-		static class RootNode extends BSTreeNode<RootNode, BouquetNode> {
-			
-			final BouquetData bouquetData;
-			final StationList stations;
-
-			RootNode(BouquetData bouquetData) {
-				super(null, "Bouquets");
-				this.bouquetData = bouquetData;
-				this.stations = new StationList();
-				
-				for (Bouquet bouquet:bouquetData.bouquets)
-					children.add(new BouquetNode(this,bouquet,stations));
-				icon = TreeIcons.Folder.getIcon();
-			}
-		}
-		
-		static class BouquetNode extends BSTreeNode<RootNode, StationNode> {
-		
-			final Bouquet bouquet;
-
-			private BouquetNode(RootNode parent, Bouquet bouquet, StationList stations) {
-				super(parent,bouquet.name);
-				this.bouquet = bouquet;
-				for (Bouquet.SubService subservice:this.bouquet.subservices)
-					children.add(new StationNode(this,subservice,stations));
-				icon = TreeIcons.Folder.getIcon();
-			}
-		}
-		
-		static class StationNode extends BSTreeNode<BouquetNode, StationNode> {
-			
-			final Bouquet.SubService subservice;
-			Vector<EPGevent> epgEvents;
-			BufferedImage piconImage;
-			Boolean isServicePlayable;
-		
-			private StationNode(BouquetNode parent, Bouquet.SubService subservice, StationList stations) {
-				super(parent, !subservice.isMarker() ? String.format("[%d] %s", subservice.pos, subservice.name) : subservice.name);
-				this.subservice = subservice;
-				this.epgEvents = null;
-				this.isServicePlayable = null;
-				//aquirePicon(); // only on demand
-				stations.add(getStationID(),this);
-			}
-
-			void updateEPG(String baseURL) {
-				epgEvents = OpenWebifTools.getCurrentEPGevent(baseURL, getStationID());
-			}
-			void updatePlayableState(String baseURL) {
-				if (isMarker()) return;
-				isServicePlayable = OpenWebifTools.getIsServicePlayable(baseURL, getStationID());
-			}
-
-			boolean isMarker() {
-				return subservice.isMarker();
-			}
-
-			@Override public boolean getAllowsChildren() { return subservice==null; }
-		
-			void aquirePicon() {
-				PICON_LOADER.addTask(getStationID());
-			}
-
-			StationID getStationID() {
-				return subservice.service.stationID;
-			}
-		
-			void setPicon(BufferedImage piconImage) {
-				setPicon(piconImage, getIcon(piconImage));
-			}
-
-			void setPicon(BufferedImage piconImage, Icon icon) {
-				this.piconImage = piconImage;
-				this.icon = icon;
-			}
-		
-			static Icon getIcon(BufferedImage piconImage) {
-				BufferedImage scaledImage = scaleImage(piconImage,ROW_HEIGHT,Color.BLACK);
-				return scaledImage==null ? null : new ImageIcon(scaledImage);
-			}
-
-			private static BufferedImage scaleImage(BufferedImage img, int newHeight, Color bgColor) {
-				if (img==null) return null;
-				int h = img.getHeight();
-				int w = img.getWidth();
-				int newWidth = (int) Math.round(w*newHeight / (double)h);
-				BufferedImage newImg = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
-				Graphics2D g2 = newImg.createGraphics();
-				//g2.setRenderingHint(RenderingHints., hintValue);
-				g2.drawImage(img, 0,0, newWidth,newHeight, bgColor, null);
-				return newImg;
-			}
-		}
 	}
 	
 }

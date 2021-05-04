@@ -16,7 +16,6 @@ import net.schwarzbaer.gui.ImageView;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
-import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BSTreeNode;
 import net.schwarzbaer.system.DateTimeFormatter;
 
 class ValuePanel {

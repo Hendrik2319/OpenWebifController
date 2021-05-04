@@ -138,7 +138,7 @@ public class OpenWebifController {
 		
 	}
 
-	public final StandardMainWindow mainWindow;
+	private final StandardMainWindow mainWindow;
 	private final Movies movies;
 	private final JFileChooser exeFileChooser;
 	private final BouquetsNStations bouquetsNStations;
@@ -150,8 +150,8 @@ public class OpenWebifController {
 		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
 		
 		mainWindow = new StandardMainWindow("OpenWebif Controller");
-		movies = new Movies(this);
-		bouquetsNStations = new BouquetsNStations(this);
+		movies = new Movies(this,mainWindow);
+		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		
 		JTabbedPane contentPane = new JTabbedPane();
 		contentPane.addTab("Movies", movies);
@@ -220,11 +220,11 @@ public class OpenWebifController {
 		return comp;
 	}
 
-	static JMenu createMenu(String title) {
+	public static JMenu createMenu(String title) {
 		return new JMenu(title);
 	}
 
-	static String toString(Process process) {
+	public static String toString(Process process) {
 		ValueListOutput out = new ValueListOutput();
 		out.add(0, "Process", process.toString());
 		try { out.add(0, "Exit Value", process.exitValue()); }

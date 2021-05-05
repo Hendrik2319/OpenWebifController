@@ -46,6 +46,7 @@ public class BouquetsNStations extends JPanel {
 	private final JLabel statusLine;
 	private final ValuePanel valuePanel;
 	private final FileChooser m3uFileChooser;
+	private final FileChooser txtFileChooser;
 	private final OpenWebifController.Updater playableStatesUpdater;
 	
 	private BSTreeNode.RootNode bsTreeRoot;
@@ -73,6 +74,7 @@ public class BouquetsNStations extends JPanel {
 		clickedStationNode = null;
 		
 		m3uFileChooser = new FileChooser("Playlist", "m3u");
+		txtFileChooser = new FileChooser("Text-File", "txt");
 		
 		bsTree = new JTree(bsTreeModel);
 		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
@@ -97,10 +99,42 @@ public class BouquetsNStations extends JPanel {
 		
 		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", e->{
 			ProgressDialog.runWithProgressDialog(this.mainWindow, "Reload Bouquets", 400, pd->{
+				SwingUtilities.invokeLater(()->{
+					pd.setTaskTitle("Bouquets 'n' Stations: Get BaseURL");
+					pd.setIndeterminate(true);
+				});
 				String baseURL = this.main.getBaseURL();
 				if (baseURL==null) return;
 				
 				readData(baseURL,pd);
+			});
+		}));
+		
+		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", e->{
+			if (bsTreeRoot==null) return;
+			
+			ProgressDialog.runWithProgressDialog(this.mainWindow, "Save Stations to TabSeparated-File", 400, pd -> {
+				SwingUtilities.invokeLater(()->{
+					pd.setTaskTitle("Choose Output File");
+					pd.setIndeterminate(true);
+				});
+				
+				if (txtFileChooser.showSaveDialog(mainWindow)!=FileChooser.APPROVE_OPTION) return;
+				File outFile = txtFileChooser.getSelectedFile();
+				
+				SwingUtilities.invokeLater(()->{
+					pd.setTaskTitle("Write to Output File");
+					pd.setIndeterminate(true);
+				});
+				try (PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outFile), StandardCharsets.UTF_8))) {
+					
+					for (Bouquet bouquet:bsTreeRoot.bouquetData.bouquets)
+						for (Bouquet.SubService subservice:bouquet.subservices)
+							out.printf("%s\t%s\t%s%n", bouquet.name, subservice.name, subservice.service.stationID.toJoinedStrings("\t","%d"));
+					
+				} catch (FileNotFoundException ex) {
+					ex.printStackTrace();
+				}
 			});
 		}));
 		

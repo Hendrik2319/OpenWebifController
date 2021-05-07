@@ -118,11 +118,11 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 		}
 
 		void updateEPG(String baseURL) {
-			epgEvents = OpenWebifTools.getCurrentEPGevent(baseURL, getStationID());
+			epgEvents = OpenWebifTools.getCurrentEPGevent(baseURL, getStationID(), null);
 		}
 		void updatePlayableState(String baseURL) {
 			if (isMarker()) return;
-			isServicePlayable = OpenWebifTools.getIsServicePlayable(baseURL, getStationID());
+			isServicePlayable = OpenWebifTools.getIsServicePlayable(baseURL, getStationID(), null);
 		}
 
 		boolean isMarker() {

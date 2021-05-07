@@ -1,6 +1,10 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.Point;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
@@ -12,16 +16,24 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
+import javax.swing.BorderFactory;
 import javax.swing.Icon;
+import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFileChooser;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSlider;
 import javax.swing.JTabbedPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -30,6 +42,7 @@ import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.system.DateTimeFormatter;
 import net.schwarzbaer.system.Settings;
@@ -142,6 +155,7 @@ public class OpenWebifController {
 	private final Movies movies;
 	private final JFileChooser exeFileChooser;
 	private final BouquetsNStations bouquetsNStations;
+	private final GeneralContol generalContol;
 
 	OpenWebifController() {
 		exeFileChooser = new JFileChooser("./");
@@ -153,10 +167,10 @@ public class OpenWebifController {
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		
-		JTabbedPane contentPane = new JTabbedPane();
-		contentPane.addTab("Movies", movies);
-		contentPane.addTab("Bouquets 'n' Stations", bouquetsNStations);
-		contentPane.setSelectedIndex(1);
+		JTabbedPane tabPanel = new JTabbedPane();
+		tabPanel.addTab("Movies", movies);
+		tabPanel.addTab("Bouquets 'n' Stations", bouquetsNStations);
+		tabPanel.setSelectedIndex(1);
 		
 		JMenuBar menuBar = new JMenuBar();
 		JMenu settingsMenu = menuBar.add(createMenu("Settings"));
@@ -180,6 +194,20 @@ public class OpenWebifController {
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		
+		generalContol = new GeneralContol(this);
+		
+		JPanel toolBar = new JPanel(new GridBagLayout());
+		GridBagConstraints c = new GridBagConstraints();
+		c.weightx = 0;
+		toolBar.add(generalContol.getPowerPanel(), c);
+		toolBar.add(generalContol.getVolumePanel(), c);
+		c.weightx = 1;
+		toolBar.add(new JLabel(""), c);
+		
+		JPanel contentPane = new JPanel(new BorderLayout());
+		contentPane.add(tabPanel,BorderLayout.CENTER);
+		contentPane.add(toolBar,BorderLayout.NORTH);
+		
 		mainWindow.setIconImagesFromResource("/AppIcons/AppIcon","16.png","24.png","32.png","48.png","64.png");
 		mainWindow.startGUI(contentPane, menuBar);
 		
@@ -201,11 +229,137 @@ public class OpenWebifController {
 			
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
+			generalContol.initialize(baseURL,pd);
 		});
+	}
+
+	static class GeneralContol {
+		
+		private final OpenWebifController main;
+		private final JPanel toolBarPower;
+		private final JPanel toolBarVolume;
+		private final JButton btnPower;
+		private final JTextField txtVolume;
+		private final JSlider sldrVolume;
+		private final Color defaultTextColor;
+		private final JButton btnVolUp;
+		private final JButton btnVolDown;
+		private final JButton btnVolMute;
+		private boolean ignoreSldrVolumeEvents;
+		
+		GeneralContol(OpenWebifController main) {
+			this.main = main;
+			
+			toolBarPower = new JPanel(new GridBagLayout());
+			GridBagConstraints c1 = new GridBagConstraints();
+			c1.weightx = 0; c1.weighty = 0;
+			toolBarPower.setBorder(BorderFactory.createTitledBorder("Power"));
+			toolBarPower.add(btnPower = createButton("on / off", null, true, e->{}), c1);
+			
+			toolBarVolume = new JPanel(new GridBagLayout());
+			GridBagConstraints c2 = new GridBagConstraints();
+			c2.weightx = 0; c2.weighty = 0;
+			toolBarVolume.setBorder(BorderFactory.createTitledBorder("Volume"));
+			toolBarVolume.add(txtVolume  = new JTextField("mute",7), c2);
+			toolBarVolume.add(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c2);
+			toolBarVolume.add(btnVolUp   = createButton("up"  , null, true, e->setVolUp  (null)), c2);
+			toolBarVolume.add(btnVolDown = createButton("down", null, true, e->setVolDown(null)), c2);
+			toolBarVolume.add(btnVolMute = createButton("mute", null, true, e->setVolMute(null)), c2);
+			
+			txtVolume.setEditable(false);
+			txtVolume.setHorizontalAlignment(JTextField.CENTER);
+			defaultTextColor = txtVolume.getForeground();
+			
+			ignoreSldrVolumeEvents = false;
+			sldrVolume.addChangeListener(e -> {
+				if (ignoreSldrVolumeEvents) return;
+				
+				int value = sldrVolume.getValue();
+				txtVolume.setText(Integer.toString(value));
+				
+				if (sldrVolume.getValueIsAdjusting()) {
+					txtVolume.setForeground(Color.GRAY);
+					
+				} else {
+					txtVolume.setForeground(defaultTextColor);
+					setVol(value,null);
+				}
+			});
+			
+		}
+	
+		void initialize(String baseURL, ProgressDialog pd) {
+			callVolumeCommand(baseURL, pd, "InitVolume", Volume::getState);
+		}
+
+		JPanel getPowerPanel() {
+			return toolBarPower;
+		}
+	
+		JPanel getVolumePanel() {
+			return toolBarVolume;
+		}
+
+		private void setVolUp  (     ProgressDialog pd) { callVolumeCommand(pd, "VolUp"  , Volume::setVolUp  ); }
+		private void setVolDown(     ProgressDialog pd) { callVolumeCommand(pd, "VolDown", Volume::setVolDown); }
+		private void setVolMute(     ProgressDialog pd) { callVolumeCommand(pd, "VolMute", Volume::setVolMute); }
+		private void setVol(int vol, ProgressDialog pd) { callVolumeCommand(pd, "SetVol", (baseURL,setTaskTitle)->Volume.setVol(baseURL, vol, setTaskTitle)); }
+		
+		private void callVolumeCommand(ProgressDialog pd, String taskLabel, BiFunction<String, Consumer<String>, Volume.Values> commandFcn) {
+			String baseURL = main.getBaseURL();
+			if (baseURL==null) return;
+			callVolumeCommand(baseURL, pd, taskLabel, commandFcn);
+		}
+
+		private void callVolumeCommand(String baseURL, ProgressDialog pd, String taskLabel, BiFunction<String, Consumer<String>, Volume.Values> commandFcn) {
+			setVolumePanelEnable(false);
+			new Thread(()->{
+				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->{
+					SwingUtilities.invokeLater(()->{
+						pd.setTaskTitle("GeneralContol."+taskLabel+": "+taskTitle);
+						pd.setIndeterminate(true);
+					});
+				};
+				Volume.Values values = commandFcn.apply(baseURL, setTaskTitle);
+				SwingUtilities.invokeLater(()->{
+					updateVolumePanel(values);
+					setVolumePanelEnable(true);
+				});
+			}).start();
+		}
+
+		private void updateVolumePanel(Volume.Values values) {
+			if (values==null) {
+				txtVolume.setText("???");
+			} else {
+				String format;
+				if (values.ismute) format = "mute (%d)";
+				else               format = "%d";
+				txtVolume.setText(String.format(format, values.current));
+				ignoreSldrVolumeEvents = true;
+				sldrVolume.setValue((int) values.current);
+				ignoreSldrVolumeEvents = false;
+			}
+		}
+
+		private void setVolumePanelEnable(boolean enabled) {
+			txtVolume .setEnabled(enabled);
+			sldrVolume.setEnabled(enabled);
+			btnVolUp  .setEnabled(enabled);
+			btnVolDown.setEnabled(enabled);
+			btnVolMute.setEnabled(enabled);
+		}
 	}
 
 	static String getCurrentTimeStr() {
 		return dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
+	}
+
+	public static JButton createButton(String text, Icon icon, boolean enabled, ActionListener al) {
+		JButton comp = new JButton(text,icon);
+		comp.setEnabled(enabled);
+		if (al!=null) comp.addActionListener(al);
+		return comp;
 	}
 
 	public static JCheckBoxMenuItem createCheckBoxMenuItem(String title, boolean isChecked, Consumer<Boolean> setValue) {

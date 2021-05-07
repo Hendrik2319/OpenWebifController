@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.LayoutManager;
 import java.awt.Point;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
@@ -12,6 +13,7 @@ import java.awt.event.ComponentListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Vector;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -23,6 +25,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
@@ -42,6 +45,7 @@ import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.system.DateTimeFormatter;
@@ -53,6 +57,14 @@ public class OpenWebifController {
 	public enum TreeIcons {
 		Folder, GreenFolder;
 		public Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
+	}
+	
+	private static IconSource.CachedIcons<CommandIcons> CommandIconsIS = IconSource.createCachedIcons(16, 16, 8, "/images/CommandIcons.png", CommandIcons.values());
+	public enum CommandIcons {
+		Muted, UnMuted, Up, Down, OnOff, Reload, Image, Save,
+		Muted_Dis, UnMuted_Dis, Up_Dis, Down_Dis, OnOff_Dis, Reload_Dis, Image_Dis, Save_Dis,
+		;
+		public Icon getIcon() { return CommandIconsIS.getCachedIcon(this); }
 	}
 	
 	public static AppSettings settings;
@@ -155,7 +167,8 @@ public class OpenWebifController {
 	private final Movies movies;
 	private final JFileChooser exeFileChooser;
 	private final BouquetsNStations bouquetsNStations;
-	private final GeneralContol generalContol;
+	private final VolumeContol volumeContol;
+	private final PowerContol powerContol;
 
 	OpenWebifController() {
 		exeFileChooser = new JFileChooser("./");
@@ -194,13 +207,14 @@ public class OpenWebifController {
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		
-		generalContol = new GeneralContol(this);
+		powerContol = new PowerContol(this);
+		volumeContol = new VolumeContol(this);
 		
 		JPanel toolBar = new JPanel(new GridBagLayout());
 		GridBagConstraints c = new GridBagConstraints();
 		c.weightx = 0;
-		toolBar.add(generalContol.getPowerPanel(), c);
-		toolBar.add(generalContol.getVolumePanel(), c);
+		toolBar.add(powerContol, c);
+		toolBar.add(volumeContol, c);
 		c.weightx = 1;
 		toolBar.add(new JLabel(""), c);
 		
@@ -229,42 +243,157 @@ public class OpenWebifController {
 			
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
-			generalContol.initialize(baseURL,pd);
+			powerContol .initialize(baseURL,pd);
+			volumeContol.initialize(baseURL,pd);
 		});
 	}
 
-	static class GeneralContol {
+	static abstract class AbstractContolPanel<ValueStructType> extends JPanel {
+		private static final long serialVersionUID = 1376060978837360833L;
 		
-		private final OpenWebifController main;
-		private final JPanel toolBarPower;
-		private final JPanel toolBarVolume;
+		protected final OpenWebifController main;
+		private final String controlLabel;
+		private final BiFunction<String, Consumer<String>, ValueStructType> updateCommand;
+	
+		AbstractContolPanel(LayoutManager layout, OpenWebifController main, String controlLabel, BiFunction<String, Consumer<String>, ValueStructType> updateCommand) {
+			super(layout);
+			this.main = main;
+			this.controlLabel = controlLabel;
+			this.updateCommand = updateCommand;
+		}
+		
+		void initialize(String baseURL, ProgressDialog pd) {
+			callVolumeCommand(baseURL, pd, "Init"+controlLabel, updateCommand);
+		}
+		
+		protected JButton createUpdateButton(String title, boolean withDelayedUpdate) {
+			return createUpdateButton(title, null, null, withDelayedUpdate);
+		}
+		protected JButton createUpdateButton(String title, Icon icon, boolean withDelayedUpdate) {
+			return createUpdateButton(title, icon, null, withDelayedUpdate);
+		}
+		protected JButton createUpdateButton(String title, Icon icon, Icon disIcon, boolean withDelayedUpdate) {
+			return createButton(title, icon, disIcon, true, e->{
+				callVolumeCommand(null, "Update"+controlLabel, withDelayedUpdate, updateCommand);
+			});
+		}
+		
+		protected void callVolumeCommand(ProgressDialog pd, String commandLabel, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
+			callVolumeCommand(pd, commandLabel, false, commandFcn);
+		}
+		protected void callVolumeCommand(ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
+			String baseURL = main.getBaseURL();
+			if (baseURL==null) return;
+			callVolumeCommand(baseURL, pd, commandLabel, withDelayedUpdate, commandFcn);
+		}
+		
+		protected void callVolumeCommand(String baseURL, ProgressDialog pd, String commandLabel, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
+			callVolumeCommand(baseURL, pd, commandLabel, false, commandFcn);
+		}
+		protected void callVolumeCommand(String baseURL, ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
+			setPanelEnable(false);
+			new Thread(()->{
+				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->{
+					SwingUtilities.invokeLater(()->{
+						pd.setTaskTitle(String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle));
+						pd.setIndeterminate(true);
+					});
+				};
+				
+				ValueStructType values, valuesPre = commandFcn.apply(baseURL, setTaskTitle);
+				
+				if (withDelayedUpdate && updateCommand!=null) {
+					synchronized (this) {
+						long time_ms = System.currentTimeMillis();
+						for (long dur=time_ms+500-System.currentTimeMillis(); dur>5; dur=time_ms+500-System.currentTimeMillis()) {
+							try { wait(dur); }
+							catch (InterruptedException e) { System.err.printf("InterruptedException while waiting for AbstractContolPanel.Update: %s%n", e.getMessage()); }
+						}
+					}
+					values = updateCommand.apply(baseURL, setTaskTitle);
+				} else
+					values = valuesPre;
+				
+				SwingUtilities.invokeLater(()->{
+					updatePanel(values);
+					setPanelEnable(true);
+				});
+			}).start();
+		}
+		
+		protected abstract void updatePanel(ValueStructType values);
+		protected abstract void setPanelEnable(boolean enabled);
+	}
+
+	static class PowerContol extends AbstractContolPanel<Power.Values> {
+		private static final long serialVersionUID = 3842993673551313089L;
+		
 		private final JButton btnPower;
+		private final JComboBox<Power.Commands> cmbbxSetOtherState;
+		private final JButton btnUpdate;
+		
+		PowerContol(OpenWebifController main) {
+			super(new GridBagLayout(),main,"PowerContol",Power::getState);
+			setBorder(BorderFactory.createTitledBorder("Power"));
+			
+			GridBagConstraints c = new GridBagConstraints();
+			c.weightx = 0;
+			c.weighty = 0;
+			c.fill = GridBagConstraints.BOTH;
+			
+			add(btnPower = createButton("Toggle StandBy", CommandIcons.OnOff.getIcon(), CommandIcons.OnOff_Dis.getIcon(), true, e->{
+				callVolumeCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle));
+			}), c);
+			
+			Vector<Power.Commands> items = new Vector<>(Arrays.asList(Power.Commands.values()));
+			items.remove(Power.Commands.ToggleStandBy);
+			add(cmbbxSetOtherState = createComboBox(items, Power.Commands.Wakeup, cmd->{
+				callVolumeCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->Power.setState(baseURL, cmd, setTaskTitle));
+			}), c);
+			
+			add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true), c);
+		}
+
+		@Override protected void updatePanel(Power.Values values) {
+			if (values==null) return;
+			if (values.instandby) btnPower.setText("Switch On");
+			else btnPower.setText("Switch to Standby");
+		}
+
+		@Override protected void setPanelEnable(boolean enabled) {
+			btnPower.setEnabled(enabled);
+			cmbbxSetOtherState.setEnabled(enabled);
+			btnUpdate.setEnabled(enabled);
+		}
+	}
+
+	static class VolumeContol extends AbstractContolPanel<Volume.Values> {
+		private static final long serialVersionUID = 6164405483744214580L;
+		
 		private final JTextField txtVolume;
 		private final JSlider sldrVolume;
 		private final Color defaultTextColor;
 		private final JButton btnVolUp;
 		private final JButton btnVolDown;
 		private final JButton btnVolMute;
+		private final JButton btnUpdate;
 		private boolean ignoreSldrVolumeEvents;
 		
-		GeneralContol(OpenWebifController main) {
-			this.main = main;
+		VolumeContol(OpenWebifController main) {
+			super(new GridBagLayout(),main,"VolumeContol",Volume::getState);
+			setBorder(BorderFactory.createTitledBorder("Volume"));
 			
-			toolBarPower = new JPanel(new GridBagLayout());
-			GridBagConstraints c1 = new GridBagConstraints();
-			c1.weightx = 0; c1.weighty = 0;
-			toolBarPower.setBorder(BorderFactory.createTitledBorder("Power"));
-			toolBarPower.add(btnPower = createButton("on / off", null, true, e->{}), c1);
+			GridBagConstraints c = new GridBagConstraints();
+			c.weightx = 0;
+			c.weighty = 0;
+			c.fill = GridBagConstraints.BOTH;
 			
-			toolBarVolume = new JPanel(new GridBagLayout());
-			GridBagConstraints c2 = new GridBagConstraints();
-			c2.weightx = 0; c2.weighty = 0;
-			toolBarVolume.setBorder(BorderFactory.createTitledBorder("Volume"));
-			toolBarVolume.add(txtVolume  = new JTextField("mute",7), c2);
-			toolBarVolume.add(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c2);
-			toolBarVolume.add(btnVolUp   = createButton("up"  , null, true, e->setVolUp  (null)), c2);
-			toolBarVolume.add(btnVolDown = createButton("down", null, true, e->setVolDown(null)), c2);
-			toolBarVolume.add(btnVolMute = createButton("mute", null, true, e->setVolMute(null)), c2);
+			add(txtVolume  = new JTextField("mute",7), c);
+			add(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c);
+			add(btnVolDown = createButton("-", true, e->setVolDown(null)), c);
+			add(btnVolUp   = createButton("+", true, e->setVolUp  (null)), c);
+			add(btnVolMute = createButton("Mute", CommandIcons.Muted.getIcon(), CommandIcons.Muted_Dis.getIcon(), true, e->setVolMute(null)), c);
+			add(btnUpdate  = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), false), c);
 			
 			txtVolume.setEditable(false);
 			txtVolume.setHorizontalAlignment(JTextField.CENTER);
@@ -285,56 +414,29 @@ public class OpenWebifController {
 					setVol(value,null);
 				}
 			});
-			
 		}
 	
-		void initialize(String baseURL, ProgressDialog pd) {
-			callVolumeCommand(baseURL, pd, "InitVolume", Volume::getState);
-		}
-
-		JPanel getPowerPanel() {
-			return toolBarPower;
-		}
-	
-		JPanel getVolumePanel() {
-			return toolBarVolume;
-		}
-
 		private void setVolUp  (     ProgressDialog pd) { callVolumeCommand(pd, "VolUp"  , Volume::setVolUp  ); }
 		private void setVolDown(     ProgressDialog pd) { callVolumeCommand(pd, "VolDown", Volume::setVolDown); }
 		private void setVolMute(     ProgressDialog pd) { callVolumeCommand(pd, "VolMute", Volume::setVolMute); }
 		private void setVol(int vol, ProgressDialog pd) { callVolumeCommand(pd, "SetVol", (baseURL,setTaskTitle)->Volume.setVol(baseURL, vol, setTaskTitle)); }
-		
-		private void callVolumeCommand(ProgressDialog pd, String taskLabel, BiFunction<String, Consumer<String>, Volume.Values> commandFcn) {
-			String baseURL = main.getBaseURL();
-			if (baseURL==null) return;
-			callVolumeCommand(baseURL, pd, taskLabel, commandFcn);
-		}
 
-		private void callVolumeCommand(String baseURL, ProgressDialog pd, String taskLabel, BiFunction<String, Consumer<String>, Volume.Values> commandFcn) {
-			setVolumePanelEnable(false);
-			new Thread(()->{
-				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->{
-					SwingUtilities.invokeLater(()->{
-						pd.setTaskTitle("GeneralContol."+taskLabel+": "+taskTitle);
-						pd.setIndeterminate(true);
-					});
-				};
-				Volume.Values values = commandFcn.apply(baseURL, setTaskTitle);
-				SwingUtilities.invokeLater(()->{
-					updateVolumePanel(values);
-					setVolumePanelEnable(true);
-				});
-			}).start();
-		}
-
-		private void updateVolumePanel(Volume.Values values) {
+		@Override protected void updatePanel(Volume.Values values) {
 			if (values==null) {
 				txtVolume.setText("???");
 			} else {
 				String format;
-				if (values.ismute) format = "mute (%d)";
-				else               format = "%d";
+				if (values.ismute) {
+					format = "mute (%d)";
+					btnVolMute.setIcon(CommandIcons.UnMuted.getIcon());
+					btnVolMute.setDisabledIcon(CommandIcons.UnMuted_Dis.getIcon());
+					btnVolMute.setText("UnMute");
+				} else {
+					format = "%d";
+					btnVolMute.setIcon(CommandIcons.Muted.getIcon());
+					btnVolMute.setDisabledIcon(CommandIcons.Muted_Dis.getIcon());
+					btnVolMute.setText("Mute");
+				}
 				txtVolume.setText(String.format(format, values.current));
 				ignoreSldrVolumeEvents = true;
 				sldrVolume.setValue((int) values.current);
@@ -342,12 +444,13 @@ public class OpenWebifController {
 			}
 		}
 
-		private void setVolumePanelEnable(boolean enabled) {
+		@Override protected void setPanelEnable(boolean enabled) {
 			txtVolume .setEnabled(enabled);
 			sldrVolume.setEnabled(enabled);
 			btnVolUp  .setEnabled(enabled);
 			btnVolDown.setEnabled(enabled);
 			btnVolMute.setEnabled(enabled);
+			btnUpdate .setEnabled(enabled);
 		}
 	}
 
@@ -355,8 +458,34 @@ public class OpenWebifController {
 		return dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
 	}
 
+	public static <E> JComboBox<E> createComboBox(E[] items, E initialValue, Consumer<E> setValue) {
+		return confirureComboBox(new JComboBox<E>(items), initialValue, setValue);
+	}
+
+	public static <E> JComboBox<E> createComboBox(Vector<E> items, E initialValue, Consumer<E> setValue) {
+		return confirureComboBox(new JComboBox<E>(items), initialValue, setValue);
+	}
+	
+	public static <E> JComboBox<E> confirureComboBox(JComboBox<E> comp, E initialValue, Consumer<E> setValue) {
+		comp.setSelectedItem(initialValue);
+		if (setValue!=null)
+			comp.addActionListener(e->{
+				int i = comp.getSelectedIndex();
+				if (i<0) setValue.accept(null);
+				else setValue.accept(comp.getItemAt(i));
+			});
+		return comp;
+	}
+
+	public static JButton createButton(String text, boolean enabled, ActionListener al) {
+		return createButton(text, null, null, enabled, al);
+	}
 	public static JButton createButton(String text, Icon icon, boolean enabled, ActionListener al) {
+		return createButton(text, icon, null, enabled, al);
+	}
+	public static JButton createButton(String text, Icon icon, Icon disabledIcon, boolean enabled, ActionListener al) {
 		JButton comp = new JButton(text,icon);
+		if (disabledIcon!=null) comp.setDisabledIcon(disabledIcon);
 		comp.setEnabled(enabled);
 		if (al!=null) comp.addActionListener(al);
 		return comp;
@@ -369,7 +498,14 @@ public class OpenWebifController {
 	}
 
 	public static JMenuItem createMenuItem(String title, ActionListener al) {
-		JMenuItem comp = new JMenuItem(title);
+		return createMenuItem(title, null, null, al);
+	}
+	public static JMenuItem createMenuItem(String title, Icon icon, ActionListener al) {
+		return createMenuItem(title, icon, null, al);
+	}
+	public static JMenuItem createMenuItem(String title, Icon icon, Icon disabledIcon, ActionListener al) {
+		JMenuItem comp = new JMenuItem(title,icon);
+		if (disabledIcon!=null) comp.setDisabledIcon(disabledIcon);
 		if (al!=null) comp.addActionListener(al);
 		return comp;
 	}

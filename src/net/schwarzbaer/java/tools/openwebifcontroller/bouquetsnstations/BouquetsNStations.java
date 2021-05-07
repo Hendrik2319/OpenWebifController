@@ -35,6 +35,7 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.ResponseMessage;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 
 public class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
@@ -97,7 +98,7 @@ public class BouquetsNStations extends JPanel {
 		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U, miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet;
 		ContextMenu treeContextMenu = new ContextMenu();
 		
-		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", e->{
+		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
 			ProgressDialog.runWithProgressDialog(this.mainWindow, "Reload Bouquets", 400, pd->{
 				SwingUtilities.invokeLater(()->{
 					pd.setTaskTitle("Bouquets 'n' Stations: Get BaseURL");
@@ -110,7 +111,7 @@ public class BouquetsNStations extends JPanel {
 			});
 		}));
 		
-		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", e->{
+		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
 			if (bsTreeRoot==null) return;
 			
 			ProgressDialog.runWithProgressDialog(this.mainWindow, "Save Stations to TabSeparated-File", 400, pd -> {
@@ -153,14 +154,14 @@ public class BouquetsNStations extends JPanel {
 			else
 				playableStatesUpdater.stop();
 		}));
-		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", e->{
+		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
 			//System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 			playableStatesUpdater.runOnce();
 		}));
 		
 		treeContextMenu.addSeparator();
 		
-		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", e->{
+		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
 			//System.out.printf("[0x%08X|%s] updatePlayableStates(BouquetNode): GUI action%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
@@ -172,7 +173,7 @@ public class BouquetsNStations extends JPanel {
 			} );
 		}));
 		
-		treeContextMenu.add(miWriteStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", e->{
+		treeContextMenu.add(miWriteStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
 			if (clickedBouquetNode==null) return;
 			
 			String baseURL = this.main.getBaseURL();
@@ -187,7 +188,7 @@ public class BouquetsNStations extends JPanel {
 		
 		treeContextMenu.addSeparator();
 		
-		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", e->{
+		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", CommandIcons.Image.getIcon(), CommandIcons.Image_Dis.getIcon(), e->{
 			if (clickedBouquetNode!=null) {
 				String baseURL = this.main.getBaseURL();
 				if (baseURL==null) return;

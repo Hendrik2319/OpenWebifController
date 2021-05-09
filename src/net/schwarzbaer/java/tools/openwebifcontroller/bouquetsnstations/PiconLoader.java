@@ -3,7 +3,6 @@ package net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import java.util.HashMap;
-import java.util.Vector;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
@@ -55,7 +54,7 @@ class PiconLoader {
 			}
 		}
 		if (task!=null) {
-			task.updateTreeNode(localTreeModel, localRootNode, piconCache);
+			task.updateTreeNodes(localTreeModel, localRootNode, piconCache);
 			return true;
 		}
 		
@@ -75,7 +74,7 @@ class PiconLoader {
 			}
 			
 			if (localTreeModel!=null)
-				task.updateTreeNode(localTreeModel, localRootNode, piconCache);
+				task.updateTreeNodes(localTreeModel, localRootNode, piconCache);
 			else
 				synchronized (this) { solvedTasks.addLast(task); }
 			return true;
@@ -176,18 +175,13 @@ class PiconLoader {
 			}
 		}
 		
-		void updateTreeNode(DefaultTreeModel treeModel, BSTreeNode.RootNode rootNode, PiconCache piconCache) {
-			Vector<BSTreeNode.StationNode> stations = rootNode.stations.get(stationID);
-			if (stations!=null && !stations.isEmpty()) {
+		void updateTreeNodes(DefaultTreeModel treeModel, BSTreeNode.RootNode rootNode, PiconCache piconCache) {
+			rootNode.updateStationNodes(stationID, treeModel, stations->{
 				PiconCache.CachedPicon cachedPicon = piconCache.get(stationID);
 				if (cachedPicon!=null)
 					for (BSTreeNode.StationNode treeNode:stations)
 						treeNode.setPicon(cachedPicon.piconImage, cachedPicon.icon);
-				SwingUtilities.invokeLater(()->{
-					for (BSTreeNode.StationNode treeNode:stations)
-						treeModel.nodeChanged(treeNode);
-				});
-			}
+			});
 		}
 	}
 }

@@ -11,13 +11,15 @@ import java.util.function.Consumer;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.SwingUtilities;
+import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
 
@@ -86,6 +88,21 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 				children.add(new BouquetNode(this,bouquet,stations));
 			icon = TreeIcons.Folder.getIcon();
 		}
+
+		void updateStationNodes(StationID stationID, DefaultTreeModel treeModel, Consumer<Vector<BSTreeNode.StationNode>> doWithStationNodes) {
+			Vector<StationNode> stations = this.stations.get(stationID);
+			if (stations==null || stations.isEmpty())
+				return;
+			
+			if (doWithStationNodes!=null)
+				doWithStationNodes.accept(stations);
+			
+			if (treeModel!=null)
+				SwingUtilities.invokeLater(()->{
+					for (BSTreeNode.StationNode treeNode:stations)
+						treeModel.nodeChanged(treeNode);
+				});
+		}
 	}
 	
 	static class BouquetNode extends BSTreeNode<RootNode, StationNode> {
@@ -107,12 +124,14 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 		Vector<EPGevent> epgEvents;
 		BufferedImage piconImage;
 		Boolean isServicePlayable;
+		boolean isCurrentlyPlayed;
 	
 		private StationNode(BouquetNode parent, Bouquet.SubService subservice, StationList stations) {
 			super(parent, !subservice.isMarker() ? String.format("[%d] %s", subservice.pos, subservice.name) : subservice.name);
 			this.subservice = subservice;
 			this.epgEvents = null;
 			this.isServicePlayable = null;
+			this.isCurrentlyPlayed = false;
 			//aquirePicon(); // only on demand
 			stations.add(getStationID(),this);
 		}

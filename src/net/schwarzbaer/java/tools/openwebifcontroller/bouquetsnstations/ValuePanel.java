@@ -14,7 +14,7 @@ import javax.swing.tree.TreePath;
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.ImageView;
 import net.schwarzbaer.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 import net.schwarzbaer.system.DateTimeFormatter;
@@ -184,7 +184,7 @@ class ValuePanel {
 			else {
 				int level = stationNode.epgEvents.size()==1 ? 1 : 2;
 				for (int i=0; i<stationNode.epgEvents.size(); i++) {
-					OpenWebifTools.EPGevent event = stationNode.epgEvents.get(i);
+					EPGevent event = stationNode.epgEvents.get(i);
 					if (level==2) out.add(1, String.format("Event[%d]", i+1));
 					out.add(level, "Station"   , event.station_name);
 					out.add(level, "SRef"      , event.sref);

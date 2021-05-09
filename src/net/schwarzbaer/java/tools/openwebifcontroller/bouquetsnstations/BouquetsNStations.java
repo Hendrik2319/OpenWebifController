@@ -11,6 +11,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
@@ -32,6 +33,7 @@ import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.ResponseMessage;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
@@ -48,7 +50,7 @@ public class BouquetsNStations extends JPanel {
 	private final ValuePanel valuePanel;
 	private final FileChooser m3uFileChooser;
 	private final FileChooser txtFileChooser;
-	private final OpenWebifController.Updater playableStatesUpdater;
+	private final OpenWebifController.Updater periodicUpdater10s;
 	
 	private BSTreeNode.RootNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
@@ -59,6 +61,8 @@ public class BouquetsNStations extends JPanel {
 	private BSTreeNode.StationNode clickedStationNode;
 	private TreePath selectedTreePath;
 	private boolean updatePlayableStatesPeriodically;
+	private boolean updateCurrentStationPeriodically;
+	private CurrentStation currentStationData;
 
 	public BouquetsNStations(OpenWebifController main, StandardMainWindow mainWindow) {
 		super(new BorderLayout());
@@ -95,7 +99,8 @@ public class BouquetsNStations extends JPanel {
 		add(centerPanel,BorderLayout.CENTER);
 		add(statusLine,BorderLayout.SOUTH);
 		
-		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U, miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet;
+		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U;
+		JMenuItem miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet, miUpdateCurrentStationNow;
 		ContextMenu treeContextMenu = new ContextMenu();
 		
 		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
@@ -139,38 +144,35 @@ public class BouquetsNStations extends JPanel {
 			});
 		}));
 		
-		playableStatesUpdater = new OpenWebifController.Updater(10,()->{
-			//String timeStr = getCurrentTimeStr();
-			//System.out.printf("[0x%08X|%s] PlayableStatesUpdater: started%n", Thread.currentThread().hashCode(), timeStr);
-			updatePlayableStates();
-			//System.out.printf("[0x%08X|%s] PlayableStatesUpdater: finished (%s started)%n", Thread.currentThread().hashCode(), getCurrentTimeStr(), timeStr);
+		periodicUpdater10s = new OpenWebifController.Updater(10, () -> {
+			if (updatePlayableStatesPeriodically) updatePlayableStates();
+			if (updateCurrentStationPeriodically) updateCurrentStation();
 		});
+		
 		updatePlayableStatesPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, false);
 		treeContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Update 'Is Playable' States Periodically", updatePlayableStatesPeriodically, isChecked->{
-			//System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
-			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, updatePlayableStatesPeriodically=isChecked);
-			if (updatePlayableStatesPeriodically)
-				playableStatesUpdater.start();
-			else
-				playableStatesUpdater.stop();
+			startStopPeriodicUpdater10s( ()->updatePlayableStatesPeriodically=isChecked );
+			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, isChecked);
 		}));
 		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
-			//System.out.printf("[0x%08X|%s] PlayableStatesUpdater: GUI action%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
-			playableStatesUpdater.runOnce();
+			periodicUpdater10s.runOnce( () -> updatePlayableStates() );
+		}));
+		
+		updateCurrentStationPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, false);
+		treeContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Update 'Current Station' Periodically", updateCurrentStationPeriodically, isChecked->{
+			startStopPeriodicUpdater10s( ()->updateCurrentStationPeriodically=isChecked );
+			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, isChecked);
+		}));
+		treeContextMenu.add(miUpdateCurrentStationNow = OpenWebifController.createMenuItem("Update 'Current Station' Now", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
+			periodicUpdater10s.runOnce( () -> updateCurrentStation() );
 		}));
 		
 		treeContextMenu.addSeparator();
 		
 		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
-			//System.out.printf("[0x%08X|%s] updatePlayableStates(BouquetNode): GUI action%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
-			playableStatesUpdater.runOnce( ()->{
-				//String timeStr = getCurrentTimeStr();
-				//System.out.printf("[0x%08X|%s] updatePlayableStates(BouquetNode): started%n", Thread.currentThread().hashCode(), timeStr);
-				updatePlayableStates(baseURL, clickedBouquetNode);
-				//System.out.printf("[0x%08X|%s] updatePlayableStates(BouquetNode): finished (%s started)%n", Thread.currentThread().hashCode(), getCurrentTimeStr(), timeStr);
-			} );
+			periodicUpdater10s.runOnce( () -> updatePlayableStates(baseURL, clickedBouquetNode) );
 		}));
 		
 		treeContextMenu.add(miWriteStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
@@ -237,18 +239,19 @@ public class BouquetsNStations extends JPanel {
 			miStreamStation  .setText(clickedStationNode!=null ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
 			
 			miUpdatePlayableStatesBouquet.setEnabled(clickedBouquetNode!=null && !updatePlayableStatesPeriodically);
-			miWriteStreamsToM3U          .setEnabled(clickedBouquetNode!=null);
 			miUpdatePlayableStatesBouquet.setText(
 					clickedBouquetNode!=null ?
 							String.format("Update 'Is Playable' States of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
 							"Update 'Is Playable' States of Bouquet"
 			);
+			miWriteStreamsToM3U.setEnabled(clickedBouquetNode!=null);
 			miWriteStreamsToM3U.setText(
 					clickedBouquetNode!=null ?
 							String.format("Write Streams of Bouquet \"%s\" to M3U-File", clickedBouquetNode.bouquet.name) :
 							"Write Streams of Bouquet to M3U-File"
 			);
 			
+			miUpdateCurrentStationNow.setEnabled(!updateCurrentStationPeriodically);
 			miUpdatePlayableStatesNow.setEnabled(!updatePlayableStatesPeriodically);
 		});
 		
@@ -264,18 +267,60 @@ public class BouquetsNStations extends JPanel {
 			//}
 		});
 		
-		if (updatePlayableStatesPeriodically)
-			playableStatesUpdater.start();
+		if (shouldPeriodicUpdaterRun())
+			periodicUpdater10s.start();
+	}
+	
+	private boolean shouldPeriodicUpdaterRun() {
+		return updatePlayableStatesPeriodically ||
+				updateCurrentStationPeriodically;
 	}
 
-	private void updatePlayableStates(String baseURL, BSTreeNode.BouquetNode bouquetNode) {
-		int[] indices = new int[bouquetNode.children.size()];
-		for (int i=0; i<bouquetNode.children.size(); i++) {
-			indices[i] = i;
-			BSTreeNode.StationNode stationNode = bouquetNode.children.get(i);
-			stationNode.updatePlayableState(baseURL);
-			SwingUtilities.invokeLater(()->{ if (bsTreeModel!=null) bsTreeModel.nodeChanged(stationNode); });
+	private void startStopPeriodicUpdater10s(Runnable changeValues) {
+		boolean currentState = shouldPeriodicUpdaterRun();
+		changeValues.run();
+		boolean newState = shouldPeriodicUpdaterRun();
+		
+		if (currentState != newState) {
+			if (newState)
+				periodicUpdater10s.start();
+			else
+				periodicUpdater10s.stop();
 		}
+	}
+
+	private void updateCurrentStation() {
+		String baseURL = main.getBaseURL(false);
+		if (baseURL==null) return;
+		updateCurrentStation(baseURL, null);
+	}
+
+	private void updateCurrentStation(String baseURL, ProgressDialog pd) {
+		Consumer<String> setIndeterminateProgressTask = pd==null ? null : taskTitle -> {
+			SwingUtilities.invokeLater(()->{
+				pd.setTaskTitle("CurrentStation: "+taskTitle);
+				pd.setIndeterminate(true);
+			});
+		};
+		
+		updateCurrentlyPlayedStationNodes(false);
+		currentStationData = OpenWebifTools.getCurrentStation(baseURL, setIndeterminateProgressTask);
+		updateCurrentlyPlayedStationNodes(true);
+	}
+
+	private void updateCurrentlyPlayedStationNodes(boolean isCurrentlyPlayed) {
+		if (bsTreeRoot == null) return;
+		if (bsTreeModel == null) return;
+		if (currentStationData == null) return;
+		if (currentStationData.stationInfo == null) return;
+		StationID stationID = currentStationData.stationInfo.stationID;
+		if (stationID == null) return;
+		
+		bsTreeRoot.updateStationNodes(stationID, bsTreeModel, stations->{
+			stations.forEach(station->{
+				station.isCurrentlyPlayed=isCurrentlyPlayed;
+			});
+		});
 	}
 
 	private void updatePlayableStates() {
@@ -288,7 +333,17 @@ public class BouquetsNStations extends JPanel {
 				updatePlayableStates(baseURL, bouquetNode);
 		});
 	}
-	
+
+	private void updatePlayableStates(String baseURL, BSTreeNode.BouquetNode bouquetNode) {
+		int[] indices = new int[bouquetNode.children.size()];
+		for (int i=0; i<bouquetNode.children.size(); i++) {
+			indices[i] = i;
+			BSTreeNode.StationNode stationNode = bouquetNode.children.get(i);
+			stationNode.updatePlayableState(baseURL);
+			SwingUtilities.invokeLater(()->{ if (bsTreeModel!=null) bsTreeModel.nodeChanged(stationNode); });
+		}
+	}
+
 	private static class ValueContainer<ValueType> {
 		ValueType value;
 		boolean isUnset;
@@ -380,6 +435,9 @@ public class BouquetsNStations extends JPanel {
 				BSTreeNode.StationNode stationNode = (BSTreeNode.StationNode) value;
 				if (stationNode.isMarker()) {
 					if (!isSelected) setForeground(Color.BLACK);
+					
+				} else if (stationNode.isCurrentlyPlayed) {
+					if (!isSelected) setForeground(Color.BLUE);
 					
 				} else if (stationNode.isServicePlayable==null) {
 					if (!isSelected) setForeground(Color.MAGENTA);

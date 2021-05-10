@@ -5,12 +5,11 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 
 import javax.swing.Icon;
-import javax.swing.JLabel;
-import javax.swing.SwingUtilities;
 import javax.swing.tree.DefaultTreeModel;
 
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.StationID;
+import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.StatusOut;
 
 class PiconLoader {
 
@@ -21,23 +20,23 @@ class PiconLoader {
 	private BSTreeNode.RootNode rootNode = null;
 	private Thread taskThread = null;
 	private String baseURL = null;
-	private JLabel statusLine = null;
+	private StatusOut statusOut;
 
 	private synchronized void startTasks() {
 		if (taskThread!=null)
 			return;
 		taskThread = new Thread(()->{
-			System.out.println("PiconLoader.start");
+			//System.out.println("PiconLoader.start");
 			while (performTask());
-			System.out.println("PiconLoader.end");
-			SwingUtilities.invokeLater(()->statusLine.setText(" "));
+			//System.out.println("PiconLoader.end");
+			if (statusOut!=null) statusOut.clear();;
 		});
 		taskThread.start();
 	}
 
 	private synchronized void updateStatus() {
 		String msg = String.format("Picon Loader : %d pending tasks, %d tree nodes to update, %d picons cached", tasks.size(), solvedTasks.size(), piconCache.size());
-		SwingUtilities.invokeLater(()->statusLine.setText(msg));
+		if (statusOut!=null) statusOut.showMessage(msg);
 	}
 
 	private boolean performTask() {
@@ -103,8 +102,8 @@ class PiconLoader {
 		piconCache.clear();
 	}
 
-	synchronized void setStatusOutput(JLabel statusLine) {
-		this.statusLine = statusLine;
+	synchronized void setStatusOutput(StatusOut statusOut) {
+		this.statusOut = statusOut;
 	}
 
 	synchronized void setBaseURL(String baseURL) {

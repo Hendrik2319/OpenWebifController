@@ -17,7 +17,6 @@ import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
-import net.schwarzbaer.system.DateTimeFormatter;
 
 class ValuePanel {
 	private final Supplier<String> getBaseURL;
@@ -173,6 +172,8 @@ class ValuePanel {
 		else
 			out.add(0, "Is Playable", stationNode.isServicePlayable);
 		
+		out.add(0, "Is Currently Played", stationNode.isCurrentlyPlayed);
+		
 		String output = out.generateOutput();
 		
 		if (stationNode.epgEvents!=null) {
@@ -186,18 +187,7 @@ class ValuePanel {
 				for (int i=0; i<stationNode.epgEvents.size(); i++) {
 					EPGevent event = stationNode.epgEvents.get(i);
 					if (level==2) out.add(1, String.format("Event[%d]", i+1));
-					out.add(level, "Station"   , event.station_name);
-					out.add(level, "SRef"      , event.sref);
-					out.add(level, "Title"     , event.title);
-					out.add(level, "Genre"     , "[%d] \"%s\"", event.genreid, event.genre);
-					out.add(level, "ID"        , event.id);
-					out.add(level, "Begin"     , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
-					out.add(level, "Now"       , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
-					out.add(level, "Duration"  , "%s", DateTimeFormatter.getDurationStr(event.duration_sec));
-					out.add(level, "Remaining" , "%s", DateTimeFormatter.getDurationStr(event.remaining));
-					out.add(level, "Description");
-					out.add(level+1, "", event.shortdesc);
-					out.add(level+1, "", event.longdesc );
+					OpenWebifController.generateOutput(out, level, event);
 				}
 			}
 			

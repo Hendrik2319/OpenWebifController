@@ -45,6 +45,8 @@ import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.openwebif.EPGevent;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
@@ -118,6 +120,8 @@ public class OpenWebifController {
 	}
 
 	public static class Updater {
+		private static boolean SHOW_PROGRESS = false;
+		
 		private final ScheduledExecutorService scheduler;
 		private ScheduledFuture<?> taskHandle;
 		private final long interval_sec;
@@ -125,7 +129,11 @@ public class OpenWebifController {
 	
 		public Updater(long interval_sec, Runnable task) {
 			this.interval_sec = interval_sec;
-			this.task = task;
+			this.task = !SHOW_PROGRESS ? task : ()->{
+				System.out.printf("[0x%08X|%s] Updater.task.run()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
+				task.run();
+				System.out.printf("[0x%08X|%s] Updater.task.run() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+			};
 			scheduler = Executors.newSingleThreadScheduledExecutor();
 			
 			//int prio;
@@ -145,20 +153,26 @@ public class OpenWebifController {
 		}
 	
 		public void runOnce(Runnable task) {
-			//System.out.printf("[0x%08X|%s] Updater.runOnce()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
-			scheduler.execute(task);
-			//System.out.printf("[0x%08X|%s] Updater.runOnce() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.runOnce()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
+			scheduler.execute(!SHOW_PROGRESS ? task : ()->{
+				System.out.printf("[0x%08X|%s] Updater.runOnce() -> start task%n"   , Thread.currentThread().hashCode(), getCurrentTimeStr());
+				task.run();
+				System.out.printf("[0x%08X|%s] Updater.runOnce() -> task finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+			});
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.runOnce() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 		}
 	
 		public void start() {
-			//System.out.printf("[0x%08X|%s] Updater.start()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.start()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
 			taskHandle = scheduler.scheduleWithFixedDelay(task, 0, interval_sec, TimeUnit.SECONDS);
-			//System.out.printf("[0x%08X|%s] Updater.start() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.start() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 		}
 	
 		public void stop() {
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.stop()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
 			taskHandle.cancel(false);
 			taskHandle = null;
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.stop() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
 		}
 		
 	}
@@ -263,7 +277,8 @@ public class OpenWebifController {
 		}
 		
 		void initialize(String baseURL, ProgressDialog pd) {
-			callVolumeCommand(baseURL, pd, "Init"+controlLabel, updateCommand);
+			if (updateCommand!=null)
+				callCommand(baseURL, pd, "Init"+controlLabel, updateCommand);
 		}
 		
 		protected JButton createUpdateButton(String title, boolean withDelayedUpdate) {
@@ -273,24 +288,26 @@ public class OpenWebifController {
 			return createUpdateButton(title, icon, null, withDelayedUpdate);
 		}
 		protected JButton createUpdateButton(String title, Icon icon, Icon disIcon, boolean withDelayedUpdate) {
+			if (updateCommand==null)
+				throw new UnsupportedOperationException("Can't create an UpdateButton for a ContolPanel without an UpdateCommand");
 			return createButton(title, icon, disIcon, true, e->{
-				callVolumeCommand(null, "Update"+controlLabel, withDelayedUpdate, updateCommand);
+				callCommand(null, "Update"+controlLabel, withDelayedUpdate, updateCommand);
 			});
 		}
 		
-		protected void callVolumeCommand(ProgressDialog pd, String commandLabel, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
-			callVolumeCommand(pd, commandLabel, false, commandFcn);
+		protected void callCommand(ProgressDialog pd, String commandLabel, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
+			callCommand(pd, commandLabel, false, commandFcn);
 		}
-		protected void callVolumeCommand(ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
+		protected void callCommand(ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
 			String baseURL = main.getBaseURL();
 			if (baseURL==null) return;
-			callVolumeCommand(baseURL, pd, commandLabel, withDelayedUpdate, commandFcn);
+			callCommand(baseURL, pd, commandLabel, withDelayedUpdate, commandFcn);
 		}
 		
-		protected void callVolumeCommand(String baseURL, ProgressDialog pd, String commandLabel, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
-			callVolumeCommand(baseURL, pd, commandLabel, false, commandFcn);
+		protected void callCommand(String baseURL, ProgressDialog pd, String commandLabel, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
+			callCommand(baseURL, pd, commandLabel, false, commandFcn);
 		}
-		protected void callVolumeCommand(String baseURL, ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
+		protected void callCommand(String baseURL, ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
 			setPanelEnable(false);
 			new Thread(()->{
 				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->{
@@ -342,13 +359,13 @@ public class OpenWebifController {
 			c.fill = GridBagConstraints.BOTH;
 			
 			add(btnPower = createButton("Toggle StandBy", CommandIcons.OnOff.getIcon(), CommandIcons.OnOff_Dis.getIcon(), true, e->{
-				callVolumeCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle));
+				callCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle));
 			}), c);
 			
 			Vector<Power.Commands> items = new Vector<>(Arrays.asList(Power.Commands.values()));
 			items.remove(Power.Commands.ToggleStandBy);
 			add(cmbbxSetOtherState = createComboBox(items, Power.Commands.Wakeup, cmd->{
-				callVolumeCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->Power.setState(baseURL, cmd, setTaskTitle));
+				callCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->Power.setState(baseURL, cmd, setTaskTitle));
 			}), c);
 			
 			add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true), c);
@@ -416,10 +433,10 @@ public class OpenWebifController {
 			});
 		}
 	
-		private void setVolUp  (     ProgressDialog pd) { callVolumeCommand(pd, "VolUp"  , Volume::setVolUp  ); }
-		private void setVolDown(     ProgressDialog pd) { callVolumeCommand(pd, "VolDown", Volume::setVolDown); }
-		private void setVolMute(     ProgressDialog pd) { callVolumeCommand(pd, "VolMute", Volume::setVolMute); }
-		private void setVol(int vol, ProgressDialog pd) { callVolumeCommand(pd, "SetVol", (baseURL,setTaskTitle)->Volume.setVol(baseURL, vol, setTaskTitle)); }
+		private void setVolUp  (     ProgressDialog pd) { callCommand(pd, "VolUp"  , Volume::setVolUp  ); }
+		private void setVolDown(     ProgressDialog pd) { callCommand(pd, "VolDown", Volume::setVolDown); }
+		private void setVolMute(     ProgressDialog pd) { callCommand(pd, "VolMute", Volume::setVolMute); }
+		private void setVol(int vol, ProgressDialog pd) { callCommand(pd, "SetVol", (baseURL,setTaskTitle)->Volume.setVol(baseURL, vol, setTaskTitle)); }
 
 		@Override protected void updatePanel(Volume.Values values) {
 			if (values==null) {
@@ -523,6 +540,58 @@ public class OpenWebifController {
 		out.add(0, "Is Alive"  , process.isAlive());
 		out.add(0, "Class"     , "%s", process.getClass());
 		return out.generateOutput();
+	}
+
+	public static void generateOutput(ValueListOutput out, int level, OpenWebifTools.CurrentStation currentStation) {
+		out.add(level, "Station"          ); generateOutput(out, level+1, currentStation.stationInfo    );
+		out.add(level, "Current EPG Event"); generateOutput(out, level+1, currentStation.currentEPGevent);
+		out.add(level, "Next EPG Event"   ); generateOutput(out, level+1, currentStation.nextEPGevent   );
+	}
+
+	public static void generateOutput(ValueListOutput out, int level, OpenWebifTools.StationInfo stationInfo) {
+		out.add(level, "Bouquet Name"      , stationInfo.bouquetName ); // String    bouquetName ;
+		out.add(level, "Bouquet Reference" , stationInfo.bouquetRef  ); // String    bouquetRef  ;
+		out.add(level, "Service Name"      , stationInfo.serviceName ); // String    serviceName ;
+		out.add(level, "service Reference" , stationInfo.serviceRef  ); // String    serviceRef  ;
+		if (stationInfo.stationID!=null)
+			out.add(level, "StationID", " %s", stationInfo.stationID.toIDStr()); // StationID stationID   ;
+		out.add(level, "Provider"          , stationInfo.provider    ); // String    provider    ;
+		if (stationInfo.width !=null)    out.add(level, "Width"     , stationInfo.width    ); // long      width       ;
+		else                             out.add(level, "Width"     , stationInfo.widthStr ); // String    widthStr    ;
+		if (stationInfo.height!=null)    out.add(level, "Height"    , stationInfo.height   ); // long      height      ;
+		else                             out.add(level, "Height"    , stationInfo.heightStr); // String    heightStr   ;
+		if (stationInfo.aspect!=null)    out.add(level, "\"Aspect\"", stationInfo.aspect   ); // long      aspect      ;
+		else                             out.add(level, "\"Aspect\"", stationInfo.aspectStr); // String    aspectStr   ;
+		                                 out.add(level, "Is WideScreen"          , stationInfo.isWideScreen              ); // boolean   isWideScreen;
+		                                 out.add(level, "[onid]"     , "0x%X, %d", stationInfo.onid, stationInfo.onid    ); // long      onid        ;
+		if (stationInfo.txtpid!=null)    out.add(level, "[txtpid]"   , "0x%X, %d", stationInfo.txtpid, stationInfo.txtpid); // Long      txtpid      ;
+		else                             out.add(level, "[txtpid]"   ,             stationInfo.txtpidStr                 ); // String    txtpidStr   ;
+		if (stationInfo.pmtpid!=null)    out.add(level, "[pmtpid]"   , "0x%X, %d", stationInfo.pmtpid, stationInfo.pmtpid); // long      pmtpid      ;
+		else                             out.add(level, "[pmtpid]"   ,             stationInfo.pmtpidStr                 ); // String    pmtpidStr   ;
+		                                 out.add(level, "[tsid]"     , "0x%X, %d", stationInfo.tsid  , stationInfo.tsid  ); // long      tsid        ;
+		                                 out.add(level, "[pcrpid]"   , "0x%X, %d", stationInfo.pcrpid, stationInfo.pcrpid); // long      pcrpid      ;
+		                                 out.add(level, "[sid]"      , "0x%X, %d", stationInfo.sid   , stationInfo.sid   ); // long      sid         ;
+		if (stationInfo.namespace!=null) out.add(level, "[namespace]", "0x%X, %d", stationInfo.namespace, stationInfo.namespace); // Long      namespace   ;
+		else                             out.add(level, "[namespace]",             stationInfo.namespaceStr                    ); // String    namespaceStr;
+		                                 out.add(level, "[apid]"     , "0x%X, %d", stationInfo.apid  , stationInfo.apid  ); // long      apid        ;
+		                                 out.add(level, "[vpid]"     , "0x%X, %d", stationInfo.vpid  , stationInfo.vpid  ); // long      vpid        ;
+		out.add(level, "result"              , stationInfo.result                    ); // boolean   result      ;
+	}
+
+	public static void generateOutput(ValueListOutput out, int level, EPGevent event) {
+		out.add(level, "Station"   , event.station_name);
+		out.add(level, "SRef"      , event.sref);
+		if (event.provider!=null) out.add(level, "Provider", event.provider);
+		out.add(level, "Title"     , event.title);
+		out.add(level, "Genre"     , "[%d] \"%s\"", event.genreid, event.genre);
+		out.add(level, "ID"        , event.id);
+		out.add(level, "Begin"     , "%s", dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
+		out.add(level, "Now"       , "%s", dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
+		out.add(level, "Duration"  , "%s", DateTimeFormatter.getDurationStr(event.duration_sec));
+		out.add(level, "Remaining" , "%s", DateTimeFormatter.getDurationStr(event.remaining));
+		out.add(level, "Description");
+		out.add(level+1, "", event.shortdesc);
+		out.add(level+1, "", event.longdesc );
 	}
 
 	public void openUrlInVideoPlayer(String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL", url); }

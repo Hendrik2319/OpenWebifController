@@ -30,11 +30,13 @@ import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.FileChooser;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
+import net.schwarzbaer.gui.TextAreaDialog;
+import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.ResponseMessage;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
@@ -46,7 +48,7 @@ public class BouquetsNStations extends JPanel {
 	private final OpenWebifController main;
 	private final StandardMainWindow mainWindow;
 	private final JTree bsTree;
-	private final JLabel statusLine;
+	private final StatusOut statusLine;
 	private final ValuePanel valuePanel;
 	private final FileChooser m3uFileChooser;
 	private final FileChooser txtFileChooser;
@@ -91,13 +93,12 @@ public class BouquetsNStations extends JPanel {
 		
 		valuePanel = new ValuePanel(()->this.main.getBaseURL());
 		
-		statusLine = new JLabel();
-		statusLine.setBorder(BorderFactory.createEtchedBorder());
+		statusLine = new StatusOut();
 		PICON_LOADER.setStatusOutput(statusLine);
 		
 		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,treeScrollPane,valuePanel.panel);
 		add(centerPanel,BorderLayout.CENTER);
-		add(statusLine,BorderLayout.SOUTH);
+		add(statusLine.comp,BorderLayout.SOUTH);
 		
 		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U;
 		JMenuItem miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet, miUpdateCurrentStationNow;
@@ -145,8 +146,15 @@ public class BouquetsNStations extends JPanel {
 		}));
 		
 		periodicUpdater10s = new OpenWebifController.Updater(10, () -> {
-			if (updatePlayableStatesPeriodically) updatePlayableStates();
-			if (updateCurrentStationPeriodically) updateCurrentStation();
+			if (updatePlayableStatesPeriodically) {
+				statusLine.showMessage("Update 'Playable' States");
+				updatePlayableStates();
+			}
+			if (updateCurrentStationPeriodically) {
+				statusLine.showMessage("Update 'Current Station'");
+				updateCurrentStation();
+			}
+			statusLine.clear();
 		});
 		
 		updatePlayableStatesPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, false);
@@ -165,6 +173,11 @@ public class BouquetsNStations extends JPanel {
 		}));
 		treeContextMenu.add(miUpdateCurrentStationNow = OpenWebifController.createMenuItem("Update 'Current Station' Now", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
 			periodicUpdater10s.runOnce( () -> updateCurrentStation() );
+		}));
+		treeContextMenu.add(OpenWebifController.createMenuItem("Show 'Current Station' Data", e->{
+			String msg = toString( currentStationData );
+			TextAreaDialog.showText(mainWindow, "Current Station", 800, 500, true, msg);
+			//JOptionPane.showMessageDialog(mainWindow, msg, "Current Station", JOptionPane.INFORMATION_MESSAGE);
 		}));
 		
 		treeContextMenu.addSeparator();
@@ -207,7 +220,7 @@ public class BouquetsNStations extends JPanel {
 		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e->{
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
-			ResponseMessage response = OpenWebifTools.zapToStation(baseURL, clickedStationNode.getStationID());
+			MessageResponse response = OpenWebifTools.zapToStation(baseURL, clickedStationNode.getStationID());
 			if (response!=null) response.printTo(System.out);
 		}));
 		treeContextMenu.add(miStreamStation = OpenWebifController.createMenuItem("Stream Station", e->streamStation(clickedStationNode.getStationID())));
@@ -360,7 +373,7 @@ public class BouquetsNStations extends JPanel {
 		if (isExpanded.isUnset) return false;
 		return isExpanded.value.booleanValue();
 	}
-
+	
 	private void invokeAndWait(Runnable task) {
 		try { SwingUtilities.invokeAndWait(task); }
 		catch (InvocationTargetException | InterruptedException e) {
@@ -421,8 +434,36 @@ public class BouquetsNStations extends JPanel {
 		main.openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
 	}
 	
+	private static String toString(CurrentStation currentStationData) {
+		ValueListOutput out = new ValueListOutput();
+		OpenWebifController.generateOutput(out, 0, currentStationData);
+		return out.generateOutput();
+	}
+
+	static class StatusOut {
+		
+		private final JLabel comp;
+		
+		StatusOut() {
+			comp = new JLabel(); 
+			comp.setBorder(BorderFactory.createEtchedBorder());
+		}
+		
+		public void showMessage(String msg) {
+			SwingUtilities.invokeLater(()->comp.setText(msg));
+		}
+		public void clear() {
+			SwingUtilities.invokeLater(()->comp.setText(" "));
+		}
+	}
+
 	private static class BSTreeCellRenderer extends DefaultTreeCellRenderer {
 		private static final long serialVersionUID = 8843157059053309466L;
+		private static final Color TEXTCOLOR_DEFAULT          = Color.BLACK;
+		private static final Color TEXTCOLOR_CURRENTLY_PLAYED = new Color(0x0080ff);
+		private static final Color TEXTCOLOR_STATE_UNDEFINED  = new Color(0x800080);
+		private static final Color TEXTCOLOR_IS_PLAYABLE      = new Color(0x008000);
+		private static final Color TEXTCOLOR_IS_NOT_PLAYABLE  = Color.BLACK;
 
 		@Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean isSelected, boolean isExpanded, boolean isLeaf, int row, boolean hasFocus) {
 			Component comp = super.getTreeCellRendererComponent(tree, value, isSelected, isExpanded, isLeaf, row, hasFocus);
@@ -434,19 +475,19 @@ public class BouquetsNStations extends JPanel {
 			if (value instanceof BSTreeNode.StationNode) {
 				BSTreeNode.StationNode stationNode = (BSTreeNode.StationNode) value;
 				if (stationNode.isMarker()) {
-					if (!isSelected) setForeground(Color.BLACK);
+					if (!isSelected) setForeground(TEXTCOLOR_DEFAULT);
 					
 				} else if (stationNode.isCurrentlyPlayed) {
-					if (!isSelected) setForeground(Color.BLUE);
+					if (!isSelected) setForeground(TEXTCOLOR_CURRENTLY_PLAYED);
 					
 				} else if (stationNode.isServicePlayable==null) {
-					if (!isSelected) setForeground(Color.MAGENTA);
+					if (!isSelected) setForeground(TEXTCOLOR_STATE_UNDEFINED);
 					
 				} else {
-					if (!isSelected) setForeground(stationNode.isServicePlayable ? Color.BLACK : Color.GRAY);
+					if (!isSelected) setForeground(stationNode.isServicePlayable ? TEXTCOLOR_IS_PLAYABLE : TEXTCOLOR_IS_NOT_PLAYABLE);
 				}
 			} else
-				if (!isSelected) setForeground(Color.BLACK);
+				if (!isSelected) setForeground(TEXTCOLOR_DEFAULT);
 			
 			return comp;
 		}

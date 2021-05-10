@@ -10,6 +10,8 @@ import java.awt.Point;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -20,10 +22,13 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
@@ -47,6 +52,7 @@ import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
@@ -54,6 +60,14 @@ import net.schwarzbaer.system.DateTimeFormatter;
 import net.schwarzbaer.system.Settings;
 
 public class OpenWebifController {
+	
+	public static void ASSERT( boolean predicate) { ASSERT( predicate, null ); }
+	public static void ASSERT( boolean predicate, String message ) {
+		if (!predicate) {
+			if (message==null) throw new IllegalStateException();
+			else               throw new IllegalStateException(message);
+		}
+	}
 	
 	private static IconSource.CachedIcons<TreeIcons> TreeIconsIS = IconSource.createCachedIcons(16, 16, "/images/TreeIcons.png", TreeIcons.values());
 	public enum TreeIcons {
@@ -183,6 +197,7 @@ public class OpenWebifController {
 	private final BouquetsNStations bouquetsNStations;
 	private final VolumeContol volumeContol;
 	private final PowerContol powerContol;
+	private final MessageControl messageControl;
 
 	OpenWebifController() {
 		exeFileChooser = new JFileChooser("./");
@@ -221,14 +236,12 @@ public class OpenWebifController {
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		
-		powerContol = new PowerContol(this);
-		volumeContol = new VolumeContol(this);
-		
 		JPanel toolBar = new JPanel(new GridBagLayout());
 		GridBagConstraints c = new GridBagConstraints();
 		c.weightx = 0;
-		toolBar.add(powerContol, c);
-		toolBar.add(volumeContol, c);
+		toolBar.add(powerContol    = new PowerContol   (this), c);
+		toolBar.add(volumeContol   = new VolumeContol  (this), c);
+		toolBar.add(messageControl = new MessageControl(this), c);
 		c.weightx = 1;
 		toolBar.add(new JLabel(""), c);
 		
@@ -257,8 +270,9 @@ public class OpenWebifController {
 			
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
-			powerContol .initialize(baseURL,pd);
-			volumeContol.initialize(baseURL,pd);
+			powerContol   .initialize(baseURL,pd);
+			volumeContol  .initialize(baseURL,pd);
+			messageControl.initialize(baseURL,pd);
 		});
 	}
 
@@ -340,6 +354,76 @@ public class OpenWebifController {
 		
 		protected abstract void updatePanel(ValueStructType values);
 		protected abstract void setPanelEnable(boolean enabled);
+	}
+
+	static class MessageControl extends AbstractContolPanel<OpenWebifTools.MessageResponse> {
+		private static final long serialVersionUID = 139846886828802469L;
+		private final JButton btnSend;
+		private final JButton btnGetAnswer;
+		private final JTextField txtfldMessage;
+		private final JTextField txtfldTimeOut;
+		private final JCheckBox chkbxTimeOut;
+		private final JComboBox<MessageType> cmbbxMessageType;
+		private Integer timeOut;
+		private OpenWebifTools.MessageType messageType;
+
+		MessageControl(OpenWebifController main) {
+			super(new GridBagLayout(),main,"MessageControl",null);
+			setBorder(BorderFactory.createTitledBorder("Messages"));
+			
+			timeOut = null;
+			messageType = OpenWebifTools.MessageType.INFO;
+			
+			txtfldMessage = createTextField("", 10, null);
+			txtfldTimeOut = createTextField("", 4, str->{
+				try { return Integer.parseInt(str); }
+				catch (NumberFormatException e1) { return null; }
+			}, n->n>0, n->timeOut=n);
+			
+			chkbxTimeOut = createCheckBox("Time Out", false, b->{
+				txtfldTimeOut.setEditable(b);
+				txtfldTimeOut.setEnabled(b);
+			});
+			txtfldTimeOut.setEditable(false);
+			txtfldTimeOut.setEnabled(false);
+			
+			cmbbxMessageType = createComboBox(OpenWebifTools.MessageType.values(), messageType, type->messageType = type);
+			
+			btnSend = createButton("Send Message", true, e->{
+				String message = txtfldMessage.getText();
+				Integer timeOut_sec = chkbxTimeOut.isSelected() ? timeOut : null;
+				callCommand(null, "SendMessage", (baseURL, setTaskTitle)->OpenWebifTools.sendMessage(baseURL, message, messageType, timeOut_sec, setTaskTitle));
+			});
+			btnGetAnswer = createButton("Get Answer", true, e->{
+				callCommand(null, "GetAnswer", OpenWebifTools::getMessageAnswer);
+			});
+			
+			GridBagConstraints c = new GridBagConstraints();
+			c.weightx = 0;
+			c.weighty = 0;
+			c.fill = GridBagConstraints.BOTH;
+			
+			add(btnSend, c);
+			add(txtfldMessage, c);
+			add(cmbbxMessageType, c);
+			add(chkbxTimeOut, c);
+			add(txtfldTimeOut, c);
+			add(btnGetAnswer, c);
+		}
+
+		@Override protected void updatePanel(OpenWebifTools.MessageResponse values) {
+			String message = OpenWebifController.toString(values);
+			JOptionPane.showMessageDialog(main.mainWindow, message, "Message Response", JOptionPane.INFORMATION_MESSAGE);
+		}
+
+		@Override
+		protected void setPanelEnable(boolean enabled) {
+			btnSend      .setEnabled(enabled);
+			btnGetAnswer .setEnabled(enabled);
+			txtfldMessage.setEnabled(enabled);
+			txtfldTimeOut.setEnabled(enabled);
+			chkbxTimeOut .setEnabled(enabled);
+		}
 	}
 
 	static class PowerContol extends AbstractContolPanel<Power.Values> {
@@ -475,6 +559,47 @@ public class OpenWebifController {
 		return dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
 	}
 
+	public static JCheckBox createCheckBox(String text, boolean selected, Consumer<Boolean> setValue) {
+		JCheckBox comp = new JCheckBox(text, selected);
+		if (setValue!=null)
+			comp.addActionListener(e->setValue.accept(comp.isSelected()));
+		return comp;
+	}
+
+	public static JTextField createTextField(String text, int columns, Consumer<String> setValue) {
+		JTextField comp = new JTextField(text, columns);
+		if (setValue!=null) {
+			comp.addActionListener(e->setValue.accept(comp.getText()));
+			comp.addFocusListener(new FocusListener() {
+				@Override public void focusLost  (FocusEvent e) { setValue.accept(comp.getText()); }
+				@Override public void focusGained(FocusEvent e) {}
+			});
+		}
+		return comp;
+	}
+
+	public static <ValueType> JTextField createTextField(String initialValue, int columns, Function<String,ValueType> convert, Predicate<ValueType> isOk, Consumer<ValueType> setValue) {
+		JTextField comp = new JTextField(initialValue, columns);
+		Color defaultBackground = comp.getBackground();
+		ASSERT(setValue!=null);
+		ASSERT(convert !=null);
+		Runnable setValueTask = ()->{
+			String str = comp.getText();
+			ValueType value = convert.apply(str);
+			if (value==null) { comp.setBackground(Color.RED); return; }
+			if (isOk ==null) { setValue.accept(value); return; }
+			if (!isOk.test(value)) { comp.setBackground(Color.RED); return; }
+			comp.setBackground(defaultBackground);
+			setValue.accept(value);
+		};
+		comp.addActionListener(e->setValueTask.run());
+		comp.addFocusListener(new FocusListener() {
+			@Override public void focusLost  (FocusEvent e) { setValueTask.run(); }
+			@Override public void focusGained(FocusEvent e) {}
+		});
+		return comp;
+	}
+
 	public static <E> JComboBox<E> createComboBox(E[] items, E initialValue, Consumer<E> setValue) {
 		return confirureComboBox(new JComboBox<E>(items), initialValue, setValue);
 	}
@@ -542,6 +667,13 @@ public class OpenWebifController {
 		return out.generateOutput();
 	}
 
+	public static String toString(OpenWebifTools.MessageResponse values) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format("Message: \"%s\"%n", values.message));
+		sb.append(String.format("Result: %s%n", values.result));
+		return sb.toString();
+	}
+
 	public static void generateOutput(ValueListOutput out, int level, OpenWebifTools.CurrentStation currentStation) {
 		out.add(level, "Station"          ); generateOutput(out, level+1, currentStation.stationInfo    );
 		out.add(level, "Current EPG Event"); generateOutput(out, level+1, currentStation.currentEPGevent);
@@ -575,7 +707,7 @@ public class OpenWebifController {
 		else                             out.add(level, "[namespace]",             stationInfo.namespaceStr                    ); // String    namespaceStr;
 		                                 out.add(level, "[apid]"     , "0x%X, %d", stationInfo.apid  , stationInfo.apid  ); // long      apid        ;
 		                                 out.add(level, "[vpid]"     , "0x%X, %d", stationInfo.vpid  , stationInfo.vpid  ); // long      vpid        ;
-		out.add(level, "result"              , stationInfo.result                    ); // boolean   result      ;
+		out.add(level, "result", stationInfo.result); // boolean   result      ;
 	}
 
 	public static void generateOutput(ValueListOutput out, int level, EPGevent event) {

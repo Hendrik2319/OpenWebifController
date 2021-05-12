@@ -14,6 +14,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Vector;
 import java.util.concurrent.Executors;
@@ -98,6 +99,50 @@ public class OpenWebifController {
 				
 				return;
 			}
+			if (args.length==0) {
+				System.out.println("OpenWebifController");
+				System.out.println("by Hendrik Scholtz");
+				System.out.println();
+				System.out.println("Usage");
+				System.out.println("  -b, --baseurl [BaseURL]    Sets base URL of STB");
+				System.out.println("  -on|-off                   Turns STB ON or OFF (=StandBy)");
+				System.out.println("  --reboot                   Restarts STB (Linux & GUI)");
+				
+			} else {
+				String baseURL = null;
+				boolean turnOn = false;
+				boolean turnOff = false;
+				boolean reboot = false;
+				for (int i=0; i<args.length; i++) {
+					String str = args[i];
+					if ( (str.equalsIgnoreCase("--baseurl") || str.equalsIgnoreCase("-b")) && i+1 < args.length) {
+						baseURL = args[i+1];
+						i++;
+						
+					} else if (str.equalsIgnoreCase("-on")) {
+						turnOn = true;
+						
+					} else if (str.equalsIgnoreCase("-off")) {
+						turnOff = true;
+						
+					} else if (str.equalsIgnoreCase("--reboot")) {
+						reboot = true;
+					}
+				}
+				
+				if (turnOn || turnOff || reboot) {
+					if (baseURL==null) baseURL = getBaseURL_DontAskUser();
+					if (baseURL==null) {
+						System.err.println("Can't execute task: No Base URL defined.");
+					} else {
+						if      (turnOff) PowerContol.setState(baseURL, Power.Commands.Standby, System.out);
+						else if (turnOn ) PowerContol.setState(baseURL, Power.Commands.Wakeup , System.out);
+						else if (reboot ) PowerContol.setState(baseURL, Power.Commands.Reboot , System.out);
+					}
+					return;
+				}
+			}
+			
 		}
 		
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
@@ -454,6 +499,12 @@ public class OpenWebifController {
 			
 			add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true), c);
 		}
+		
+		static void setState(String baseURL, Power.Commands cmd, PrintStream out) {
+			Power.Values values = Power.setState(baseURL, cmd, str->out.printf("PowerContol: %s%n", str));
+			if (values==null) out.printf("PowerContol: No Answer%n");
+			else              out.printf("PowerContol: In Standby = %s%n", values.instandby);
+		}
 
 		@Override protected void updatePanel(Power.Values values) {
 			if (values==null) return;
@@ -751,6 +802,9 @@ public class OpenWebifController {
 	public String getBaseURL(boolean askUser) {
 		if (!settings.contains(AppSettings.ValueKey.BaseURL) && askUser)
 			return askUserForBaseURL();
+		return getBaseURL_DontAskUser();
+	}
+	public static String getBaseURL_DontAskUser() {
 		return settings.getString(AppSettings.ValueKey.BaseURL, null);
 	}
 

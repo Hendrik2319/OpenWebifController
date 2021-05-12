@@ -11,6 +11,8 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
+import java.util.Vector;
 import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
@@ -61,10 +63,10 @@ public class BouquetsNStations extends JPanel {
 	private BSTreeNode.RootNode    clickedRootNode;
 	private BSTreeNode.BouquetNode clickedBouquetNode;
 	private BSTreeNode.StationNode clickedStationNode;
-	private TreePath selectedTreePath;
 	private boolean updatePlayableStatesPeriodically;
 	private boolean updateCurrentStationPeriodically;
 	private CurrentStation currentStationData;
+	private final Vector<BSTreeNode.StationNode> selectedStationNodes;
 
 	public BouquetsNStations(OpenWebifController main, StandardMainWindow mainWindow) {
 		super(new BorderLayout());
@@ -79,12 +81,12 @@ public class BouquetsNStations extends JPanel {
 		clickedRootNode    = null;
 		clickedBouquetNode = null;
 		clickedStationNode = null;
+		selectedStationNodes = new Vector<>();
 		
 		m3uFileChooser = new FileChooser("Playlist", "m3u");
 		txtFileChooser = new FileChooser("Text-File", "txt");
 		
 		bsTree = new JTree(bsTreeModel);
-		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		bsTree.setCellRenderer(new BSTreeCellRenderer());
 		bsTree.setRowHeight(BSTreeNode.ROW_HEIGHT);
 		
@@ -100,7 +102,7 @@ public class BouquetsNStations extends JPanel {
 		add(centerPanel,BorderLayout.CENTER);
 		add(statusLine.comp,BorderLayout.SOUTH);
 		
-		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteStreamsToM3U;
+		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteBouquetStreamsToM3U, miWriteSelectedStreamsToM3U;
 		JMenuItem miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet, miUpdateCurrentStationNow;
 		ContextMenu treeContextMenu = new ContextMenu();
 		
@@ -180,6 +182,19 @@ public class BouquetsNStations extends JPanel {
 			//JOptionPane.showMessageDialog(mainWindow, msg, "Current Station", JOptionPane.INFORMATION_MESSAGE);
 		}));
 		
+		treeContextMenu.add(miWriteSelectedStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Selected Stations to M3U-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
+			if (selectedStationNodes.isEmpty()) return;
+			
+			String baseURL = this.main.getBaseURL();
+			if (baseURL==null) return;
+			
+			if (m3uFileChooser.showSaveDialog(this.mainWindow)!=FileChooser.APPROVE_OPTION) return;
+			File m3uFile = m3uFileChooser.getSelectedFile();
+			
+			writeStreamsToM3U(selectedStationNodes,baseURL,m3uFile);
+			this.main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Selected Stations"));
+		}));
+		
 		treeContextMenu.addSeparator();
 		
 		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
@@ -188,7 +203,7 @@ public class BouquetsNStations extends JPanel {
 			periodicUpdater10s.runOnce( () -> updatePlayableStates(baseURL, clickedBouquetNode) );
 		}));
 		
-		treeContextMenu.add(miWriteStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
+		treeContextMenu.add(miWriteBouquetStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
 			if (clickedBouquetNode==null) return;
 			
 			String baseURL = this.main.getBaseURL();
@@ -257,27 +272,31 @@ public class BouquetsNStations extends JPanel {
 							String.format("Update 'Is Playable' States of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
 							"Update 'Is Playable' States of Bouquet"
 			);
-			miWriteStreamsToM3U.setEnabled(clickedBouquetNode!=null);
-			miWriteStreamsToM3U.setText(
+			miWriteBouquetStreamsToM3U.setEnabled(clickedBouquetNode!=null);
+			miWriteBouquetStreamsToM3U.setText(
 					clickedBouquetNode!=null ?
 							String.format("Write Streams of Bouquet \"%s\" to M3U-File", clickedBouquetNode.bouquet.name) :
 							"Write Streams of Bouquet to M3U-File"
 			);
+			miWriteSelectedStreamsToM3U.setEnabled(!selectedStationNodes.isEmpty());
 			
 			miUpdateCurrentStationNow.setEnabled(!updateCurrentStationPeriodically);
 			miUpdatePlayableStatesNow.setEnabled(!updatePlayableStatesPeriodically);
 		});
 		
-		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION);
 		bsTree.addTreeSelectionListener(e->{
-			selectedTreePath = bsTree.getSelectionPath();
-			valuePanel.showValues(selectedTreePath);
-			//if (selectedTreePath!=null) {
-			//	Object obj = clickedTreePath.getLastPathComponent();
-			//	if (obj instanceof BSTreeNode.RootNode   ) clickedRootNode    = (BSTreeNode.RootNode   ) obj;
-			//	if (obj instanceof BSTreeNode.BouquetNode) clickedBouquetNode = (BSTreeNode.BouquetNode) obj;
-			//	if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
-			//}
+			TreePath[] selectedTreePaths = bsTree.getSelectionPaths();
+			
+			if (selectedTreePaths.length==1)
+				valuePanel.showValues(selectedTreePaths[0]);
+			
+			selectedStationNodes.clear();
+			for (TreePath path:selectedTreePaths) {
+				Object obj = path.getLastPathComponent();
+				if (obj instanceof BSTreeNode.StationNode)
+					selectedStationNodes.add((BSTreeNode.StationNode) obj);
+			}
 		});
 		
 		if (shouldPeriodicUpdaterRun())
@@ -405,11 +424,20 @@ public class BouquetsNStations extends JPanel {
 		PICON_LOADER.clearPiconCache();
 	}
 
+	private void writeStreamsToM3U(Vector<BSTreeNode.StationNode> stationNodes, String baseURL, File m3uFile) {
+		Iterator<Bouquet.SubService> iterator = stationNodes.stream().filter(node->!node.isMarker()).map(node->node.subservice).iterator();
+		writeStreamsToM3U(()->iterator, baseURL, m3uFile);
+	}
+
 	private void writeStreamsToM3U(Bouquet bouquet, String baseURL, File m3uFile) {
+		writeStreamsToM3U(bouquet.subservices, baseURL, m3uFile);
+	}
+
+	private void writeStreamsToM3U(Iterable<Bouquet.SubService> subservices, String baseURL, File m3uFile) {
 		try (PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(m3uFile), StandardCharsets.UTF_8))) {
 			
 			out.println("#EXTM3U");
-			for (Bouquet.SubService subservice:bouquet.subservices) {
+			for (Bouquet.SubService subservice:subservices) {
 				if (subservice.isMarker()) continue;
 				// #EXTINF:0,SPORT1
 				// http://et7x00:8001/1:0:1:384:21:85:C00000:0:0:0:
@@ -421,7 +449,6 @@ public class BouquetsNStations extends JPanel {
 		catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
-		
 	}
 
 	private void streamStation(StationID stationID) {

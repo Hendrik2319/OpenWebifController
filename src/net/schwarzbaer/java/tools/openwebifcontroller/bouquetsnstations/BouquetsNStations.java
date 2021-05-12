@@ -226,7 +226,7 @@ public class BouquetsNStations extends JPanel {
 					boolean isInterrupted = Thread.currentThread().isInterrupted();
 					System.out.printf("EPG for Station \"%s\"%s%n", station.name, isInterrupted ? " -> omitted" : "");
 					if (isInterrupted) return;
-					epg.getEPGforService(baseURL, station.service.stationID, null, null, taskTitle->{
+					epg.readEPGforService(baseURL, station.service.stationID, null, null, taskTitle->{
 						this.main.setIndeterminateProgressTask(pd, String.format("EPG for Station \"%s\": %s", station.name, taskTitle));
 					});
 				});

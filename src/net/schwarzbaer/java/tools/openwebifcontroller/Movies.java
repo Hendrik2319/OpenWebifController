@@ -20,7 +20,6 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTree;
-import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
@@ -38,7 +37,6 @@ import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MovieListReadInterface;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
 import net.schwarzbaer.system.DateTimeFormatter;
@@ -318,14 +316,7 @@ class Movies extends JSplitPane {
 	private MovieList getMovieList(String baseURL, String dir, ProgressDialog pd) {
 		if (baseURL==null) return null;
 		
-		MovieList movieList = OpenWebifTools.readMovieList(baseURL, dir, new MovieListReadInterface() {
-			@Override public void setIndeterminateProgressTask(String taskTitle) {
-				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle("Movies: "+taskTitle);
-					pd.setIndeterminate(true);
-				});
-			}
-		});
+		MovieList movieList = OpenWebifTools.readMovieList(baseURL, dir, taskTitle -> main.setIndeterminateProgressTask(pd, "Movies: "+taskTitle));
 		//movieList.printTo(System.out);
 		return movieList;
 	}

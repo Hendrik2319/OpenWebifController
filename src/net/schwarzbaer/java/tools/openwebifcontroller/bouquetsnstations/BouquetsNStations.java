@@ -35,6 +35,7 @@ import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.TextAreaDialog;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
@@ -107,11 +108,8 @@ public class BouquetsNStations extends JPanel {
 		ContextMenu treeContextMenu = new ContextMenu();
 		
 		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
-			ProgressDialog.runWithProgressDialog(this.mainWindow, "Reload Bouquets", 400, pd->{
-				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle("Bouquets 'n' Stations: Get BaseURL");
-					pd.setIndeterminate(true);
-				});
+			this.main.runWithProgressDialog("Reload Bouquets", pd->{
+				this.main.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: Get BaseURL");
 				String baseURL = this.main.getBaseURL();
 				if (baseURL==null) return;
 				
@@ -122,19 +120,13 @@ public class BouquetsNStations extends JPanel {
 		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
 			if (bsTreeRoot==null) return;
 			
-			ProgressDialog.runWithProgressDialog(this.mainWindow, "Save Stations to TabSeparated-File", 400, pd -> {
-				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle("Choose Output File");
-					pd.setIndeterminate(true);
-				});
+			this.main.runWithProgressDialog("Save Stations to TabSeparated-File", pd -> {
+				this.main.setIndeterminateProgressTask(pd, "Choose Output File");
 				
 				if (txtFileChooser.showSaveDialog(mainWindow)!=FileChooser.APPROVE_OPTION) return;
 				File outFile = txtFileChooser.getSelectedFile();
 				
-				SwingUtilities.invokeLater(()->{
-					pd.setTaskTitle("Write to Output File");
-					pd.setIndeterminate(true);
-				});
+				this.main.setIndeterminateProgressTask(pd, "Write to Output File");
 				try (PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outFile), StandardCharsets.UTF_8))) {
 					
 					for (Bouquet bouquet:bsTreeRoot.bouquetData.bouquets)
@@ -216,6 +208,33 @@ public class BouquetsNStations extends JPanel {
 			this.main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Bouquet: %s", clickedBouquetNode.bouquet.name));
 		}));
 		
+		JMenuItem miShowEPGforBouquet;
+		treeContextMenu.add(miShowEPGforBouquet = OpenWebifController.createMenuItem("Show EPG for Bouquet", e->{
+			if (clickedBouquetNode==null) return;
+			
+			String baseURL = this.main.getBaseURL();
+			if (baseURL==null) return;
+			
+			EPG epg = new EPG(new EPG.Tools() {
+				@Override public String getTimeStr(long millis) {
+					return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+				}
+			});
+			
+			this.main.runWithProgressDialog("Show EPG for Bouquet", pd->{
+				clickedBouquetNode.bouquet.forEachStation(station->{
+					boolean isInterrupted = Thread.currentThread().isInterrupted();
+					System.out.printf("EPG for Station \"%s\"%s%n", station.name, isInterrupted ? " -> omitted" : "");
+					if (isInterrupted) return;
+					epg.getEPGforService(baseURL, station.service.stationID, null, null, taskTitle->{
+						this.main.setIndeterminateProgressTask(pd, String.format("EPG for Station \"%s\": %s", station.name, taskTitle));
+					});
+				});
+				System.out.println("... done");
+			});
+			// TODO: process EPG content
+		}));
+		
 		treeContextMenu.addSeparator();
 		
 		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", CommandIcons.Image.getIcon(), CommandIcons.Image_Dis.getIcon(), e->{
@@ -266,6 +285,12 @@ public class BouquetsNStations extends JPanel {
 			miSwitchToStation.setText(clickedStationNode!=null ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
 			miStreamStation  .setText(clickedStationNode!=null ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
 			
+			miShowEPGforBouquet.setEnabled(clickedBouquetNode!=null);
+			miShowEPGforBouquet.setText(
+					clickedBouquetNode!=null ?
+							String.format("Show EPG for Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
+							"Show EPG for Bouquet"
+			);
 			miUpdatePlayableStatesBouquet.setEnabled(clickedBouquetNode!=null && !updatePlayableStatesPeriodically);
 			miUpdatePlayableStatesBouquet.setText(
 					clickedBouquetNode!=null ?
@@ -328,12 +353,7 @@ public class BouquetsNStations extends JPanel {
 	}
 
 	private void updateCurrentStation(String baseURL, ProgressDialog pd) {
-		Consumer<String> setIndeterminateProgressTask = pd==null ? null : taskTitle -> {
-			SwingUtilities.invokeLater(()->{
-				pd.setTaskTitle("CurrentStation: "+taskTitle);
-				pd.setIndeterminate(true);
-			});
-		};
+		Consumer<String> setIndeterminateProgressTask = pd==null ? null : taskTitle -> main.setIndeterminateProgressTask(pd, "CurrentStation: "+taskTitle);
 		
 		updateCurrentlyPlayedStationNodes(false);
 		currentStationData = OpenWebifTools.getCurrentStation(baseURL, setIndeterminateProgressTask);
@@ -403,12 +423,7 @@ public class BouquetsNStations extends JPanel {
 	public void readData(String baseURL, ProgressDialog pd) {
 		if (baseURL==null) return;
 		
-		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle->{
-			SwingUtilities.invokeLater(()->{
-				pd.setTaskTitle("Bouquets 'n' Stations: "+taskTitle);
-				pd.setIndeterminate(true);
-			});
-		});
+		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> main.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: "+taskTitle));
 		
 		if (bouquetData!=null) {
 			PICON_LOADER.clear();

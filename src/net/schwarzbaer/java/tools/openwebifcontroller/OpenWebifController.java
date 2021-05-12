@@ -320,6 +320,17 @@ public class OpenWebifController {
 			messageControl.initialize(baseURL,pd);
 		});
 	}
+	
+	public void runWithProgressDialog(String title, Consumer<ProgressDialog> action) {
+		ProgressDialog.runWithProgressDialog(mainWindow, title, 400, action);
+	}
+	
+	public void setIndeterminateProgressTask(ProgressDialog pd, String taskTitle) {
+		SwingUtilities.invokeLater(()->{
+			pd.setTaskTitle(taskTitle);
+			pd.setIndeterminate(true);
+		});
+	}
 
 	static abstract class AbstractContolPanel<ValueStructType> extends JPanel {
 		private static final long serialVersionUID = 1376060978837360833L;
@@ -369,12 +380,7 @@ public class OpenWebifController {
 		protected void callCommand(String baseURL, ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
 			setPanelEnable(false);
 			new Thread(()->{
-				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->{
-					SwingUtilities.invokeLater(()->{
-						pd.setTaskTitle(String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle));
-						pd.setIndeterminate(true);
-					});
-				};
+				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->main.setIndeterminateProgressTask(pd, String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle));
 				
 				ValueStructType values, valuesPre = commandFcn.apply(baseURL, setTaskTitle);
 				

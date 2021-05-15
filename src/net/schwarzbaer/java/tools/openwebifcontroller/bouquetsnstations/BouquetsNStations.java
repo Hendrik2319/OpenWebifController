@@ -35,7 +35,6 @@ import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.TextAreaDialog;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
-import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
@@ -215,24 +214,7 @@ public class BouquetsNStations extends JPanel {
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
 			
-			EPG epg = new EPG(new EPG.Tools() {
-				@Override public String getTimeStr(long millis) {
-					return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
-				}
-			});
-			
-			this.main.runWithProgressDialog("Show EPG for Bouquet", pd->{
-				clickedBouquetNode.bouquet.forEachStation(station->{
-					boolean isInterrupted = Thread.currentThread().isInterrupted();
-					System.out.printf("EPG for Station \"%s\"%s%n", station.name, isInterrupted ? " -> omitted" : "");
-					if (isInterrupted) return;
-					epg.readEPGforService(baseURL, station.service.stationID, null, null, taskTitle->{
-						this.main.setIndeterminateProgressTask(pd, String.format("EPG for Station \"%s\": %s", station.name, taskTitle));
-					});
-				});
-				System.out.println("... done");
-			});
-			// TODO: process EPG content
+			EPGDialog.showDialog(baseURL, clickedBouquetNode.bouquet.subservices, this.mainWindow, "EPG");
 		}));
 		
 		treeContextMenu.addSeparator();

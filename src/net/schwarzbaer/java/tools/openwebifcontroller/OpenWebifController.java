@@ -156,7 +156,8 @@ public class OpenWebifController {
 	public static class AppSettings extends Settings<AppSettings.ValueGroup,AppSettings.ValueKey> {
 		public enum ValueKey {
 			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser, JavaVM,
-			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates, BouquetsNStations_UpdateCurrentStation, EPGDialogWidth, EPGDialogHeight,
+			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates, BouquetsNStations_UpdateCurrentStation,
+			EPGDialogWidth, EPGDialogHeight, EPGDialog_TimeScale, EPGDialog_RowHeight,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {

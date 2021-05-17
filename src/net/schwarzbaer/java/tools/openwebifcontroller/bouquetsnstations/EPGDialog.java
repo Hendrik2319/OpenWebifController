@@ -25,6 +25,7 @@ import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
@@ -42,6 +43,25 @@ import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSet
 
 public class EPGDialog extends StandardDialog {
 	private static final long serialVersionUID = 8634962178940555542L;
+	
+	private enum RowHeight {
+		_15px(15),
+		_17px(17),
+		_19px(19),
+		_21px(21),
+		_23px(23),
+		;
+		private final int value;
+		RowHeight(int value) { this.value = value; }
+		@Override public String toString() { return String.format("%d px", value); }
+		
+		public static RowHeight get(int value) {
+			for (RowHeight e:values())
+				if (e.value==value)
+					return e;
+			return null;
+		}
+	}
 	
 	private final EPG epg;
 	private final Vector<Bouquet.SubService> stations;
@@ -67,8 +87,35 @@ public class EPGDialog extends StandardDialog {
 		loadEPGThread = new LoadEPGThread(baseURL);
 		epgView = new EPGView();
 		
-		JSlider widthSlider = new JSlider(JSlider.HORIZONTAL);
-		JSlider heightSlider = new JSlider(JSlider.VERTICAL);
+		int rowHeight = OpenWebifController.settings.getInt(ValueKey.EPGDialog_RowHeight, -1);
+		if (rowHeight<0) rowHeight = epgView.getRowHeight();
+		else epgView.setRowHeight(rowHeight);
+		
+		JComboBox<RowHeight> cmbbxRowHeight = OpenWebifController.createComboBox(RowHeight.values(), RowHeight.get(rowHeight), val->{
+			epgView.setRowHeight(val.value);
+			epgView.repaint();
+			reconfigureEPGViewVertScrollBar();
+			OpenWebifController.settings.putInt(ValueKey.EPGDialog_RowHeight, val.value);
+		});
+		
+		//int timeScale_min = epgView.getTimeScale_s(400)/60;
+		int timeScale_min = OpenWebifController.settings.getInt(ValueKey.EPGDialog_TimeScale, -1);
+		if (timeScale_min<0) timeScale_min = epgView.getTimeScale_s(400)/60;
+		else epgView.setTimeScale(400, timeScale_min*60);
+		
+		JLabel timeScaleValueLabel = new JLabel(String.format("400px ~ %02d:%02dh ", timeScale_min/60, timeScale_min%60));
+		JSlider timeScaleSlider = new JSlider(JSlider.HORIZONTAL);
+		timeScaleSlider.setMinimum(30);
+		timeScaleSlider.setMaximum(4*60);
+		timeScaleSlider.setValue(timeScale_min);
+		timeScaleSlider.addChangeListener(e->{
+			int timeScale_min_ = timeScaleSlider.getValue();
+			epgView.setTimeScale(400, timeScale_min_*60);
+			epgView.repaint();
+			timeScaleValueLabel.setText(String.format("400px ~ %02d:%02dh ", timeScale_min_/60, timeScale_min_%60));
+			reconfigureEPGViewHorizScrollBar();
+			OpenWebifController.settings.putInt(ValueKey.EPGDialog_TimeScale, timeScale_min_);
+		});
 		
 		epgViewHorizScrollBar = new JScrollBar(JScrollBar.HORIZONTAL);
 		epgViewVertScrollBar  = new JScrollBar(JScrollBar.VERTICAL);
@@ -117,25 +164,29 @@ public class EPGDialog extends StandardDialog {
 		GridBagConstraints c = new GridBagConstraints();
 		c.fill = GridBagConstraints.BOTH;
 		
-		JPanel bottomPanel = new JPanel(new GridBagLayout());
-		set(c,0,0,1,0); bottomPanel.add(statusOutput,c);
-		set(c,1,0,0,0); bottomPanel.add(loadEPGThread.getButton(),c);
-		set(c,2,0,0,0); bottomPanel.add(closeButton,c);
+		JPanel northPanel = new JPanel(new GridBagLayout());
+		set(c,0,0,0,0); northPanel.add(new JLabel("Row Height: "),c);
+		set(c,1,0,0,0); northPanel.add(cmbbxRowHeight,c);
+		set(c,2,0,0,0); northPanel.add(new JLabel("  Time Scale: "),c);
+		set(c,3,0,0,0); northPanel.add(timeScaleValueLabel,c);
+		set(c,4,0,1,0); northPanel.add(timeScaleSlider,c);
 		
+		JPanel centerPanel = new JPanel(new GridBagLayout());
+		set(c,0,0,1,1); centerPanel.add(epgView,c);
+		set(c,1,0,0,1); centerPanel.add(epgViewVertScrollBar,c);
+		set(c,0,1,1,0); centerPanel.add(epgViewHorizScrollBar,c);
 		
-		JPanel centerPaneL = new JPanel(new GridBagLayout());
-		
-		set(c,1,0,1,0); centerPaneL.add(widthSlider,c);
-		set(c,0,1,0,1); centerPaneL.add(heightSlider,c);
-		set(c,1,1,1,1); centerPaneL.add(epgView,c);
-		set(c,2,1,0,1); centerPaneL.add(epgViewVertScrollBar,c);
-		set(c,1,2,1,0); centerPaneL.add(epgViewHorizScrollBar,c);
+		JPanel southPanel = new JPanel(new GridBagLayout());
+		set(c,0,0,1,0); southPanel.add(statusOutput,c);
+		set(c,1,0,0,0); southPanel.add(loadEPGThread.getButton(),c);
+		set(c,2,0,0,0); southPanel.add(closeButton,c);
 		
 		
 		JPanel contentPane = new JPanel(new BorderLayout(3,3));
 		contentPane.setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
-		contentPane.add(centerPaneL,BorderLayout.CENTER);
-		contentPane.add(bottomPanel,BorderLayout.SOUTH);
+		contentPane.add(northPanel ,BorderLayout.NORTH );
+		contentPane.add(centerPanel,BorderLayout.CENTER);
+		contentPane.add(southPanel ,BorderLayout.SOUTH );
 		
 		createGUI(contentPane);
 		
@@ -356,18 +407,23 @@ public class EPGDialog extends StandardDialog {
 	private class EPGView extends Canvas {
 		private static final long serialVersionUID = 8667640106638383774L;
 		private static final int HEADERHEIGHT = 20;
-		private static final int ROWHEIGHT = 23;
 		private static final int STATIONWIDTH = 100;
 		
 		private final Calendar calendar;
-		private final int baseTimeOffset_s;
+		private final long baseTimeOffset_s;
 		private final HashMap<String, Vector<EPGViewEvent>> events;
+		private int rowHeight;
 		private int rowOffsetY;
-		//private int rowOffsetX;
 		private int rowAnchorTime_s_based;
 		private int minTime_s_based;
 		private int maxTime_s_based;
 		private float timeScale;
+		private int scaleTicksBaseHour;
+		private int scaleTicksBaseTime_s_based;
+		
+		// TODO: repaint periodically ('Now' marker)
+		// TODO: hover effects for events
+		// TODO: tooltip box for events
 		
 		EPGView() {
 			calendar = Calendar.getInstance(TimeZone.getTimeZone("CET"), Locale.GERMANY);
@@ -376,18 +432,25 @@ public class EPGDialog extends StandardDialog {
 			calendar.set(Calendar.SECOND, 0);
 			calendar.set(Calendar.MILLISECOND, 0);
 			long baseTime = calendar.getTimeInMillis();
-			baseTimeOffset_s = (int) (baseTime/1000);
+			baseTimeOffset_s = baseTime/1000;
 			
 			long currentTimeMillis = System.currentTimeMillis();
 			minTime_s_based = maxTime_s_based = (int) (currentTimeMillis/1000-baseTimeOffset_s);
 			rowAnchorTime_s_based = (int) (currentTimeMillis/1000-baseTimeOffset_s) - 3600/2; // now - 1/2 h
-			timeScale = 4*3600f/800f;
-			//rowOffsetX = Math.round(rowAnchorTime_s / timeScale);
-			
+			timeScale = 4*3600f/800f; // 4h ~ 800px
+			updateTimeScaleTicks();
+						
+			rowHeight = 23;
 			rowOffsetY = 0;
 			events = new HashMap<>();
 			setBorder(BorderFactory.createLineBorder(Color.GRAY));
 		}
+		
+		public int  getRowHeight() { return rowHeight; }
+		public void setRowHeight(int rowHeight) { this.rowHeight = rowHeight; }
+
+		public int getTimeScale_s(int width_px) { return Math.round( width_px * timeScale ); }
+		public void setTimeScale(int width_px, int time_s) { timeScale = time_s / (float)width_px; }
 
 		@SuppressWarnings("unused")
 		private void setDate(int year, int month, int date, int hourOfDay, int minute, int second) {
@@ -398,15 +461,30 @@ public class EPGDialog extends StandardDialog {
 		public void setRowOffsetY_px(int rowOffsetY) { this.rowOffsetY = rowOffsetY; repaint(); }
 		public int  getRowOffsetY_px() { return rowOffsetY; }
 
-		public int getContentHeight_px() { return stations.size()*ROWHEIGHT; }
+		public int getContentHeight_px() { return stations.size()*rowHeight; }
 		public int getRowViewHeight_px() { return Math.max(0, height-HEADERHEIGHT); }
 		
-		public void setRowAnchorTime_s(int rowAnchorTime_s) { this.rowAnchorTime_s_based = rowAnchorTime_s; repaint(); }
+		public void setRowAnchorTime_s(int rowAnchorTime_s) { this.rowAnchorTime_s_based = rowAnchorTime_s; updateTimeScaleTicks(); repaint(); }
 		public int  getRowAnchorTime_s() { return rowAnchorTime_s_based; }
 
 		public int getRowViewWidth_s() { return Math.max(0, Math.round( (width-STATIONWIDTH)*timeScale )); }
 		public int getMinTime_s() { return minTime_s_based; }
 		public int getMaxTime_s() { return maxTime_s_based; }
+
+		private void updateTimeScaleTicks() {
+			int x0Time_s_based = Math.round( rowAnchorTime_s_based - STATIONWIDTH*timeScale );
+			calendar.setTimeInMillis( (x0Time_s_based+baseTimeOffset_s)*1000L );
+			scaleTicksBaseHour = calendar.get(Calendar.HOUR_OF_DAY);
+			calendar.set(Calendar.MINUTE, 0);
+			calendar.set(Calendar.SECOND, 0);
+			calendar.set(Calendar.MILLISECOND, 0);
+			scaleTicksBaseTime_s_based = (int) (calendar.getTimeInMillis()/1000 - baseTimeOffset_s);
+			//String timeStr1 = OpenWebifController.dateTimeFormatter.getTimeStr((scaleTicksBaseTime_s_based+baseTimeOffset_s)*1000L, false, true, false, true, false);
+			//String timeStr2 = DateTimeFormatter.getTimeStr(calendar, false, true, false, true, false);
+			//System.out.printf("Hour: %d | BaseTime: %d%n", scaleTicksBaseHour, scaleTicksBaseTime_s_based);
+			//System.out.printf("TimeStr1: %s%n", timeStr1);
+			//System.out.printf("TimeStr2: %s%n", timeStr2);
+		}
 
 		synchronized void updateEvents(StationID stationID, Vector<EPGViewEvent> viewEvents) {
 			String key = stationID.toIDStr();
@@ -448,16 +526,43 @@ public class EPGDialog extends StandardDialog {
 			int fontHeight = 8; // default font size: 11  -->  fontHeight == 8
 			int stationTextOffsetX = 10;
 			int   eventTextOffsetX = 5;
-			int    rowTextOffsetY = (ROWHEIGHT   -1-fontHeight)/2+fontHeight; 
-			int headerTextOffsetY = (HEADERHEIGHT-1-fontHeight)/2+fontHeight;
+			int rowTextOffsetY = (rowHeight-1-fontHeight)/2+fontHeight; 
 			
 			g2.setColor(Color.GRAY);
 			g2.drawLine(x0_, y0_+HEADERHEIGHT-1, x0_+width-1, y0_+HEADERHEIGHT-1);
-			g2.setColor(Color.BLACK);
-			g2.drawString("Zeit-Achse", x0_+10, y0_+headerTextOffsetY);
+			
+			int xBase = x0_ + STATIONWIDTH + Math.round( (scaleTicksBaseTime_s_based - rowAnchorTime_s_based)/timeScale );
+			int iHour = 0;
+			int iQuarter = 0;
+			int xTick = xBase;
+			while (xTick<x0_) {
+				iQuarter++;
+				if (iQuarter==4) { iQuarter = 0; iHour++; }
+				xTick = xBase + Math.round( (iHour*3600 + iQuarter*900)/timeScale );
+			}
+			while (xTick<=x0_+width) {
+				switch (iQuarter) {
+				case 0:
+					g2.setColor(Color.GRAY);
+					g2.drawLine(xTick, y0_, xTick, y0_+HEADERHEIGHT-1);
+					g2.setColor(Color.BLACK);
+					g2.drawString(String.format("%02d:00", (scaleTicksBaseHour+iHour)%24), xTick+4, y0_+11);
+					break;
+				case 1: case 3:
+					g2.setColor(Color.GRAY);
+					g2.drawLine(xTick, y0_+(HEADERHEIGHT*3)/4, xTick, y0_+HEADERHEIGHT-1);
+					break;
+				case 2:
+					g2.setColor(Color.GRAY);
+					g2.drawLine(xTick, y0_+HEADERHEIGHT/2, xTick, y0_+HEADERHEIGHT-1);
+					break;
+				}
+				iQuarter++;
+				if (iQuarter==4) { iQuarter = 0; iHour++; }
+				xTick = xBase + Math.round( (iHour*3600 + iQuarter*900)/timeScale );
+			}
 			
 			int y0 = y0_+HEADERHEIGHT-rowOffsetY;
-			//int x0 = x0_+STATIONWIDTH-rowOffsetX;
 			mainClip = new Rectangle(x0_, y0_+HEADERHEIGHT, width, height-HEADERHEIGHT);
 			Rectangle rowViewClip = new Rectangle(x0_+STATIONWIDTH, y0_+HEADERHEIGHT, width-STATIONWIDTH, height-HEADERHEIGHT);
 			
@@ -465,10 +570,10 @@ public class EPGDialog extends StandardDialog {
 				Bouquet.SubService station = stations.get(i);
 				Vector<EPGViewEvent> events = station.isMarker() ? null : getEvents(station.service.stationID);
 				
-				int rowY     = y0+ROWHEIGHT*i;
-				int nextRowY = y0+ROWHEIGHT*(i+1);
+				int rowY     = y0+rowHeight*i;
+				int nextRowY = y0+rowHeight*(i+1);
 				
-				Rectangle stationCellClip = new Rectangle(x0_, rowY, STATIONWIDTH, ROWHEIGHT).intersection(mainClip);
+				Rectangle stationCellClip = new Rectangle(x0_, rowY, STATIONWIDTH, rowHeight).intersection(mainClip);
 				if (!stationCellClip.isEmpty()) {
 					g2.setClip(stationCellClip);
 					g2.setColor(Color.GRAY);
@@ -476,13 +581,13 @@ public class EPGDialog extends StandardDialog {
 					g2.drawLine(x0_+STATIONWIDTH-1, rowY      , x0_+STATIONWIDTH-1, nextRowY-1);
 				}
 				
-				Rectangle stationTextCellClip = new Rectangle(x0_, rowY, STATIONWIDTH-1, ROWHEIGHT-1).intersection(mainClip);
+				Rectangle stationTextCellClip = new Rectangle(x0_, rowY, STATIONWIDTH-1, rowHeight-1).intersection(mainClip);
 				if (!stationTextCellClip.isEmpty()) {
 					g2.setClip(stationTextCellClip);
 					
 					if (!station.isMarker()) {
 						g2.setColor(Color.WHITE);
-						g2.fillRect(x0_-10, rowY-10, STATIONWIDTH+10, ROWHEIGHT+10);
+						g2.fillRect(x0_-10, rowY-10, STATIONWIDTH+10, rowHeight+10);
 					}
 					
 					g2.setColor(events!=null || station.isMarker() ? Color.BLACK : Color.GRAY);
@@ -496,14 +601,14 @@ public class EPGDialog extends StandardDialog {
 						int xBegin = x0_ + STATIONWIDTH + Math.round( (tBegin_s_based - rowAnchorTime_s_based)/timeScale );
 						int xEnd   = x0_ + STATIONWIDTH + Math.round( (tEnd_s_based   - rowAnchorTime_s_based)/timeScale );
 						
-						Rectangle eventCellClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, ROWHEIGHT-1).intersection(rowViewClip);
+						Rectangle eventCellClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, rowHeight-1).intersection(rowViewClip);
 						if (!eventCellClip.isEmpty()) {
 							g2.setClip(eventCellClip);
 							g2.setColor(Color.BLACK);
-							g2.drawRect(xBegin, rowY, xEnd-xBegin-2, ROWHEIGHT-2);
+							g2.drawRect(xBegin, rowY, xEnd-xBegin-2, rowHeight-2);
 						}
 						
-						Rectangle eventTextClip = new Rectangle(xBegin+1, rowY+1, xEnd-xBegin-3, ROWHEIGHT-1-2).intersection(rowViewClip);
+						Rectangle eventTextClip = new Rectangle(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-1-2).intersection(rowViewClip);
 						if (!eventTextClip.isEmpty()) {
 							g2.setClip(eventTextClip);
 							g2.setColor(Color.BLACK);

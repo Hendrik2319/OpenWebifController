@@ -878,10 +878,24 @@ public class EPGDialog extends StandardDialog {
 		@Override
 		protected void paintCanvas(Graphics g, final int x0_, final int y0_, final int width, final int height) {
 			if (!(g instanceof Graphics2D)) return;
-			Graphics2D g2 = (Graphics2D) g;
-			Shape oldClip = g2.getClip();
-			Rectangle mainClip;
+			final Graphics2D g2 = (Graphics2D) g;
 			
+			Shape oldClip = g2.getClip();
+			
+			g2.setClip(new Rectangle(x0_, y0_, width, height));
+			g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+			
+			paintRepaintCounter(g2, x0_, y0_);
+			paintTimeScale     (g2, x0_, y0_, width);
+			paintMainView      (g2, x0_, y0_, width, height);
+			
+			g2.setClip(oldClip);
+			
+			paintNowMarker(g2, x0_, y0_,        height);
+			paintToolTip  (g2, x0_, y0_, width, height);
+		}
+
+		private void paintRepaintCounter(final Graphics2D g2, final int x0_, final int y0_) {
 			repaintCounter++;
 			int pos = repaintCounter & 0x1f;
 			g2.setColor(Color.RED);
@@ -893,17 +907,9 @@ public class EPGDialog extends StandardDialog {
 				value >>= 1;
 				if (value==0) break;
 			}
-			
-			g2.setClip(mainClip = new Rectangle(x0_, y0_, width, height));
-			
-			g2.setColor(Color.BLACK);
-			g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
-			
-			int fontHeight = 8; // default font size: 11  -->  fontHeight == 8
-			int stationTextOffsetX = 10;
-			int   eventTextOffsetX = 5;
-			int rowTextOffsetY = (rowHeight-1-fontHeight)/2+fontHeight; 
-			
+		}
+
+		private void paintTimeScale(final Graphics2D g2, final int x0_, final int y0_, final int width) {
 			g2.setColor(Color.GRAY);
 			g2.drawLine(x0_, y0_+HEADERHEIGHT-1, x0_+width-1, y0_+HEADERHEIGHT-1);
 			
@@ -937,70 +943,83 @@ public class EPGDialog extends StandardDialog {
 				if (iQuarter==4) { iQuarter = 0; iHour++; }
 				xTick = xBase + Math.round( (iHour*3600 + iQuarter*900)/timeScale );
 			}
+		}
+
+		private void paintMainView(final Graphics2D g2, final int x0_, final int y0_, final int width, final int height) {
+			int fontHeight = 8; // default font size: 11  -->  fontHeight == 8
+			int rowTextOffsetY = (rowHeight-1-fontHeight)/2+fontHeight; 
 			
 			int y0 = y0_+HEADERHEIGHT-rowOffsetY;
-			mainClip = new Rectangle(x0_, y0_+HEADERHEIGHT, width, height-HEADERHEIGHT);
-			Rectangle rowViewClip = new Rectangle(x0_+STATIONWIDTH, y0_+HEADERHEIGHT, width-STATIONWIDTH, height-HEADERHEIGHT);
+			Rectangle mainClip      = new Rectangle(x0_,              y0_+HEADERHEIGHT, width,              height-HEADERHEIGHT);
+			Rectangle eventViewClip = new Rectangle(x0_+STATIONWIDTH, y0_+HEADERHEIGHT, width-STATIONWIDTH, height-HEADERHEIGHT);
 			
 			for (int i=0; i<stations.size(); i++) {
 				Bouquet.SubService station = stations.get(i);
 				Vector<EPGViewEvent> events = station.isMarker() ? null : getEvents(station.service.stationID);
 				
-				int rowY     = y0+rowHeight*i;
-				int nextRowY = y0+rowHeight*(i+1);
-				
-				Rectangle stationCellClip = new Rectangle(x0_, rowY, STATIONWIDTH, rowHeight).intersection(mainClip);
-				if (!stationCellClip.isEmpty()) {
-					g2.setClip(stationCellClip);
-					g2.setColor(Color.GRAY);
-					g2.drawLine(x0_               , nextRowY-1, x0_+STATIONWIDTH-1, nextRowY-1);
-					g2.drawLine(x0_+STATIONWIDTH-1, rowY      , x0_+STATIONWIDTH-1, nextRowY-1);
-				}
-				
-				Rectangle stationTextCellClip = new Rectangle(x0_, rowY, STATIONWIDTH-1, rowHeight-1).intersection(mainClip);
-				if (!stationTextCellClip.isEmpty()) {
-					g2.setClip(stationTextCellClip);
-					
-					if (!station.isMarker()) {
-						g2.setColor(Color.WHITE);
-						g2.fillRect(x0_-10, rowY-10, STATIONWIDTH+10, rowHeight+10);
-					}
-					
-					g2.setColor(events!=null || station.isMarker() ? Color.BLACK : Color.GRAY);
-					g2.drawString(station.name, x0_+stationTextOffsetX, rowY+rowTextOffsetY);
-				}
-				
-				if (events!=null && !events.isEmpty())
-					for (EPGViewEvent event:events) {
-						int xBegin = x0_ + STATIONWIDTH + Math.round( (event.begin_s_based - rowAnchorTime_s_based)/timeScale );
-						int xEnd   = x0_ + STATIONWIDTH + Math.round( (event.  end_s_based - rowAnchorTime_s_based)/timeScale );
-						
-						Rectangle eventCellClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, rowHeight-1).intersection(rowViewClip);
-						if (!eventCellClip.isEmpty()) {
-							g2.setClip(eventCellClip);
-							g2.setColor(Color.BLACK);
-							g2.drawRect(xBegin, rowY, xEnd-xBegin-2, rowHeight-2);
-						}
-						
-						Rectangle eventTextClip = new Rectangle(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-1-2).intersection(rowViewClip);
-						if (!eventTextClip.isEmpty()) {
-							g2.setClip(eventTextClip);
-							if (hoveredEvent!=null && event.event==hoveredEvent.event) {
-								g2.setColor(Color.WHITE);
-								g2.fillRect(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-3);
-							}
-							
-							g2.setColor(Color.BLACK);
-							int textX = xBegin+1+eventTextOffsetX;
-							if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
-							g2.drawString(event.title, textX, rowY+rowTextOffsetY);
-						}
-					}
+				int rowY = y0+rowHeight*i;
+				paintStation(g2, x0_, rowY, rowTextOffsetY, mainClip, station, events!=null);
+				paintEvents (g2, x0_, rowY, rowTextOffsetY, eventViewClip, events);
+			}
+		}
+
+		private void paintStation(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle mainClip, final Bouquet.SubService station, final boolean hasEvents) {
+			int stationTextOffsetX = 10;
+			int nextRowY = rowY+rowHeight;
+			
+			Rectangle stationCellClip = new Rectangle(x0_, rowY, STATIONWIDTH, rowHeight).intersection(mainClip);
+			if (!stationCellClip.isEmpty()) {
+				g2.setClip(stationCellClip);
+				g2.setColor(Color.GRAY);
+				g2.drawLine(x0_               , nextRowY-1, x0_+STATIONWIDTH-1, nextRowY-1);
+				g2.drawLine(x0_+STATIONWIDTH-1, rowY      , x0_+STATIONWIDTH-1, nextRowY-1);
 			}
 			
-			g2.setClip(oldClip);
-			
-			//g2.setClip(rowViewClip);
+			Rectangle stationTextCellClip = new Rectangle(x0_, rowY, STATIONWIDTH-1, rowHeight-1).intersection(mainClip);
+			if (!stationTextCellClip.isEmpty()) {
+				g2.setClip(stationTextCellClip);
+				
+				if (!station.isMarker()) {
+					g2.setColor(Color.WHITE);
+					g2.fillRect(x0_-10, rowY-10, STATIONWIDTH+10, rowHeight+10);
+				}
+				
+				g2.setColor(hasEvents || station.isMarker() ? Color.BLACK : Color.GRAY);
+				g2.drawString(station.name, x0_+stationTextOffsetX, rowY+rowTextOffsetY);
+			}
+		}
+
+		private void paintEvents(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle eventViewClip, final Vector<EPGViewEvent> events) {
+			int eventTextOffsetX = 5;
+			if (events!=null && !events.isEmpty())
+				for (EPGViewEvent event:events) {
+					int xBegin = x0_ + STATIONWIDTH + Math.round( (event.begin_s_based - rowAnchorTime_s_based)/timeScale );
+					int xEnd   = x0_ + STATIONWIDTH + Math.round( (event.  end_s_based - rowAnchorTime_s_based)/timeScale );
+					
+					Rectangle eventCellClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, rowHeight-1).intersection(eventViewClip);
+					if (!eventCellClip.isEmpty()) {
+						g2.setClip(eventCellClip);
+						g2.setColor(Color.BLACK);
+						g2.drawRect(xBegin, rowY, xEnd-xBegin-2, rowHeight-2);
+					}
+					
+					Rectangle eventTextClip = new Rectangle(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-1-2).intersection(eventViewClip);
+					if (!eventTextClip.isEmpty()) {
+						g2.setClip(eventTextClip);
+						if (hoveredEvent!=null && event.event==hoveredEvent.event) {
+							g2.setColor(Color.WHITE);
+							g2.fillRect(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-3);
+						}
+						
+						g2.setColor(Color.BLACK);
+						int textX = xBegin+1+eventTextOffsetX;
+						if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
+						g2.drawString(event.title, textX, rowY+rowTextOffsetY);
+					}
+				}
+		}
+
+		private void paintNowMarker(final Graphics2D g2, final int x0_, final int y0_, final int height) {
 			g2.setColor(Color.RED);
 			long tNow_ms = System.currentTimeMillis();
 			long tNow_s_based = tNow_ms/1000 - baseTimeOffset_s;
@@ -1008,11 +1027,13 @@ public class EPGDialog extends StandardDialog {
 				int xNow = x0_ + STATIONWIDTH + Math.round( (tNow_s_based - rowAnchorTime_s_based)/timeScale );
 				g2.drawLine(xNow, y0_+HEADERHEIGHT, xNow, y0_+height-1);
 			}
-			
+		}
+
+		private void paintToolTip(final Graphics2D g2, final int x0_, final int y0_, final int width, final int height) {
 			if (toolTip!=null && toolTipPos!=null) {
-				int toolTipWidth = toolTip.getWidth();
+				int toolTipWidth  = toolTip.getWidth();
 				int toolTipHeight = toolTip.getHeight();
-				int distToPosX = 10;
+				int distToPosX = 15;
 				int distToPosY = 10;
 				int distToBorder = 10;
 				int imgX;

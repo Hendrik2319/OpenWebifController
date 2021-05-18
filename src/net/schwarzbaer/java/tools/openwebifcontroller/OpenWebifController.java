@@ -771,14 +771,30 @@ public class OpenWebifController {
 	public static void generateOutput(ValueListOutput out, int level, EPGevent event) {
 		out.add(level, "Station"   , event.station_name);
 		out.add(level, "SRef"      , event.sref);
+		if (event.picon   !=null) out.add(level, "Picon"   , event.picon);
 		if (event.provider!=null) out.add(level, "Provider", event.provider);
 		out.add(level, "Title"     , event.title);
 		out.add(level, "Genre"     , "[%d] \"%s\"", event.genreid, event.genre);
 		out.add(level, "ID"        , event.id);
+		if (event.date!=null && event.begin!=null && event.end  !=null)
+			out.add(level, "Time", "%s, %s - %s", event.date, event.begin, event.end  );
+		else {
+			if (event.date !=null) out.add(level, "Date" , event.date );
+			if (event.begin!=null) out.add(level, "Begin", event.begin);
+			if (event.end  !=null) out.add(level, "End"  , event.end  );
+		}
 		out.add(level, "Begin"     , "%s", dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
-		out.add(level, "Now"       , "%s", dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
-		out.add(level, "Duration"  , "%s", DateTimeFormatter.getDurationStr(event.duration_sec));
-		out.add(level, "Remaining" , "%s", DateTimeFormatter.getDurationStr(event.remaining));
+		if (event.isUpToDate)
+			out.add(level, "Now"       , "%s", dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
+		out.add(level, "Duration"  , "%s (%d s)", DateTimeFormatter.getDurationStr(event.duration_sec), event.duration_sec);
+		if (event.duration_min!=null                    ) out.add(level, "Duration" , "%s (%d min)", DateTimeFormatter.getDurationStr(event.duration_min*60), event.duration_min);
+		if (event.remaining   !=null && event.isUpToDate) out.add(level, "Remaining", "%s", DateTimeFormatter.getDurationStr(event.remaining));
+		if (event.tleft       !=null && event.isUpToDate) {
+			if (event.tleft<0) out.add(level, "Time Left", "ended %s ago", DateTimeFormatter.getDurationStr(-event.tleft*60));
+			else               out.add(level, "Time Left", "%s"          , DateTimeFormatter.getDurationStr( event.tleft*60));
+		}
+		if (event.progress    !=null && event.isUpToDate) out.add(level, "Progress" , event.progress);
+		out.add(level, "Is Up-To-Date" , event.isUpToDate);
 		out.add(level, "Description");
 		out.add(level+1, "", event.shortdesc);
 		out.add(level+1, "", event.longdesc );

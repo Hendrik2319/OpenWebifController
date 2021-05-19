@@ -36,6 +36,7 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.JSlider;
@@ -47,6 +48,7 @@ import net.schwarzbaer.gui.StandardDialog;
 import net.schwarzbaer.gui.TextAreaDialog;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
@@ -56,6 +58,42 @@ import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.Update
 
 public class EPGDialog extends StandardDialog {
 	private static final long serialVersionUID = 8634962178940555542L;
+	
+	private enum LeadTime {
+		_2_00h("-2:00h",7200),
+		_1_30h("-1:30h",5400),
+		_1_00h("-1:00h",3600),
+		_45min("-45min",2700),
+		_30min("-30min",1800),
+		;
+		private final int time_s;
+		private final String label;
+		private LeadTime(String label, int time_s) { this.label = label; this.time_s = time_s; }
+		static LeadTime get(int time_s) {
+			for (LeadTime e:values())
+				if (e.time_s==time_s)
+					return e;
+			return null;
+		}
+		@Override public String toString() { return label; }
+	}
+	private enum RangeTime {
+		_4h ("+4h" , 4*3600),
+		_8h ("+8h" , 8*3600),
+		_12h("+12h",12*3600),
+		_24h("+24h",24*3600),
+		;
+		private final int time_s;
+		private final String label;
+		private RangeTime(String label, int time_s) { this.label = label; this.time_s = time_s; }
+		static RangeTime get(int time_s) {
+			for (RangeTime e:values())
+				if (e.time_s==time_s)
+					return e;
+			return null;
+		}
+		@Override public String toString() { return label; }
+	}
 	
 	private enum RowHeight {
 		_15px(15),
@@ -79,27 +117,32 @@ public class EPGDialog extends StandardDialog {
 	private final EPG epg;
 	private final Vector<Bouquet.SubService> stations;
 	private final LoadEPGThread loadEPGThread;
-	private final JLabel statusOutput;
 	private final EPGView epgView;
 	private final JScrollBar epgViewVertScrollBar;
 	private final JScrollBar epgViewHorizScrollBar;
 	private Updater epgViewRepainter;
+	private int leadTime_s;
+	private int rangeTime_s;
 
-	public EPGDialog(String baseURL, Vector<Bouquet.SubService> stations, Window parent, String title, ModalityType modality, boolean repeatedUseOfDialogObject) {
+	public static void showDialog(Window parent, String title, String baseURL, EPG epg, Vector<Bouquet.SubService> subservices) {
+		new EPGDialog(parent, title, ModalityType.APPLICATION_MODAL, false, baseURL, epg, subservices)
+			.showDialog();
+	}
+
+	public EPGDialog(Window parent, String title, ModalityType modality, boolean repeatedUseOfDialogObject, String baseURL, EPG epg, Vector<Bouquet.SubService> stations) {
 		super(parent, title, modality, repeatedUseOfDialogObject);
+		this.epg = epg;
 		this.stations = stations;
 		
-		epg = new EPG(new EPG.Tools() {
-			@Override public String getTimeStr(long millis) {
-				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
-			}
-		});
-		
-		statusOutput = new JLabel("");
+		JLabel statusOutput = new JLabel("");
 		statusOutput.setBorder(BorderFactory.createLoweredSoftBevelBorder());
 		
-		loadEPGThread = new LoadEPGThread(baseURL);
-		epgView = new EPGView();
+		loadEPGThread = new LoadEPGThread(baseURL, this.epg, this.stations) {
+			@Override public void setStatusOutput(String text) { statusOutput.setText(text); }
+			@Override public void updateEPGView            () { EPGDialog.this.updateEPGView(); }
+			@Override public void reconfigureHorizScrollBar() { EPGDialog.this.reconfigureEPGViewHorizScrollBar(); }
+		};
+		epgView = new EPGView(this.stations);
 		epgViewRepainter = new OpenWebifController.Updater(20, epgView::repaint);
 		
 		int rowHeight = OpenWebifController.settings.getInt(ValueKey.EPGDialog_RowHeight, -1);
@@ -111,6 +154,41 @@ public class EPGDialog extends StandardDialog {
 			epgView.repaint();
 			reconfigureEPGViewVertScrollBar();
 			OpenWebifController.settings.putInt(ValueKey.EPGDialog_RowHeight, val.value);
+		});
+		
+		leadTime_s  = OpenWebifController.settings.getInt(ValueKey.EPGDialog_LeadTime , LeadTime._1_30h.time_s);
+		rangeTime_s = OpenWebifController.settings.getInt(ValueKey.EPGDialog_RangeTime, RangeTime._4h  .time_s);
+		loadEPGThread.setLeadTime(leadTime_s);
+		
+		JComboBox<LeadTime > cmbbxLeadTime = OpenWebifController.createComboBox(LeadTime.values(), LeadTime.get(leadTime_s), e->{
+			int oldLeadTime_s = leadTime_s;
+			OpenWebifController.settings.putInt(ValueKey.EPGDialog_LeadTime, leadTime_s = e.time_s);
+			loadEPGThread.setLeadTime(oldLeadTime_s);
+			if (!loadEPGThread.isRunning()) {
+				if (oldLeadTime_s < leadTime_s) {
+					SwingUtilities.invokeLater(()->{
+						String dlgTitle = "Restart EPG loading thread?";
+						String message = "Lead Time was raised.\r\nDo you want to restart EPG loading thread?";
+						int result = JOptionPane.showConfirmDialog(this, message, dlgTitle, JOptionPane.YES_NO_CANCEL_OPTION);
+						if (result==JOptionPane.YES_OPTION)
+							loadEPGThread.start();
+						else {
+							updateEPGView();
+							reconfigureEPGViewHorizScrollBar();
+						}
+					});
+				} else {
+					updateEPGView();
+					reconfigureEPGViewHorizScrollBar();
+				}
+			}
+		});
+		JComboBox<RangeTime> cmbbxRangeTime = OpenWebifController.createComboBox(RangeTime.values(), RangeTime.get(rangeTime_s), e->{
+			OpenWebifController.settings.putInt(ValueKey.EPGDialog_RangeTime, rangeTime_s = e.time_s);
+			if (!loadEPGThread.isRunning()) {
+				updateEPGView();
+				reconfigureEPGViewHorizScrollBar();
+			}
 		});
 		
 		//int timeScale_min = epgView.getTimeScale_s(400)/60;
@@ -141,7 +219,7 @@ public class EPGDialog extends StandardDialog {
 		epgViewHorizScrollBar.addAdjustmentListener(e -> epgView.setRowAnchorTime_s(e.getValue()));
 		//epgViewHorizScrollBar.setValues(epgView.getRowOffsetY(), epgView.getRowViewHeight(), 0, epgView.getContentHeight());
 		
-		new EpgViewMouseHandler(this,epgView,epgViewHorizScrollBar,epgViewVertScrollBar);
+		new EPGViewMouseHandler(this,epgView,epgViewHorizScrollBar,epgViewVertScrollBar);
 		
 		JButton closeButton = OpenWebifController.createButton("Close", true, e->closeDialog());
 		
@@ -154,6 +232,9 @@ public class EPGDialog extends StandardDialog {
 		set(c,2,0,0,0); northPanel.add(new JLabel("  Time Scale: "),c);
 		set(c,3,0,0,0); northPanel.add(timeScaleValueLabel,c);
 		set(c,4,0,1,0); northPanel.add(timeScaleSlider,c);
+		set(c,5,0,0,0); northPanel.add(new JLabel("  Time Range: "),c);
+		set(c,6,0,0,0); northPanel.add(cmbbxLeadTime,c);
+		set(c,7,0,0,0); northPanel.add(cmbbxRangeTime,c);
 		
 		JPanel centerPanel = new JPanel(new GridBagLayout());
 		set(c,0,0,1,1); centerPanel.add(epgView,c);
@@ -199,7 +280,7 @@ public class EPGDialog extends StandardDialog {
 		
 		reconfigureEPGViewVertScrollBar();
 		reconfigureEPGViewHorizScrollBar();
-		loadEPGThread.start();
+		if (this.epg.isEmpty()) loadEPGThread.start();
 		epgViewRepainter.start();
 	}
 
@@ -252,11 +333,6 @@ public class EPGDialog extends StandardDialog {
 		c.gridy = gridy;
 		c.weightx = weightx;
 		c.weighty = weighty;
-	}
-
-	public static void showDialog(String baseURL, Vector<Bouquet.SubService> subservices, Window parent, String title) {
-		EPGDialog dialog = new EPGDialog(baseURL, subservices, parent, title, ModalityType.APPLICATION_MODAL, false);
-		dialog.showDialog();
 	}
 
 	@Override
@@ -359,8 +435,9 @@ public class EPGDialog extends StandardDialog {
 */
 
 	private void updateEPGView() {
-		long beginTime_UnixTS = System.currentTimeMillis()/1000 - 3600; // TODO: change to userdefined range
-		long endTime_UnixTS   = beginTime_UnixTS + 3600*4;
+		long now_ms = System.currentTimeMillis();
+		long beginTime_UnixTS = now_ms/1000 - leadTime_s;
+		long endTime_UnixTS   = beginTime_UnixTS + rangeTime_s;
 		for (Bouquet.SubService station:stations) {
 			if (station.isMarker()) continue;
 			StationID stationID = station.service.stationID;
@@ -378,22 +455,31 @@ public class EPGDialog extends StandardDialog {
 		epgView.repaint();
 	}
 
-	private class LoadEPGThread {
-		private final JButton button;
+	private static abstract class LoadEPGThread {
 		private final String baseURL;
+		private final EPG epg;
+		private final Vector<SubService> stations;
+		private final JButton button;
 
 		private Thread thread;
 		private boolean isRunning;
-
+		private int leadTime_s;
 		
-		LoadEPGThread(String baseURL) {
+		LoadEPGThread(String baseURL, EPG epg, Vector<Bouquet.SubService> stations) {
 			this.baseURL = baseURL;
-			button = OpenWebifController.createButton("Load EPG", true, null);
-			
+			this.epg = epg;
+			this.stations = stations;
 			isRunning = false;
 			thread = null;
-			
-			button.addActionListener(e->startStopThread());
+			button = OpenWebifController.createButton("Load EPG", true, e->startStopThread());
+		}
+		
+		protected abstract void setStatusOutput(String text);
+		protected abstract void updateEPGView();
+		protected abstract void reconfigureHorizScrollBar();
+		
+		void setLeadTime(int leadTime_s) {
+			this.leadTime_s = leadTime_s;
 		}
 
 		JButton getButton() {
@@ -408,25 +494,25 @@ public class EPGDialog extends StandardDialog {
 				button.setEnabled(true);
 			}
 			
-			long now = System.currentTimeMillis();
-			long beginTime_UnixTS = now/1000 - 3600; // 1 hour before now
+			long now_ms = System.currentTimeMillis();
 			
 			for (Bouquet.SubService subservice:stations)
 				if (!subservice.isMarker()) {
 					boolean isInterrupted = Thread.currentThread().isInterrupted();
 					System.out.printf("EPG for Station \"%s\"%s%n", subservice.name, isInterrupted ? " -> omitted" : "");
 					if (isInterrupted) continue;
+					long beginTime_UnixTS = now_ms/1000 - leadTime_s;
 					epg.readEPGforService(baseURL, subservice.service.stationID, beginTime_UnixTS, null, taskTitle->{
 						SwingUtilities.invokeLater(()->{
-							statusOutput.setText( String.format("EPG for Station \"%s\": %s", subservice.name, taskTitle) );
+							setStatusOutput(String.format("EPG for Station \"%s\": %s", subservice.name, taskTitle));
 						});
 					});
 					updateEPGView();
-					SwingUtilities.invokeLater(EPGDialog.this::reconfigureEPGViewHorizScrollBar);
+					SwingUtilities.invokeLater(this::reconfigureHorizScrollBar);
 				}
 			System.out.println("... done");
 			SwingUtilities.invokeLater(()->{
-				statusOutput.setText( "" );
+				setStatusOutput("");
 			});
 			
 			
@@ -437,20 +523,23 @@ public class EPGDialog extends StandardDialog {
 			}
 		}
 
+		synchronized boolean isRunning() {
+			return isRunning;
+		}
+		
 		private synchronized void startStopThread() {
-			if (isRunning) stop(); else start();
+			if (isRunning()) stop(); else start();
 		}
 
 		synchronized void start() {
-			if (!isRunning) {
+			if (!isRunning()) {
 				button.setEnabled(false);
 				thread = new Thread(()->loadEPG(baseURL));
 				thread.start();
 			}
 		}
-
 		synchronized void stop() {
-			if (isRunning) {
+			if (isRunning()) {
 				if (thread!=null) {
 					thread.interrupt();
 					button.setEnabled(false);
@@ -461,7 +550,7 @@ public class EPGDialog extends StandardDialog {
 		
 	}
 	
-	private static class EpgViewMouseHandler implements MouseListener, MouseMotionListener, MouseWheelListener{
+	private static class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWheelListener{
 
 		private final EPGView epgView;
 		private final JScrollBar epgViewHorizScrollBar;
@@ -470,7 +559,7 @@ public class EPGDialog extends StandardDialog {
 		private EPGViewEvent hoveredEvent;
 		private final EPGDialog parent;
 
-		public EpgViewMouseHandler(EPGDialog parent, EPGView epgView, JScrollBar epgViewHorizScrollBar, JScrollBar epgViewVertScrollBar) {
+		public EPGViewMouseHandler(EPGDialog parent, EPGView epgView, JScrollBar epgViewHorizScrollBar, JScrollBar epgViewVertScrollBar) {
 			this.parent = parent;
 			this.epgView = epgView;
 			this.epgViewHorizScrollBar = epgViewHorizScrollBar;
@@ -621,14 +710,16 @@ public class EPGDialog extends StandardDialog {
 		
 	}
 
-	private class EPGView extends Canvas {
+	private static class EPGView extends Canvas {
 		private static final long serialVersionUID = 8667640106638383774L;
 		private static final int HEADERHEIGHT = 20;
 		private static final int STATIONWIDTH = 100;
 		
+		
 		private final Calendar calendar;
 		private final long baseTimeOffset_s;
 		private final HashMap<String, Vector<EPGViewEvent>> events;
+		private final Vector<Bouquet.SubService> stations;
 		private int rowHeight;
 		private int rowOffsetY;
 		private int rowAnchorTime_s_based;
@@ -642,7 +733,8 @@ public class EPGDialog extends StandardDialog {
 		private BufferedImage toolTip;
 		private Point toolTipPos;
 		
-		EPGView() {
+		EPGView(Vector<Bouquet.SubService> stations) {
+			this.stations = stations;
 			repaintCounter = 0;
 			
 			calendar = Calendar.getInstance(TimeZone.getTimeZone("CET"), Locale.GERMANY);

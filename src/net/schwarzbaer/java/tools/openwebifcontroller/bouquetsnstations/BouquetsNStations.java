@@ -35,6 +35,7 @@ import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.TextAreaDialog;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
@@ -49,6 +50,7 @@ public class BouquetsNStations extends JPanel {
 	
 	private final OpenWebifController main;
 	private final StandardMainWindow mainWindow;
+	private final EPG epg;
 	private final JTree bsTree;
 	private final StatusOut statusLine;
 	private final ValuePanel valuePanel;
@@ -85,6 +87,12 @@ public class BouquetsNStations extends JPanel {
 		
 		m3uFileChooser = new FileChooser("Playlist", "m3u");
 		txtFileChooser = new FileChooser("Text-File", "txt");
+		
+		epg = new EPG(new EPG.Tools() {
+			@Override public String getTimeStr(long millis) {
+				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+			}
+		});
 		
 		bsTree = new JTree(bsTreeModel);
 		bsTree.setCellRenderer(new BSTreeCellRenderer());
@@ -214,7 +222,8 @@ public class BouquetsNStations extends JPanel {
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
 			
-			EPGDialog.showDialog(baseURL, clickedBouquetNode.bouquet.subservices, this.mainWindow, "EPG");
+			EPGDialog.showDialog(this.mainWindow, "EPG", baseURL, epg, clickedBouquetNode.bouquet.subservices);
+			// TODO: context menu for stations (switch, stream), updates (current station, "is playable")
 		}));
 		
 		treeContextMenu.addSeparator();

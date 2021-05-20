@@ -3,6 +3,7 @@ package net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -44,7 +45,7 @@ import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 
-public class BouquetsNStations extends JPanel {
+public class BouquetsNStations extends JPanel implements EPGDialog.ExternCommands {
 	private static final long serialVersionUID = 1873358104402086477L;
 	static final PiconLoader PICON_LOADER = new PiconLoader();
 	
@@ -69,6 +70,7 @@ public class BouquetsNStations extends JPanel {
 	private boolean updateCurrentStationPeriodically;
 	private CurrentStation currentStationData;
 	private final Vector<BSTreeNode.StationNode> selectedStationNodes;
+	private EPGDialog epgDialog;
 
 	public BouquetsNStations(OpenWebifController main, StandardMainWindow mainWindow) {
 		super(new BorderLayout());
@@ -222,9 +224,11 @@ public class BouquetsNStations extends JPanel {
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
 			
-			EPGDialog.showDialog(this.mainWindow, "EPG", baseURL, epg, clickedBouquetNode.bouquet.subservices);
-			// TODO: context menu for stations (switch, stream), updates (current station, "is playable")
+			epgDialog = new EPGDialog(this.mainWindow, "EPG", ModalityType.APPLICATION_MODAL, false, baseURL, epg, clickedBouquetNode.bouquet.subservices, this);
+			epgDialog.showDialog();
+			epgDialog = null;
 		}));
+		epgDialog = null;
 		
 		treeContextMenu.addSeparator();
 		
@@ -242,13 +246,8 @@ public class BouquetsNStations extends JPanel {
 				PICON_LOADER.addTask(clickedStationNode.getStationID());
 			}
 		}));
-		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e->{
-			String baseURL = this.main.getBaseURL();
-			if (baseURL==null) return;
-			MessageResponse response = OpenWebifTools.zapToStation(baseURL, clickedStationNode.getStationID());
-			if (response!=null) response.printTo(System.out);
-		}));
-		treeContextMenu.add(miStreamStation = OpenWebifController.createMenuItem("Stream Station", e->streamStation(clickedStationNode.getStationID())));
+		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e-> zapToStation(clickedStationNode.getStationID())));
+		treeContextMenu.add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , e->streamStation(clickedStationNode.getStationID())));
 		
 		treeContextMenu.addTo(bsTree);
 		treeContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
@@ -318,7 +317,7 @@ public class BouquetsNStations extends JPanel {
 		if (shouldPeriodicUpdaterRun())
 			periodicUpdater10s.start();
 	}
-	
+
 	private boolean shouldPeriodicUpdaterRun() {
 		return updatePlayableStatesPeriodically ||
 				updateCurrentStationPeriodically;
@@ -349,6 +348,13 @@ public class BouquetsNStations extends JPanel {
 		updateCurrentlyPlayedStationNodes(false);
 		currentStationData = OpenWebifTools.getCurrentStation(baseURL, setIndeterminateProgressTask);
 		updateCurrentlyPlayedStationNodes(true);
+		
+		if (epgDialog!=null) {
+			if (currentStationData!=null && currentStationData.stationInfo!=null)
+				epgDialog.setCurrentStation(currentStationData.stationInfo.stationID);
+			else
+				epgDialog.setCurrentStation(null);
+		}
 	}
 
 	private void updateCurrentlyPlayedStationNodes(boolean isCurrentlyPlayed) {
@@ -457,12 +463,30 @@ public class BouquetsNStations extends JPanel {
 		}
 	}
 
+	private void zapToStation(StationID stationID) {
+		if (stationID==null) return;
+		
+		String baseURL = this.main.getBaseURL();
+		if (baseURL==null) return;
+		
+		zapToStation(baseURL, stationID);
+	}
+
+	@Override public void zapToStation(String baseURL, StationID stationID) {
+		MessageResponse response = OpenWebifTools.zapToStation(baseURL, stationID);
+		if (response!=null) response.printTo(System.out);
+	}
+
 	private void streamStation(StationID stationID) {
 		if (stationID==null) return;
 		
 		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
 		
+		streamStation(baseURL, stationID);
+	}
+
+	@Override public void streamStation(String baseURL, StationID stationID) {
 		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
 		main.openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
 	}
@@ -490,13 +514,13 @@ public class BouquetsNStations extends JPanel {
 		}
 	}
 
-	private static class BSTreeCellRenderer extends DefaultTreeCellRenderer {
+	static class BSTreeCellRenderer extends DefaultTreeCellRenderer {
 		private static final long serialVersionUID = 8843157059053309466L;
-		private static final Color TEXTCOLOR_DEFAULT          = Color.BLACK;
-		private static final Color TEXTCOLOR_CURRENTLY_PLAYED = new Color(0x0080ff);
-		private static final Color TEXTCOLOR_STATE_UNDEFINED  = new Color(0x800080);
-		private static final Color TEXTCOLOR_IS_PLAYABLE      = new Color(0x008000);
-		private static final Color TEXTCOLOR_IS_NOT_PLAYABLE  = Color.BLACK;
+		static final Color TEXTCOLOR_DEFAULT          = Color.BLACK;
+		static final Color TEXTCOLOR_CURRENTLY_PLAYED = new Color(0x0080ff);
+		static final Color TEXTCOLOR_STATE_UNDEFINED  = new Color(0x800080);
+		static final Color TEXTCOLOR_IS_PLAYABLE      = new Color(0x008000);
+		static final Color TEXTCOLOR_IS_NOT_PLAYABLE  = Color.BLACK;
 
 		@Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean isSelected, boolean isExpanded, boolean isLeaf, int row, boolean hasFocus) {
 			Component comp = super.getTreeCellRendererComponent(tree, value, isSelected, isExpanded, isLeaf, row, hasFocus);

@@ -36,6 +36,7 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
@@ -44,17 +45,16 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.Border;
 
 import net.schwarzbaer.gui.Canvas;
+import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.StandardDialog;
 import net.schwarzbaer.gui.TextAreaDialog;
 import net.schwarzbaer.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.Updater;
 
 public class EPGDialog extends StandardDialog {
 	private static final long serialVersionUID = 8634962178940555542L;
@@ -115,21 +115,26 @@ public class EPGDialog extends StandardDialog {
 	}
 	
 	private final EPG epg;
-	private final Vector<Bouquet.SubService> stations;
+	private final Vector<SubService> stations;
 	private final LoadEPGThread loadEPGThread;
 	private final EPGView epgView;
 	private final JScrollBar epgViewVertScrollBar;
 	private final JScrollBar epgViewHorizScrollBar;
-	private Updater epgViewRepainter;
+	private OpenWebifController.Updater epgViewRepainter;
 	private int leadTime_s;
 	private int rangeTime_s;
 
-	public static void showDialog(Window parent, String title, String baseURL, EPG epg, Vector<Bouquet.SubService> subservices) {
-		new EPGDialog(parent, title, ModalityType.APPLICATION_MODAL, false, baseURL, epg, subservices)
+	public static void showDialog(Window parent, String title, String baseURL, EPG epg, Vector<SubService> subservices, ExternCommands externCommands) {
+		new EPGDialog(parent, title, ModalityType.APPLICATION_MODAL, false, baseURL, epg, subservices, externCommands)
 			.showDialog();
 	}
+	
+	interface ExternCommands {
+		void zapToStation(String baseURL, StationID stationID);
+		void streamStation(String baseURL, StationID stationID);
+	}
 
-	public EPGDialog(Window parent, String title, ModalityType modality, boolean repeatedUseOfDialogObject, String baseURL, EPG epg, Vector<Bouquet.SubService> stations) {
+	public EPGDialog(Window parent, String title, ModalityType modality, boolean repeatedUseOfDialogObject, String baseURL, EPG epg, Vector<SubService> stations, ExternCommands externCommands) {
 		super(parent, title, modality, repeatedUseOfDialogObject);
 		this.epg = epg;
 		this.stations = stations;
@@ -219,7 +224,8 @@ public class EPGDialog extends StandardDialog {
 		epgViewHorizScrollBar.addAdjustmentListener(e -> epgView.setRowAnchorTime_s(e.getValue()));
 		//epgViewHorizScrollBar.setValues(epgView.getRowOffsetY(), epgView.getRowViewHeight(), 0, epgView.getContentHeight());
 		
-		new EPGViewMouseHandler(this,epgView,epgViewHorizScrollBar,epgViewVertScrollBar);
+		StationContextMenu stationContextMenu = externCommands==null ? null : new StationContextMenu(externCommands, baseURL);
+		new EPGViewMouseHandler(this,epgView,epgViewHorizScrollBar,epgViewVertScrollBar,stationContextMenu,this.stations);
 		
 		JButton closeButton = OpenWebifController.createButton("Close", true, e->closeDialog());
 		
@@ -281,6 +287,7 @@ public class EPGDialog extends StandardDialog {
 		reconfigureEPGViewVertScrollBar();
 		reconfigureEPGViewHorizScrollBar();
 		if (this.epg.isEmpty()) loadEPGThread.start();
+		else updateEPGView();
 		epgViewRepainter.start();
 	}
 
@@ -345,108 +352,18 @@ public class EPGDialog extends StandardDialog {
 		}
 		super.showDialog();
 	}
-	
-/*
-	private static class DataStatus {
-		
-		enum DataChangeEventType { Removed, Added, Changed, UnChanged }
-		
-		static class DataChangeEvent {
-			final long time;
-			final DataChangeEventType type;
-			final boolean eventsAdded;
-			final boolean eventsRemoved;
-			DataChangeEvent(long time, DataChangeEventType type, boolean eventsAdded, boolean eventsRemoved) {
-				this.time = time;
-				this.type = type;
-				this.eventsAdded = eventsAdded;
-				this.eventsRemoved = eventsRemoved;
-			}
-			
-			@Override public String toString() {
-				switch (type) {
-				case Removed: case Added:
-					return String.format("[%016X] <%s>", time, type);
-				case Changed: case UnChanged:
-					break;
-				}
-				return String.format("[%016X] <%s> %s%s", time, type, eventsAdded ? " Added" : "", eventsRemoved ? " Removed" : "");
-			}
-			
-		}
-		
-		private final Vector<DataChangeEvent> dataChangeEvents = new Vector<>();
 
-		public void determineDataChange(Vector<EPGViewEvent> oldData, Vector<EPGViewEvent> newData) {
-			long now = System.currentTimeMillis();
-			if (oldData==null && newData==null) {
-				if (!isLastEvent(DataChangeEventType.UnChanged))
-					dataChangeEvents.add(new DataChangeEvent(now, DataChangeEventType.UnChanged, false, false));
-				return;
-			}
-			if (oldData==null && newData!=null) { dataChangeEvents.add(new DataChangeEvent(now, DataChangeEventType.Added  , true, false)); return; }
-			if (oldData!=null && newData==null) { dataChangeEvents.add(new DataChangeEvent(now, DataChangeEventType.Removed, false, true)); return; }
-			
-			boolean eventsAdded   = areEventsMissed(newData, oldData);
-			boolean eventsRemoved = areEventsMissed(oldData, newData);
-			
-			if (eventsAdded || eventsRemoved)
-				dataChangeEvents.add(new DataChangeEvent(now, DataChangeEventType.Changed, eventsAdded, eventsRemoved));
-			
-			else if (!isLastEvent(DataChangeEventType.UnChanged))
-				dataChangeEvents.add(new DataChangeEvent(now, DataChangeEventType.UnChanged, eventsAdded, eventsRemoved));
-		}
-
-		private boolean areEventsMissed(Vector<EPGViewEvent> source, Vector<EPGViewEvent> target) {
-			for (EPGViewEvent es:source) {
-				if (es.event.id==null) continue;
-				boolean found = false;
-				for (EPGViewEvent et:target) {
-					if (et.event.id==null) continue;
-					if (es.event.id.longValue()==et.event.id.longValue()) {
-						found = true;
-						break;
-					}
-				}
-				if (!found) return true;
-			}
-			return false;
-		}
-
-		public boolean isLastEvent(DataChangeEventType... types) {
-			if (dataChangeEvents.isEmpty()) return false;
-			DataChangeEvent lastEvent = dataChangeEvents.lastElement();
-			for (DataChangeEventType type:types)
-				if (lastEvent.type==type)
-					return true;
-			return false;
-		}
-
-		@Override
-		public String toString() {
-			if (dataChangeEvents.isEmpty()) return "[]";
-			Iterator<String> it = dataChangeEvents.stream().map(DataChangeEvent::toString).iterator();
-			return "[\r\n    "+String.join(",\r\n    ", (Iterable<String>)()->it)+"\r\n]";
-		}
-		
+	public void setCurrentStation(StationID stationID) {
+		epgView.setCurrentStation(stationID);
 	}
-	
-	private HashMap<String,DataStatus> dataStates = new HashMap<>();
-*/
 
 	private void updateEPGView() {
 		long now_ms = System.currentTimeMillis();
 		long beginTime_UnixTS = now_ms/1000 - leadTime_s;
 		long endTime_UnixTS   = beginTime_UnixTS + rangeTime_s;
-		for (Bouquet.SubService station:stations) {
+		for (SubService station:stations) {
 			if (station.isMarker()) continue;
 			StationID stationID = station.service.stationID;
-			//String idStr = stationID.toIDStr();
-			//DataStatus dataStatus = dataStates.get(idStr);
-			//if (dataStatus==null) dataStates.put(idStr,dataStatus = new DataStatus());
-			//if (!dataStatus.isLastEvent(DataStatus.DataChangeEventType.UnChanged,DataStatus.DataChangeEventType.Added)) {
-			//	System.out.printf("DataStatus of \"%s\": %s%n", station.name, dataStatus.toString());
-			//}
 			Vector<EPGevent> events = epg.getEvents(stationID, beginTime_UnixTS, endTime_UnixTS, true);
 			Vector<EPGViewEvent> viewEvents = epgView.convert(events);
 			epgView.updateEvents(stationID,viewEvents/*,dataStatus*/);
@@ -465,7 +382,7 @@ public class EPGDialog extends StandardDialog {
 		private boolean isRunning;
 		private int leadTime_s;
 		
-		LoadEPGThread(String baseURL, EPG epg, Vector<Bouquet.SubService> stations) {
+		LoadEPGThread(String baseURL, EPG epg, Vector<SubService> stations) {
 			this.baseURL = baseURL;
 			this.epg = epg;
 			this.stations = stations;
@@ -496,7 +413,7 @@ public class EPGDialog extends StandardDialog {
 			
 			long now_ms = System.currentTimeMillis();
 			
-			for (Bouquet.SubService subservice:stations)
+			for (SubService subservice:stations)
 				if (!subservice.isMarker()) {
 					boolean isInterrupted = Thread.currentThread().isInterrupted();
 					System.out.printf("EPG for Station \"%s\"%s%n", subservice.name, isInterrupted ? " -> omitted" : "");
@@ -550,74 +467,151 @@ public class EPGDialog extends StandardDialog {
 		
 	}
 	
+	private static class StationContextMenu extends ContextMenu {
+		private static final long serialVersionUID = 3048130309705457643L;
+		
+		private StationID stationID;
+		private final JMenuItem miSwitchToStation;
+		private final JMenuItem miStreamStation;
+		
+		StationContextMenu(ExternCommands externCommands, String baseURL) {
+			add(miSwitchToStation = OpenWebifController.createMenuItem("Switch to Station", e->externCommands. zapToStation(baseURL,stationID)));
+			add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , e->externCommands.streamStation(baseURL,stationID)));
+		}
+
+		void setStationID(String stationName, StationID stationID) {
+			this.stationID = stationID;
+			miSwitchToStation.setText(String.format("Switch to \"%s\"", stationName));
+			miStreamStation  .setText(String.format("Stream \"%s\""   , stationName));
+		}
+	}
+	
 	private static class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWheelListener{
 
+		private final Window parent;
 		private final EPGView epgView;
 		private final JScrollBar epgViewHorizScrollBar;
 		private final JScrollBar epgViewVertScrollBar;
+		private final StationContextMenu stationContextMenu;
+		private final Vector<SubService> stations;
+		
 		private Integer hoveredRowIndex;
 		private EPGViewEvent hoveredEvent;
-		private final EPGDialog parent;
+		private boolean isStationHovered;
 
-		public EPGViewMouseHandler(EPGDialog parent, EPGView epgView, JScrollBar epgViewHorizScrollBar, JScrollBar epgViewVertScrollBar) {
+		public EPGViewMouseHandler(Window parent, EPGView epgView, JScrollBar epgViewHorizScrollBar, JScrollBar epgViewVertScrollBar, StationContextMenu stationContextMenu, Vector<SubService> stations) {
 			this.parent = parent;
 			this.epgView = epgView;
 			this.epgViewHorizScrollBar = epgViewHorizScrollBar;
 			this.epgViewVertScrollBar = epgViewVertScrollBar;
+			this.stationContextMenu = stationContextMenu;
+			this.stations = stations;
 			this.epgView.addMouseListener(this);
 			this.epgView.addMouseMotionListener(this);
 			this.epgView.addMouseWheelListener(this);
 			hoveredRowIndex = null;
 			hoveredEvent = null;
+			isStationHovered = false;
+		}
+		
+		private void clearHoveredItem() {
+			boolean repaintEPGView = false;
+			hoveredRowIndex = null;
+			repaintEPGView |= clearHoveredStation();
+			repaintEPGView |= clearHoveredEvent();
+			if (repaintEPGView)
+				epgView.repaint();
+		}
+
+		private boolean clearHoveredStation() {
+			if (isStationHovered) {
+				epgView.setHoveredStation(null);
+				isStationHovered = false;
+				return true;
+			}
+			return false;
 		}
 	
-		private void clearHoveredEvent() {
-			if (hoveredRowIndex!=null || hoveredEvent!=null) {
-				hoveredRowIndex = null;
+		private boolean clearHoveredEvent() {
+			if (hoveredEvent!=null) {
 				hoveredEvent = null;
 				//System.out.printf("HoveredEvent: [%d] %s%n", hoveredRowIndex, hoveredEvent);
 				epgView.setHoveredEvent(hoveredEvent);
 				epgView.hideToolTip();
-				epgView.repaint();
+				return true;
+			}
+			return false;
+		}
+
+		private void updateHoveredItem(Point point) {
+			EPGView.DataPos dataPos = epgView.getDataPos(point);
+			if (dataPos==null || dataPos.rowIndex==null || (dataPos.time_s_based==null && !dataPos.isStationSelected)) {
+				clearHoveredItem();
+				
+			} else {
+				boolean repaintEPGView = false;
+				
+				if (hoveredRowIndex==null || !hoveredRowIndex.equals(dataPos.rowIndex)) {
+					//System.out.printf("updateHoveredItem(...) HoveredRow changed: %d -> %d%n", hoveredRowIndex, dataPos.rowIndex);
+					hoveredRowIndex = dataPos.rowIndex;
+					
+					if (!dataPos.isStationSelected)
+						repaintEPGView |= clearHoveredStation();
+					else
+						repaintEPGView |= setHoveredStation(dataPos);
+					
+					if (dataPos.time_s_based==null)
+						repaintEPGView |= clearHoveredEvent();
+					else
+						repaintEPGView |= setHoveredEvent(dataPos.time_s_based);
+					
+				} else {
+					
+					if (!dataPos.isStationSelected)
+						repaintEPGView |= clearHoveredStation();
+					else if (isStationHovered)
+						repaintEPGView |= epgView.updateToolTip(point);
+					else
+						repaintEPGView |= setHoveredStation(dataPos);
+					
+					if (dataPos.time_s_based==null)
+						repaintEPGView |= clearHoveredEvent();
+					else if (hoveredEvent!=null && hoveredEvent.covers(dataPos.time_s_based))
+						repaintEPGView |= epgView.updateToolTip(point);
+					else
+						repaintEPGView |= setHoveredEvent(dataPos.time_s_based);
+				}
+				
+				if (repaintEPGView)
+					epgView.repaint();
 			}
 		}
 
-		private void updateHoveredEvent(Point point) {
-			EPGView.DataPos dataPos = epgView.getDataPos(point);
-			if (dataPos==null || dataPos.rowIndex==null || dataPos.time_s_based==null) {
-				clearHoveredEvent();
-				
-			} else if (hoveredRowIndex==null || !hoveredRowIndex.equals(dataPos.rowIndex)) {
-				hoveredRowIndex = dataPos.rowIndex;
-				EPGViewEvent newHoveredEvent = epgView.getEvent(dataPos.rowIndex,dataPos.time_s_based);
-				if (hoveredEvent!=null || newHoveredEvent!=null) {
-					hoveredEvent = newHoveredEvent;
-					//System.out.printf("HoveredEvent: [%d] %s%n", hoveredRowIndex, hoveredEvent);
-					epgView.setHoveredEvent(hoveredEvent);
-					epgView.hideToolTip();
-					epgView.repaint();
-				} else {
-					boolean changed = epgView.updateToolTip(point);
-					if (changed) epgView.repaint();
+		private boolean setHoveredStation(EPGView.DataPos dataPos) {
+			//System.out.printf("setHoveredStation(%d) [isStationHovered:%s, dataPos:%s]%n", hoveredRowIndex, isStationHovered, dataPos);
+			epgView.setHoveredStation(hoveredRowIndex);
+			isStationHovered = true;
+			if (stationContextMenu!=null) {
+				SubService station = stations.get(hoveredRowIndex);
+				if (!station.isMarker()) {
+					stationContextMenu.setStationID(station.name, station.service.stationID);
+					stationContextMenu.setVisible(false);
 				}
-				
-			} else if (hoveredEvent==null || !hoveredEvent.covers(dataPos.time_s_based)) {
-				EPGViewEvent newHoveredEvent = epgView.getEvent(dataPos.rowIndex,dataPos.time_s_based);
-				if (hoveredEvent!=null || newHoveredEvent!=null) {
-					hoveredEvent = newHoveredEvent;
-					//System.out.printf("HoveredEvent: [%d] %s%n", hoveredRowIndex, hoveredEvent);
-					epgView.setHoveredEvent(hoveredEvent);
-					epgView.hideToolTip();
-					epgView.repaint();
-				} else {
-					boolean changed = epgView.updateToolTip(point);
-					if (changed) epgView.repaint();
-				}
-				
-			} else {
-				boolean changed = epgView.updateToolTip(point);
-				if (changed) epgView.repaint();
 			}
+			return true;
+		}
+
+		private boolean setHoveredEvent(Integer time_s_based) {
+			//System.out.printf("setHoveredEvent(%d,%d)%n", hoveredRowIndex,time_s_based);
+			EPGViewEvent newHoveredEvent = epgView.getEvent(hoveredRowIndex,time_s_based);
+			if (hoveredEvent!=null || newHoveredEvent!=null) {
+				hoveredEvent = newHoveredEvent;
+				//System.out.printf("HoveredEvent: [%d] %s%n", hoveredRowIndex, hoveredEvent);
+				epgView.setHoveredEvent(hoveredEvent);
+				epgView.hideToolTip();
+				return true;
+			}
+			return false;
 		}
 
 		@Override public void mouseReleased(MouseEvent e) {}
@@ -631,21 +625,37 @@ public class EPGDialog extends StandardDialog {
 					String text = out.generateOutput();
 					TextAreaDialog.showText(parent, hoveredEvent.title, 700, 500, true, text);
 				}
+				if (isStationHovered) {
+					showStationContextMenu(e);
+				}
 				break;
 				
 			case MouseEvent.BUTTON3:
-				epgView.showToolTip(e.getPoint());
-				epgView.repaint();
+				if (hoveredEvent!=null) {
+					epgView.showToolTip(e.getPoint());
+					epgView.repaint();
+				}
+				if (isStationHovered) {
+					showStationContextMenu(e);
+				}
 				break;
 			
 			}
 		}
+
+		private void showStationContextMenu(MouseEvent e) {
+			if (stationContextMenu == null) return;
+			if (hoveredRowIndex == null) return;
+			SubService station = stations.get(hoveredRowIndex);
+			if (!station.isMarker())
+				stationContextMenu.show(epgView, e.getX(), e.getY());
+		}
 		
-		@Override public void mouseExited  (MouseEvent e) { clearHoveredEvent(); }
-		@Override public void mouseEntered (MouseEvent e) { updateHoveredEvent(e.getPoint()); }
+		@Override public void mouseExited (MouseEvent e) { clearHoveredItem(); }
+		@Override public void mouseEntered(MouseEvent e) { updateHoveredItem(e.getPoint()); }
 		
-		@Override public void mouseDragged(MouseEvent e) { updateHoveredEvent(e.getPoint()); }
-		@Override public void mouseMoved  (MouseEvent e) { updateHoveredEvent(e.getPoint()); }
+		@Override public void mouseDragged(MouseEvent e) { updateHoveredItem(e.getPoint()); }
+		@Override public void mouseMoved  (MouseEvent e) { updateHoveredItem(e.getPoint()); }
 
 		@Override public void mouseWheelMoved(MouseWheelEvent e) {
 			JScrollBar scrollBar;
@@ -659,6 +669,7 @@ public class EPGDialog extends StandardDialog {
 					return;
 			}
 			
+			clearHoveredStation();
 			clearHoveredEvent();
 			
 			int scrollType = e.getScrollType();
@@ -681,7 +692,7 @@ public class EPGDialog extends StandardDialog {
 			else if (value<minimum)                            scrollBar.setValue(minimum);
 			else if (value+visible>maximum)                    scrollBar.setValue(maximum-visible);
 			
-			updateHoveredEvent(e.getPoint());
+			updateHoveredItem(e.getPoint());
 		}
 	}
 
@@ -712,14 +723,38 @@ public class EPGDialog extends StandardDialog {
 
 	private static class EPGView extends Canvas {
 		private static final long serialVersionUID = 8667640106638383774L;
+		
+		private static final Color COLOR_STATION_BG           = Color.WHITE;
+		private static final Color COLOR_STATION_BG_HOVERED   = new Color(0xE5EDFF);
+		private static final Color COLOR_STATION_FRAME        = Color.GRAY;
+		private static final Color COLOR_STATION_TEXT         = Color.BLACK;
+		private static final Color COLOR_STATION_TEXT_ISEMPTY = Color.GRAY;
+		
+		private static final Color COLOR_EVENT_HOVERED_BG = Color.WHITE;
+		private static final Color COLOR_EVENT_FRAME      = Color.BLACK;
+		private static final Color COLOR_EVENT_TEXT       = Color.BLACK;
+		
+		private static final Color COLOR_TOOLTIP_BG    = new Color(0xFFFFD0);
+		private static final Color COLOR_TOOLTIP_FRAME = Color.BLACK;
+		private static final Color COLOR_TOOLTIP_TEXT  = Color.BLACK;
+		
+		private static final Color COLOR_TIMESCALE_LINES = Color.GRAY;
+		private static final Color COLOR_TIMESCALE_TEXT  = Color.BLACK;
+		
+		private static final Color COLOR_NOWMARKER = Color.RED;
+		
 		private static final int HEADERHEIGHT = 20;
 		private static final int STATIONWIDTH = 100;
+
+
+
+
 		
 		
 		private final Calendar calendar;
 		private final long baseTimeOffset_s;
 		private final HashMap<String, Vector<EPGViewEvent>> events;
-		private final Vector<Bouquet.SubService> stations;
+		private final Vector<SubService> stations;
 		private int rowHeight;
 		private int rowOffsetY;
 		private int rowAnchorTime_s_based;
@@ -732,8 +767,10 @@ public class EPGDialog extends StandardDialog {
 		private int repaintCounter;
 		private BufferedImage toolTip;
 		private Point toolTipPos;
+		private StationID currentStation;
+		private Integer hoveredStationIndex;
 		
-		EPGView(Vector<Bouquet.SubService> stations) {
+		EPGView(Vector<SubService> stations) {
 			this.stations = stations;
 			repaintCounter = 0;
 			
@@ -757,8 +794,18 @@ public class EPGDialog extends StandardDialog {
 			hoveredEvent = null;
 			toolTip = null;
 			toolTipPos = null;
+			currentStation = null;
+			hoveredStationIndex = null;
 			
 			setBorder(BorderFactory.createLineBorder(Color.GRAY));
+		}
+
+		public void setHoveredStation(Integer hoveredStationIndex) {
+			this.hoveredStationIndex = hoveredStationIndex;
+		}
+
+		public void setCurrentStation(StationID stationID) {
+			currentStation = stationID;
 		}
 
 		public void showToolTip(Point point) {
@@ -820,12 +867,13 @@ public class EPGDialog extends StandardDialog {
 			stdFont = g2.getFont();
 			boldFont = stdFont.deriveFont(Font.BOLD);
 			
-			g2.setColor(new Color(0xFFFFD0));
+			g2.setColor(COLOR_TOOLTIP_BG);
 			g2.fillRect(0, 0, imgWidth, imgHeight);
-			g2.setColor(Color.BLACK);
+			g2.setColor(COLOR_TOOLTIP_FRAME);
 			g2.drawRect(0, 0, imgWidth-1, imgHeight-1);
 			//g2.drawString("ToolTip Dummy", 10, 20);
 			
+			g2.setColor(COLOR_TOOLTIP_TEXT);
 			g2.setFont(stdFont);
 			g2.drawString(timeRange, borderSpacing, baselineOffset[0]);
 			g2.setFont(boldFont);
@@ -922,7 +970,7 @@ public class EPGDialog extends StandardDialog {
 		public EPGViewEvent getEvent(int rowIndex, int time_s_based) {
 			if (rowIndex<0 || rowIndex>=stations.size()) return null;
 			
-			Bouquet.SubService subService = stations.get(rowIndex);
+			SubService subService = stations.get(rowIndex);
 			if (subService.isMarker()) return null;
 			
 			Vector<EPGViewEvent> stationEvents = getEvents(subService.service.stationID);
@@ -939,10 +987,17 @@ public class EPGDialog extends StandardDialog {
 		class DataPos {
 			final Integer time_s_based;
 			final Integer rowIndex;
-			DataPos(Integer time_s_based, Integer rowIndex) {
+			final boolean isStationSelected;
+			DataPos(Integer time_s_based, Integer rowIndex, boolean isStationSelected) {
 				this.time_s_based = time_s_based;
 				this.rowIndex = rowIndex;
+				this.isStationSelected = isStationSelected;
 			}
+			@Override
+			public String toString() {
+				return String.format("DataPos [rowIndex=%s, time_s_based=%s, isStationSelected=%s]", rowIndex, time_s_based, isStationSelected);
+			}
+			
 		}
 
 		public DataPos getDataPos(Point point) {
@@ -952,6 +1007,8 @@ public class EPGDialog extends StandardDialog {
 			int borderBottom = borderInsets==null ? 0 : borderInsets.bottom;
 			int borderLeft   = borderInsets==null ? 0 : borderInsets.left  ;
 			int borderRight  = borderInsets==null ? 0 : borderInsets.right ;
+			
+			boolean isStationSelected = point.x < borderLeft+STATIONWIDTH;
 			
 			Integer time_s_based = null;
 			if (borderLeft+STATIONWIDTH < point.x && point.x < width-borderRight) {
@@ -964,7 +1021,7 @@ public class EPGDialog extends StandardDialog {
 				//int rowY = y0+rowHeight*i;
 				rowIndex = (point.y-HEADERHEIGHT-borderTop+rowOffsetY)/rowHeight;
 			}
-			return time_s_based==null && rowIndex==null ? null : new DataPos(time_s_based,rowIndex);
+			return time_s_based==null && rowIndex==null && !isStationSelected ? null : new DataPos(time_s_based,rowIndex,isStationSelected);
 		}
 
 		@Override
@@ -1002,7 +1059,7 @@ public class EPGDialog extends StandardDialog {
 		}
 
 		private void paintTimeScale(final Graphics2D g2, final int x0_, final int y0_, final int width) {
-			g2.setColor(Color.GRAY);
+			g2.setColor(COLOR_TIMESCALE_LINES);
 			g2.drawLine(x0_, y0_+HEADERHEIGHT-1, x0_+width-1, y0_+HEADERHEIGHT-1);
 			
 			int xBase = x0_ + STATIONWIDTH + Math.round( (scaleTicksBaseTime_s_based - rowAnchorTime_s_based)/timeScale );
@@ -1017,17 +1074,17 @@ public class EPGDialog extends StandardDialog {
 			while (xTick<=x0_+width) {
 				switch (iQuarter) {
 				case 0:
-					g2.setColor(Color.GRAY);
+					g2.setColor(COLOR_TIMESCALE_LINES);
 					g2.drawLine(xTick, y0_, xTick, y0_+HEADERHEIGHT-1);
-					g2.setColor(Color.BLACK);
+					g2.setColor(COLOR_TIMESCALE_TEXT);
 					g2.drawString(String.format("%02d:00", (scaleTicksBaseHour+iHour)%24), xTick+4, y0_+11);
 					break;
 				case 1: case 3:
-					g2.setColor(Color.GRAY);
+					g2.setColor(COLOR_TIMESCALE_LINES);
 					g2.drawLine(xTick, y0_+(HEADERHEIGHT*3)/4, xTick, y0_+HEADERHEIGHT-1);
 					break;
 				case 2:
-					g2.setColor(Color.GRAY);
+					g2.setColor(COLOR_TIMESCALE_LINES);
 					g2.drawLine(xTick, y0_+HEADERHEIGHT/2, xTick, y0_+HEADERHEIGHT-1);
 					break;
 				}
@@ -1046,23 +1103,23 @@ public class EPGDialog extends StandardDialog {
 			Rectangle eventViewClip = new Rectangle(x0_+STATIONWIDTH, y0_+HEADERHEIGHT, width-STATIONWIDTH, height-HEADERHEIGHT);
 			
 			for (int i=0; i<stations.size(); i++) {
-				Bouquet.SubService station = stations.get(i);
+				SubService station = stations.get(i);
 				Vector<EPGViewEvent> events = station.isMarker() ? null : getEvents(station.service.stationID);
 				
 				int rowY = y0+rowHeight*i;
-				paintStation(g2, x0_, rowY, rowTextOffsetY, mainClip, station, events!=null);
+				paintStation(g2, x0_, rowY, rowTextOffsetY, mainClip, station, i, events!=null);
 				paintEvents (g2, x0_, rowY, rowTextOffsetY, eventViewClip, events);
 			}
 		}
 
-		private void paintStation(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle mainClip, final Bouquet.SubService station, final boolean hasEvents) {
+		private void paintStation(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle mainClip, final SubService station, int stationIndex, final boolean hasEvents) {
 			int stationTextOffsetX = 10;
 			int nextRowY = rowY+rowHeight;
 			
 			Rectangle stationCellClip = new Rectangle(x0_, rowY, STATIONWIDTH, rowHeight).intersection(mainClip);
 			if (!stationCellClip.isEmpty()) {
 				g2.setClip(stationCellClip);
-				g2.setColor(Color.GRAY);
+				g2.setColor(COLOR_STATION_FRAME);
 				g2.drawLine(x0_               , nextRowY-1, x0_+STATIONWIDTH-1, nextRowY-1);
 				g2.drawLine(x0_+STATIONWIDTH-1, rowY      , x0_+STATIONWIDTH-1, nextRowY-1);
 			}
@@ -1072,11 +1129,14 @@ public class EPGDialog extends StandardDialog {
 				g2.setClip(stationTextCellClip);
 				
 				if (!station.isMarker()) {
-					g2.setColor(Color.WHITE);
-					g2.fillRect(x0_-10, rowY-10, STATIONWIDTH+10, rowHeight+10);
+					g2.setColor(hoveredStationIndex!=null && hoveredStationIndex.intValue()==stationIndex ? COLOR_STATION_BG_HOVERED : COLOR_STATION_BG);
+					g2.fillRect(x0_, rowY, STATIONWIDTH-1, rowHeight-1);
 				}
 				
-				g2.setColor(hasEvents || station.isMarker() ? Color.BLACK : Color.GRAY);
+				if (currentStation!=null && currentStation.toIDStr().equals(station.service.stationID.toIDStr()))
+					g2.setColor(BouquetsNStations.BSTreeCellRenderer.TEXTCOLOR_CURRENTLY_PLAYED);
+				else
+					g2.setColor(hasEvents || station.isMarker() ? COLOR_STATION_TEXT : COLOR_STATION_TEXT_ISEMPTY);
 				g2.drawString(station.name, x0_+stationTextOffsetX, rowY+rowTextOffsetY);
 			}
 		}
@@ -1091,7 +1151,7 @@ public class EPGDialog extends StandardDialog {
 					Rectangle eventCellClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, rowHeight-1).intersection(eventViewClip);
 					if (!eventCellClip.isEmpty()) {
 						g2.setClip(eventCellClip);
-						g2.setColor(Color.BLACK);
+						g2.setColor(COLOR_EVENT_FRAME);
 						g2.drawRect(xBegin, rowY, xEnd-xBegin-2, rowHeight-2);
 					}
 					
@@ -1099,11 +1159,11 @@ public class EPGDialog extends StandardDialog {
 					if (!eventTextClip.isEmpty()) {
 						g2.setClip(eventTextClip);
 						if (hoveredEvent!=null && event.event==hoveredEvent.event) {
-							g2.setColor(Color.WHITE);
+							g2.setColor(COLOR_EVENT_HOVERED_BG);
 							g2.fillRect(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-3);
 						}
 						
-						g2.setColor(Color.BLACK);
+						g2.setColor(COLOR_EVENT_TEXT);
 						int textX = xBegin+1+eventTextOffsetX;
 						if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
 						g2.drawString(event.title, textX, rowY+rowTextOffsetY);
@@ -1112,7 +1172,7 @@ public class EPGDialog extends StandardDialog {
 		}
 
 		private void paintNowMarker(final Graphics2D g2, final int x0_, final int y0_, final int height) {
-			g2.setColor(Color.RED);
+			g2.setColor(COLOR_NOWMARKER);
 			long tNow_ms = System.currentTimeMillis();
 			long tNow_s_based = tNow_ms/1000 - baseTimeOffset_s;
 			if (tNow_s_based > rowAnchorTime_s_based) {

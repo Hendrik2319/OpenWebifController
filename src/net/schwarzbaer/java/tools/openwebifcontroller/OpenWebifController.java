@@ -106,6 +106,7 @@ public class OpenWebifController {
 				System.out.println("Usage");
 				System.out.println("  -b, --baseurl [BaseURL]    Sets base URL of STB");
 				System.out.println("  -on|-off                   Turns STB ON or OFF (=StandBy)");
+				System.out.println("  -mute                      Turns volume off");
 				System.out.println("  --reboot                   Restarts STB (Linux & GUI)");
 				
 			} else {
@@ -113,11 +114,15 @@ public class OpenWebifController {
 				boolean turnOn = false;
 				boolean turnOff = false;
 				boolean reboot = false;
+				boolean mute = false;
 				for (int i=0; i<args.length; i++) {
 					String str = args[i];
 					if ( (str.equalsIgnoreCase("--baseurl") || str.equalsIgnoreCase("-b")) && i+1 < args.length) {
 						baseURL = args[i+1];
 						i++;
+						
+					} else if (str.equalsIgnoreCase("-mute")) {
+						mute = true;
 						
 					} else if (str.equalsIgnoreCase("-on")) {
 						turnOn = true;
@@ -138,6 +143,7 @@ public class OpenWebifController {
 						if      (turnOff) PowerContol.setState(baseURL, Power.Commands.Standby, System.out);
 						else if (turnOn ) PowerContol.setState(baseURL, Power.Commands.Wakeup , System.out);
 						else if (reboot ) PowerContol.setState(baseURL, Power.Commands.Reboot , System.out);
+						else if (mute   ) VolumeContol.setVolMute(baseURL, System.out);;
 					}
 					return;
 				}
@@ -575,6 +581,10 @@ public class OpenWebifController {
 			});
 		}
 	
+		static void setVolMute(String baseURL, PrintStream out) {
+			Volume.setVolMute(baseURL,str->out.printf("PowerContol: %s%n", str));
+		}
+		
 		private void setVolUp  (     ProgressDialog pd) { callCommand(pd, "VolUp"  , Volume::setVolUp  ); }
 		private void setVolDown(     ProgressDialog pd) { callCommand(pd, "VolDown", Volume::setVolDown); }
 		private void setVolMute(     ProgressDialog pd) { callCommand(pd, "VolMute", Volume::setVolMute); }

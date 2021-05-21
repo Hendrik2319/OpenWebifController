@@ -13,6 +13,7 @@ import java.util.Enumeration;
 import java.util.Vector;
 import java.util.function.Function;
 
+import javax.swing.BorderFactory;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -65,6 +66,7 @@ class Movies extends JSplitPane {
 	private MovieList.Movie clickedMovie;
 
 	Movies(OpenWebifController main, StandardMainWindow mainWindow) {
+		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		this.main = main;
 		this.mainWindow = mainWindow;

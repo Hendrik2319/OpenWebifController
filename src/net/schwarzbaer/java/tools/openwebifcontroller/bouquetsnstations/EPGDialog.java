@@ -23,6 +23,7 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.awt.font.FontRenderContext;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.Calendar;
@@ -915,6 +916,25 @@ public class EPGDialog extends StandardDialog {
 		public int getMinTime_s() { return minTime_s_based; }
 		public int getMaxTime_s() { return maxTime_s_based; }
 
+		private String getTimeScaleDateStr(Graphics2D g2, long time_ms, float maxWidth) {
+			String[] formatStrs = new String[] {
+					"%1$tR %1$tA, %1$td.%1$tm.%1$ty",
+					"%1$tR %1$tA",
+					"%1$tR %1$ta",
+					"%1$tR",
+			};
+			
+			Font font = g2.getFont();
+			FontRenderContext frc = g2.getFontRenderContext();
+			for (String formatStr:formatStrs) {
+				String str = OpenWebifController.dateTimeFormatter.getTimeStr(time_ms, Locale.GERMANY, formatStr);
+				Rectangle2D bounds2 = font.getStringBounds(str, frc);
+				if (bounds2.getWidth()+10 < maxWidth)
+					return str;
+			}
+			return null;
+		}
+
 		private void updateTimeScaleTicks() {
 			int x0Time_s_based = Math.round( rowAnchorTime_s_based - STATIONWIDTH*timeScale );
 			calendar.setTimeInMillis( (x0Time_s_based+baseTimeOffset_s)*1000L );
@@ -1077,7 +1097,16 @@ public class EPGDialog extends StandardDialog {
 					g2.setColor(COLOR_TIMESCALE_LINES);
 					g2.drawLine(xTick, y0_, xTick, y0_+HEADERHEIGHT-1);
 					g2.setColor(COLOR_TIMESCALE_TEXT);
-					g2.drawString(String.format("%02d:00", (scaleTicksBaseHour+iHour)%24), xTick+4, y0_+11);
+					String str;
+					if ( (scaleTicksBaseHour+iHour)%24 != 0)
+						str = String.format("%02d:00", (scaleTicksBaseHour+iHour)%24);
+					else {
+						long millis = (scaleTicksBaseTime_s_based + iHour*3600 + baseTimeOffset_s)*1000L;
+						str = getTimeScaleDateStr(g2, millis, 3600 / timeScale);
+						if (str==null)
+							str = String.format("%02d:00 ??", (scaleTicksBaseHour+iHour)%24);
+					}
+					g2.drawString(str, xTick+4, y0_+11);
 					break;
 				case 1: case 3:
 					g2.setColor(COLOR_TIMESCALE_LINES);

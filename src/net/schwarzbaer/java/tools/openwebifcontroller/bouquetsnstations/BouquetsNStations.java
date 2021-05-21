@@ -261,19 +261,19 @@ public class BouquetsNStations extends JPanel implements EPGDialog.ExternCommand
 				if (obj instanceof BSTreeNode.BouquetNode) clickedBouquetNode = (BSTreeNode.BouquetNode) obj;
 				if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
 			}
-			miLoadPicons.setEnabled(clickedBouquetNode!=null || clickedStationNode!=null);
+			
+			miLoadPicons     .setEnabled(clickedBouquetNode!=null || (clickedStationNode!=null && !clickedStationNode.subservice.isMarker()));
+			miSwitchToStation.setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
+			miStreamStation  .setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
 			miLoadPicons.setText(
 					clickedBouquetNode!=null ?
 							String.format("Load Picons of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
-							clickedStationNode!=null ?
+							(clickedStationNode!=null && !clickedStationNode.subservice.isMarker()) ?
 									String.format("Load Picon of \"%s\"", clickedStationNode.subservice.name) :
 									"Load Picons"
 			);
-			
-			miSwitchToStation.setEnabled(clickedStationNode!=null);
-			miStreamStation  .setEnabled(clickedStationNode!=null);
-			miSwitchToStation.setText(clickedStationNode!=null ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
-			miStreamStation  .setText(clickedStationNode!=null ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
+			miSwitchToStation.setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
+			miStreamStation  .setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
 			
 			miShowEPGforBouquet.setEnabled(clickedBouquetNode!=null);
 			miShowEPGforBouquet.setText(

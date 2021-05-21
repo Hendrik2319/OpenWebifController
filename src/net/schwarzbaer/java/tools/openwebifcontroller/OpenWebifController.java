@@ -244,9 +244,10 @@ public class OpenWebifController {
 	}
 
 	private final StandardMainWindow mainWindow;
-	private final Movies movies;
 	private final JFileChooser exeFileChooser;
+	private final Movies movies;
 	private final BouquetsNStations bouquetsNStations;
+	private final Timers timers;
 	private final VolumeContol volumeContol;
 	private final PowerContol powerContol;
 	private final MessageControl messageControl;
@@ -260,10 +261,12 @@ public class OpenWebifController {
 		mainWindow = new StandardMainWindow("OpenWebif Controller");
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
+		timers = new Timers(this);
 		
 		JTabbedPane tabPanel = new JTabbedPane();
 		tabPanel.addTab("Movies", movies);
 		tabPanel.addTab("Bouquets 'n' Stations", bouquetsNStations);
+		tabPanel.addTab("Timers", timers);
 		tabPanel.setSelectedIndex(1);
 		
 		JMenuBar menuBar = new JMenuBar();
@@ -322,6 +325,7 @@ public class OpenWebifController {
 			
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
+			timers           .readData(baseURL,pd);
 			powerContol   .initialize(baseURL,pd);
 			volumeContol  .initialize(baseURL,pd);
 			messageControl.initialize(baseURL,pd);

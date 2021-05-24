@@ -120,6 +120,7 @@ class Timers extends JSplitPane {
 				default: break;
 				}
 			});
+			tableModel.setAllDefaultRenderers();
 		}
 	}
 	
@@ -210,6 +211,15 @@ class Timers extends JSplitPane {
 		public TimersTableModel(Vector<Timer> timers) {
 			super(ColumnID.values());
 			this.timers = timers;
+		}
+
+		public void setAllDefaultRenderers() {
+			//setAllDefaultRenderers(columnClass->{
+			//	if ()
+			//	return new DefaultTableCellRenderer();
+			//});
+			// TODO Auto-generated method stub
+			
 		}
 
 		@Override public int getRowCount() {

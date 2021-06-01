@@ -15,6 +15,7 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 
@@ -26,20 +27,27 @@ import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.system.DateTimeFormatter;
 
-class Timers extends JSplitPane {
+public class Timers extends JSplitPane {
 	private static final long serialVersionUID = -2563250955373710618L;
 	
+	public interface DataUpdateListener {
+		void timersHasUpdated(net.schwarzbaer.java.lib.openwebif.Timers timers);
+	}
+
 	private final OpenWebifController main;
-	private JTable table;
-	private JTextArea textArea;
+	private final JTable table;
+	private final JTextArea textArea;
+	private final Vector<DataUpdateListener> dataUpdateListeners;
 	
-	private net.schwarzbaer.java.lib.openwebif.Timers timers;
+	public net.schwarzbaer.java.lib.openwebif.Timers timers;
 	private TimersTableModel tableModel;
 
 	public Timers(OpenWebifController main) {
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
 		this.main = main;
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
+		
+		dataUpdateListeners = new Vector<>();
 		
 		timers = null;
 		tableModel = null;
@@ -74,6 +82,9 @@ class Timers extends JSplitPane {
 		setLeftComponent(tableScrollPane);
 		setRightComponent(textScrollPane);
 	}
+	
+	public void    addListener(DataUpdateListener listener) { dataUpdateListeners.   add(listener); }
+	public void removeListener(DataUpdateListener listener) { dataUpdateListeners.remove(listener); }
 
 	private void showValues(Timer timer) {
 		StringBuilder sb = new StringBuilder();
@@ -103,9 +114,10 @@ class Timers extends JSplitPane {
 	public void readData(String baseURL, ProgressDialog pd) {
 		if (baseURL==null) return;
 		timers = OpenWebifTools.readTimers(baseURL, taskTitle -> main.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));
-		if (timers==null)
-			table.setModel(tableModel = null);
-		else {
+		if (timers==null) {
+			tableModel = null;
+			table.setModel(new DefaultTableModel());
+		} else {
 			table.setModel(tableModel = new TimersTableModel(timers.timers));
 			tableModel.setTable(table);
 			tableModel.setColumnWidths(table);
@@ -122,6 +134,8 @@ class Timers extends JSplitPane {
 			});
 			tableModel.setAllDefaultRenderers();
 		}
+		for (DataUpdateListener listener:dataUpdateListeners)
+			listener.timersHasUpdated(timers);
 	}
 	
 	private static class TimersTableCellRenderer extends DefaultTableCellRenderer {

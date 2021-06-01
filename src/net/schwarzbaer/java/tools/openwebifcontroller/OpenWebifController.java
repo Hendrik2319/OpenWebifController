@@ -2,6 +2,7 @@ package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -51,16 +52,21 @@ import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
 import net.schwarzbaer.java.lib.openwebif.Power;
+import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
+import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
 import net.schwarzbaer.system.DateTimeFormatter;
 import net.schwarzbaer.system.Settings;
 
-public class OpenWebifController {
+public class OpenWebifController implements EPGDialog.ExternCommands {
 	
 	public static void ASSERT( boolean predicate) { ASSERT( predicate, null ); }
 	public static void ASSERT( boolean predicate, String message ) {
@@ -251,6 +257,7 @@ public class OpenWebifController {
 	private final VolumeContol volumeContol;
 	private final PowerContol powerContol;
 	private final MessageControl messageControl;
+	private final EPG epg;
 
 	OpenWebifController() {
 		exeFileChooser = new JFileChooser("./");
@@ -262,6 +269,12 @@ public class OpenWebifController {
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new Timers(this);
+		
+		epg = new EPG(new EPG.Tools() {
+			@Override public String getTimeStr(long millis) {
+				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+			}
+		});
 		
 		JTabbedPane tabPanel = new JTabbedPane();
 		tabPanel.addTab("Movies", movies);
@@ -814,6 +827,44 @@ public class OpenWebifController {
 		out.add(level+1, "", event.longdesc );
 	}
 
+	public void zapToStation(StationID stationID) {
+		if (stationID==null) return;
+		
+		String baseURL = getBaseURL();
+		if (baseURL==null) return;
+		
+		zapToStation(baseURL, stationID);
+	}
+	@Override public void zapToStation(String baseURL, StationID stationID) {
+		MessageResponse response = OpenWebifTools.zapToStation(baseURL, stationID);
+		if (response!=null) response.printTo(System.out);
+	}
+
+	public void streamStation(StationID stationID) {
+		if (stationID==null) return;
+		
+		String baseURL = getBaseURL();
+		if (baseURL==null) return;
+		
+		streamStation(baseURL, stationID);
+	}
+	@Override public void streamStation(String baseURL, StationID stationID) {
+		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
+		openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
+	}
+
+	public void openEPGDialog(Vector<Bouquet.SubService> subservices, Consumer<EPGDialog> setEPGDialog) {
+		String baseURL = getBaseURL();
+		if (baseURL==null) return;
+		
+		
+		EPGDialog epgDialog = new EPGDialog(mainWindow, "EPG", ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers.timers, subservices, this);
+		if (setEPGDialog!=null) setEPGDialog.accept(epgDialog);
+		timers.addListener(epgDialog);
+		epgDialog.showDialog();
+		timers.removeListener(epgDialog);
+	}
+	
 	public void openUrlInVideoPlayer(String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL", url); }
 	public void openFileInVideoPlayer(File file, String taskLabel) { openInVideoPlayer(taskLabel, "File", file.getAbsolutePath()); }
 

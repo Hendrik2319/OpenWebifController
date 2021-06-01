@@ -3,7 +3,6 @@ package net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -36,22 +35,20 @@ import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.TextAreaDialog;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
-import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
+import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
 
-public class BouquetsNStations extends JPanel implements EPGDialog.ExternCommands {
+public class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
 	static final PiconLoader PICON_LOADER = new PiconLoader();
 	
 	private final OpenWebifController main;
 	private final StandardMainWindow mainWindow;
-	private final EPG epg;
 	private final JTree bsTree;
 	private final StatusOut statusLine;
 	private final ValuePanel valuePanel;
@@ -89,12 +86,6 @@ public class BouquetsNStations extends JPanel implements EPGDialog.ExternCommand
 		
 		m3uFileChooser = new FileChooser("Playlist", "m3u");
 		txtFileChooser = new FileChooser("Text-File", "txt");
-		
-		epg = new EPG(new EPG.Tools() {
-			@Override public String getTimeStr(long millis) {
-				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
-			}
-		});
 		
 		bsTree = new JTree(bsTreeModel);
 		bsTree.setCellRenderer(new BSTreeCellRenderer());
@@ -220,12 +211,9 @@ public class BouquetsNStations extends JPanel implements EPGDialog.ExternCommand
 		JMenuItem miShowEPGforBouquet;
 		treeContextMenu.add(miShowEPGforBouquet = OpenWebifController.createMenuItem("Show EPG for Bouquet", e->{
 			if (clickedBouquetNode==null) return;
+			Vector<Bouquet.SubService> subservices = clickedBouquetNode.bouquet.subservices;
 			
-			String baseURL = this.main.getBaseURL();
-			if (baseURL==null) return;
-			
-			epgDialog = new EPGDialog(this.mainWindow, "EPG", ModalityType.APPLICATION_MODAL, false, baseURL, epg, clickedBouquetNode.bouquet.subservices, this);
-			epgDialog.showDialog();
+			this.main.openEPGDialog(subservices, dlg->epgDialog=dlg);
 			epgDialog = null;
 		}));
 		epgDialog = null;
@@ -246,8 +234,8 @@ public class BouquetsNStations extends JPanel implements EPGDialog.ExternCommand
 				PICON_LOADER.addTask(clickedStationNode.getStationID());
 			}
 		}));
-		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e-> zapToStation(clickedStationNode.getStationID())));
-		treeContextMenu.add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , e->streamStation(clickedStationNode.getStationID())));
+		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e->this.main. zapToStation(clickedStationNode.getStationID())));
+		treeContextMenu.add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , e->this.main.streamStation(clickedStationNode.getStationID())));
 		
 		treeContextMenu.addTo(bsTree);
 		treeContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
@@ -461,34 +449,6 @@ public class BouquetsNStations extends JPanel implements EPGDialog.ExternCommand
 		catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
-	}
-
-	private void zapToStation(StationID stationID) {
-		if (stationID==null) return;
-		
-		String baseURL = this.main.getBaseURL();
-		if (baseURL==null) return;
-		
-		zapToStation(baseURL, stationID);
-	}
-
-	@Override public void zapToStation(String baseURL, StationID stationID) {
-		MessageResponse response = OpenWebifTools.zapToStation(baseURL, stationID);
-		if (response!=null) response.printTo(System.out);
-	}
-
-	private void streamStation(StationID stationID) {
-		if (stationID==null) return;
-		
-		String baseURL = main.getBaseURL();
-		if (baseURL==null) return;
-		
-		streamStation(baseURL, stationID);
-	}
-
-	@Override public void streamStation(String baseURL, StationID stationID) {
-		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
-		main.openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
 	}
 	
 	private static String toString(CurrentStation currentStationData) {

@@ -13,6 +13,7 @@ import java.awt.font.FontRenderContext;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -372,11 +373,19 @@ class EPGView extends Canvas {
 		Vector<EPGViewEvent> stationEvents = getEvents(subService.service.stationID);
 		if (stationEvents==null) return null;
 		
+		Vector<EPGViewEvent> coveringEvents = new Vector<>();
 		for (EPGViewEvent event:stationEvents)
 			if (event.covers(time_s_based))
-				return event;
+				//return event;
+				coveringEvents.add(event);
 		
-		return null;
+		if (coveringEvents.isEmpty())
+			return null;
+		
+		if (coveringEvents.size()>1)
+			coveringEvents.sort(Comparator.<EPGViewEvent,Long>comparing(ev->ev.event.duration_sec).thenComparing(ev->ev.event.begin_timestamp));
+		
+		return coveringEvents.firstElement();
 	}
 
 
@@ -529,41 +538,56 @@ class EPGView extends Canvas {
 		}
 	}
 
-	private void paintEvents(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle eventViewClip, final Vector<EPGViewEvent> events, HashMap<Long, Timer> timers) {
+	private void paintEvents(
+			final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle eventViewClip,
+			final Vector<EPGViewEvent> events, HashMap<Long, Timer> timers) {
 		if (events == null || events.isEmpty()) return;
 		int eventTextOffsetX = 5;
+		boolean isHoveredEventInThisRow = false;
 		for (EPGViewEvent event:events) {
-			int xBegin = x0_ + STATIONWIDTH + Math.round( (event.begin_s_based - rowAnchorTime_s_based)/timeScale );
-			int xEnd   = x0_ + STATIONWIDTH + Math.round( (event.  end_s_based - rowAnchorTime_s_based)/timeScale );
-			
-			Rectangle borderRectClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, rowHeight-1).intersection(eventViewClip);
-			if (!borderRectClip.isEmpty()) {
-				g2.setClip(borderRectClip);
-				g2.setColor(COLOR_EVENT_FRAME);
-				g2.drawRect(xBegin, rowY, xEnd-xBegin-2, rowHeight-2);
-			}
-			
-			Rectangle textClip = new Rectangle(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-1-2).intersection(eventViewClip);
-			if (!textClip.isEmpty()) {
-				g2.setClip(textClip);
-				if (hoveredEvent!=null && event.event==hoveredEvent.event) {
-					g2.setColor(COLOR_EVENT_HOVERED_BG);
-					g2.fillRect(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-3);
-					
-					if (timers!=null) {
-						Timer timer = timers.get(hoveredEvent.event.id);
-						if (timer!=null) {
-							paintTimer(g2, x0_, rowY, eventViewClip, timer, true);
-							g2.setClip(textClip);
-						}
+			boolean isHovered = hoveredEvent!=null && event.event==hoveredEvent.event;
+			if (!isHovered)
+				paintEvent(g2, x0_, rowY, rowTextOffsetY, eventViewClip, timers, eventTextOffsetX, event, isHovered);
+			else
+				isHoveredEventInThisRow = true;
+		}
+		if (isHoveredEventInThisRow && hoveredEvent!=null)
+			paintEvent(g2, x0_, rowY, rowTextOffsetY, eventViewClip, timers, eventTextOffsetX, hoveredEvent, true);
+	}
+
+	private void paintEvent(
+			final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle eventViewClip,
+			final HashMap<Long, Timer> timers, final int eventTextOffsetX, final EPGViewEvent event, final boolean isHovered) {
+		int xBegin = x0_ + STATIONWIDTH + Math.round( (event.begin_s_based - rowAnchorTime_s_based)/timeScale );
+		int xEnd   = x0_ + STATIONWIDTH + Math.round( (event.  end_s_based - rowAnchorTime_s_based)/timeScale );
+		
+		Rectangle borderRectClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, rowHeight-1).intersection(eventViewClip);
+		if (!borderRectClip.isEmpty()) {
+			g2.setClip(borderRectClip);
+			g2.setColor(COLOR_EVENT_FRAME);
+			g2.drawRect(xBegin, rowY, xEnd-xBegin-2, rowHeight-2);
+		}
+		
+		Rectangle textClip = new Rectangle(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-1-2).intersection(eventViewClip);
+		if (!textClip.isEmpty()) {
+			g2.setClip(textClip);
+			if (isHovered) {
+				g2.setColor(COLOR_EVENT_HOVERED_BG);
+				g2.fillRect(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-3);
+				
+				if (timers!=null) {
+					Timer timer = timers.get(event.event.id);
+					if (timer!=null) {
+						paintTimer(g2, x0_, rowY, eventViewClip, timer, true);
+						g2.setClip(textClip);
 					}
 				}
-				
-				g2.setColor(COLOR_EVENT_TEXT);
-				int textX = xBegin+1+eventTextOffsetX;
-				if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
-				g2.drawString(event.title, textX, rowY+rowTextOffsetY);
 			}
+			
+			g2.setColor(COLOR_EVENT_TEXT);
+			int textX = xBegin+1+eventTextOffsetX;
+			if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
+			g2.drawString(event.title, textX, rowY+rowTextOffsetY);
 		}
 	}
 

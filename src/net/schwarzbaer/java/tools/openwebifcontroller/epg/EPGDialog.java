@@ -37,11 +37,12 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	private static final long serialVersionUID = 8634962178940555542L;
 	
 	private enum LeadTime {
-		_2_00h("-2:00h",7200),
-		_1_30h("-1:30h",5400),
-		_1_00h("-1:00h",3600),
-		_45min("-45min",2700),
-		_30min("-30min",1800),
+		_4_00h("-4:00h",(4*60+ 0)*60),
+		_2_00h("-2:00h",(2*60+ 0)*60),
+		_1_30h("-1:30h",(1*60+30)*60),
+		_1_00h("-1:00h",(1*60+ 0)*60),
+		_45min("-45min",(0*60+45)*60),
+		_30min("-30min",(0*60+30)*60),
 		;
 		private final int time_s;
 		private final String label;
@@ -59,6 +60,9 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 		_8h ("+8h" , 8*3600),
 		_12h("+12h",12*3600),
 		_24h("+24h",24*3600),
+		_36h("+36h",36*3600),
+		_48h("+48h",48*3600),
+		all ("all" ,-1),
 		;
 		private final int time_s;
 		private final String label;
@@ -342,12 +346,12 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	private void updateEPGView() {
 		long now_ms = System.currentTimeMillis();
 		long beginTime_UnixTS = now_ms/1000 - leadTime_s;
-		long endTime_UnixTS   = beginTime_UnixTS + rangeTime_s;
+		Long endTime_UnixTS   = rangeTime_s<0 ? null : (beginTime_UnixTS + rangeTime_s);
 		for (SubService station:stations) {
 			if (station.isMarker()) continue;
 			StationID stationID = station.service.stationID;
 			Vector<EPGevent> events = epg.getEvents(stationID, beginTime_UnixTS, endTime_UnixTS, true);
-			Vector<EPGViewEvent> viewEvents = epgView.convert(events);
+			Vector<EPGView.EPGViewEvent> viewEvents = epgView.convertEvents(events);
 			epgView.updateEvents(stationID,viewEvents/*,dataStatus*/);
 		}
 		epgView.updateMinMaxTime();
@@ -360,7 +364,8 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	}
 	
 	private void timersHasUpdated(net.schwarzbaer.java.lib.openwebif.Timers timers, boolean repaintEPGView) {
-		// TODO Auto-generated method stub
+		Vector<EPGView.Timer> convertedTimers = epgView.convertTimers(timers.timers);
+		epgView.setTimers(convertedTimers);
 	}
 
 	static class StationContextMenu extends ContextMenu {

@@ -176,7 +176,7 @@ public class Timers extends JSplitPane {
 
 	private static class TimersTableModel extends Tables.SimplifiedTableModel<TimersTableModel.ColumnID> {
 		
-		// [70, 190, 180, 110, 220, 120, 350, 100, 100, 170, 170, 60, 170, 170, 50, 65, 90, 70, 45, 70, 50, 60, 50, 60, 90, 50, 50, 60, 45, 85, 100, 110, 110, 90]
+		// [70, 190, 180, 110, 220, 120, 350, 100, 100, 170, 170, 60, 170, 170, 50, 50, 70, 50, 60, 65, 90, 45, 70, 50, 60, 90, 50, 60, 45, 85, 100, 110, 110, 90]
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface {
 			isAutoTimer        ("isAutoTimer"        , Boolean.class,  70),
 			tags               ("tags"               , String .class, 190),
@@ -193,17 +193,18 @@ public class Timers extends JSplitPane {
 			startprepare       ("startprepare"       , Double .class, 170),
 			nextactivation     ("nextactivation"     , Long   .class, 170),
 			eit                ("eit"                , Long   .class,  50),
+			justplay           ("justplay"           , Boolean.class,  50),
+			always_zap         ("always_zap"         , Boolean.class,  70),
+			disabled           ("disabled"           , Boolean.class,  50),
+			cancelled          ("cancelled"          , Boolean.class,  60),
+			
 			afterevent         ("afterevent"         , Long   .class,  65),
 			allow_duplicate    ("allow_duplicate"    , Boolean.class,  90),
-			always_zap         ("always_zap"         , Boolean.class,  70),
 			asrefs             ("asrefs"             , String .class,  45),
 			autoadjust         ("autoadjust"         , Long   .class,  70),
 			backoff            ("backoff"            , Long   .class,  50),
-			cancelled          ("cancelled"          , Boolean.class,  60),
-			disabled           ("disabled"           , Boolean.class,  50),
 			dontsave           ("dontsave"           , Boolean.class,  60),
 			firsttryprepare    ("firsttryprepare"    , Long   .class,  90),
-			justplay           ("justplay"           , Boolean.class,  50),
 			pipzap             ("pipzap"             , Long   .class,  50),
 			repeated           ("repeated"           , Long   .class,  60),
 			state              ("state"              , Long   .class,  45),

@@ -48,6 +48,11 @@ class EPGView extends Canvas {
 	private static final Color COLOR_TIMESCALE_LINES = Color.GRAY;
 	private static final Color COLOR_TIMESCALE_TEXT  = Color.BLACK;
 	
+	private static final Color COLOR_ITMER_HOVERED   = new Color(0x66B0FF);
+	private static final Color COLOR_ITMER_RECORDING = Color.RED;
+	private static final Color COLOR_ITMER_JUST_ZAP  = new Color(0x00B000);
+	private static final Color COLOR_ITMER_DISABLED  = Color.GRAY;
+	
 	private static final Color COLOR_NOWMARKER = Color.RED;
 	
 	private static final int HEADERHEIGHT = 20;
@@ -56,6 +61,7 @@ class EPGView extends Canvas {
 	private final Calendar calendar;
 	private final long baseTimeOffset_s;
 	private final HashMap<String, Vector<EPGViewEvent>> events;
+	private final HashMap<String, HashMap<Long,Timer>> timers;
 	private final Vector<SubService> stations;
 	private int rowHeight;
 	private int rowOffsetY;
@@ -93,6 +99,7 @@ class EPGView extends Canvas {
 		rowHeight = 23;
 		rowOffsetY = 0;
 		events = new HashMap<>();
+		timers = new HashMap<>();
 		hoveredEvent = null;
 		toolTip = null;
 		toolTipPos = null;
@@ -251,7 +258,75 @@ class EPGView extends Canvas {
 		//System.out.printf("TimeStr2: %s%n", timeStr2);
 	}
 
-	Vector<EPGViewEvent> convert(Vector<EPGevent> events) {
+	static class Timer {
+		final String name;
+		final String serviceref;
+		final long eventID;
+		final int begin_s_based;
+		final int end_s_based;
+		final net.schwarzbaer.java.lib.openwebif.Timers.Timer timer;
+
+		public Timer(String name, String serviceref, long eventID, int begin_s_based, int end_s_based, net.schwarzbaer.java.lib.openwebif.Timers.Timer timer) {
+			this.name = name;
+			this.serviceref = serviceref;
+			this.eventID = eventID;
+			this.begin_s_based = begin_s_based;
+			this.end_s_based = end_s_based;
+			this.timer = timer;
+		}
+	}
+
+	Vector<Timer> convertTimers(Vector<net.schwarzbaer.java.lib.openwebif.Timers.Timer> timers) {
+		if (timers==null || timers.isEmpty()) return null;
+		Vector<Timer> result = new Vector<>(timers.size());
+		for (net.schwarzbaer.java.lib.openwebif.Timers.Timer timer:timers) {
+			int begin_s_based = (int) (timer.begin - baseTimeOffset_s);
+			int   end_s_based = (int) (timer.end   - baseTimeOffset_s);
+			if (timer.serviceref!=null)
+				result.add(new Timer(timer.name, timer.serviceref, timer.eit, begin_s_based, end_s_based, timer));
+		}
+		return result;
+	}
+
+	synchronized void setTimers(Vector<Timer> timers) {
+		this.timers.clear();
+		for (Timer timer:timers) {
+			HashMap<Long, Timer> stationTimerEvents = this.timers.get(timer.serviceref);
+			if (stationTimerEvents==null)
+				this.timers.put(timer.serviceref, stationTimerEvents = new HashMap<>());
+			stationTimerEvents.put(timer.eventID, timer);
+		}
+	}
+	
+	synchronized HashMap<Long, Timer> getTimers(StationID stationID) {
+		return timers.get(stationID.toIDStr(true));
+	}
+
+	static class EPGViewEvent {
+	
+		final String title;
+		final int begin_s_based;
+		final int   end_s_based;
+		final EPGevent event;
+	
+		EPGViewEvent(String title, int begin_s_based, int end_s_based, EPGevent event) {
+			this.title = title;
+			this.begin_s_based = begin_s_based;
+			this.  end_s_based =   end_s_based;
+			this.event = event;
+		}
+	
+		boolean covers(int time_s_based) {
+			return begin_s_based<=time_s_based && time_s_based<=end_s_based;
+		}
+	
+		@Override
+		public String toString() {
+			return String.format("%s, %d-%d", title, begin_s_based, end_s_based);
+		}
+		
+	}
+	Vector<EPGViewEvent> convertEvents(Vector<EPGevent> events) {
 		if (events==null || events.isEmpty()) return null;
 		Vector<EPGViewEvent> result = new Vector<>(events.size());
 		for (EPGevent event:events) {
@@ -353,6 +428,7 @@ class EPGView extends Canvas {
 		Shape oldClip = g2.getClip();
 		
 		g2.setClip(new Rectangle(x0_, y0_, width, height));
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
 		
 		paintRepaintCounter(g2, x0_, y0_);
@@ -363,6 +439,132 @@ class EPGView extends Canvas {
 		
 		paintNowMarker(g2, x0_, y0_,        height);
 		paintToolTip  (g2, x0_, y0_, width, height);
+	}
+
+	private void paintMainView(final Graphics2D g2, final int x0_, final int y0_, final int width, final int height) {
+		int fontHeight = 8; // default font size: 11  -->  fontHeight == 8
+		int rowTextOffsetY = (rowHeight-1-fontHeight)/2+fontHeight; 
+		
+		int y0 = y0_+HEADERHEIGHT-rowOffsetY;
+		Rectangle mainClip      = new Rectangle(x0_,              y0_+HEADERHEIGHT, width,              height-HEADERHEIGHT);
+		Rectangle eventViewClip = new Rectangle(x0_+STATIONWIDTH, y0_+HEADERHEIGHT, width-STATIONWIDTH, height-HEADERHEIGHT);
+		
+		for (int i=0; i<stations.size(); i++) {
+			SubService station = stations.get(i);
+			Vector<EPGViewEvent> events = station.isMarker() ? null : getEvents(station.service.stationID);
+			HashMap<Long,Timer>  timers = station.isMarker() ? null : getTimers(station.service.stationID);
+			
+			int rowY = y0+rowHeight*i;
+			paintStation(g2, x0_, rowY, rowTextOffsetY, mainClip, station, i, events!=null);
+			paintTimers (g2, x0_, rowY, rowTextOffsetY, eventViewClip, timers);
+			paintEvents (g2, x0_, rowY, rowTextOffsetY, eventViewClip, events, timers);
+		}
+	}
+
+	private void paintStation(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle mainClip, final SubService station, int stationIndex, final boolean hasEvents) {
+		int stationTextOffsetX = 10;
+		int nextRowY = rowY+rowHeight;
+		
+		Rectangle stationCellClip = new Rectangle(x0_, rowY, STATIONWIDTH, rowHeight).intersection(mainClip);
+		if (!stationCellClip.isEmpty()) {
+			g2.setClip(stationCellClip);
+			g2.setColor(COLOR_STATION_FRAME);
+			g2.drawLine(x0_               , nextRowY-1, x0_+STATIONWIDTH-1, nextRowY-1);
+			g2.drawLine(x0_+STATIONWIDTH-1, rowY      , x0_+STATIONWIDTH-1, nextRowY-1);
+		}
+		
+		Rectangle stationTextCellClip = new Rectangle(x0_, rowY, STATIONWIDTH-1, rowHeight-1).intersection(mainClip);
+		if (!stationTextCellClip.isEmpty()) {
+			g2.setClip(stationTextCellClip);
+			
+			if (!station.isMarker()) {
+				g2.setColor(hoveredStationIndex!=null && hoveredStationIndex.intValue()==stationIndex ? COLOR_STATION_BG_HOVERED : COLOR_STATION_BG);
+				g2.fillRect(x0_, rowY, STATIONWIDTH-1, rowHeight-1);
+			}
+			
+			if (currentStation!=null && currentStation.toIDStr().equals(station.service.stationID.toIDStr()))
+				g2.setColor(COLOR_STATION_TEXT_CURRENTLY_PLAYED);
+			else
+				g2.setColor(hasEvents || station.isMarker() ? COLOR_STATION_TEXT : COLOR_STATION_TEXT_ISEMPTY);
+			g2.drawString(station.name, x0_+stationTextOffsetX, rowY+rowTextOffsetY);
+		}
+	}
+
+	private void paintTimers(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle eventViewClip, final HashMap<Long, Timer> timers) {
+		if (timers == null || timers.isEmpty()) return;
+		for (Timer timer:timers.values()) {
+			boolean isHovered = hoveredEvent!=null && hoveredEvent.event.id!=null && hoveredEvent.event.id.longValue()==timer.eventID;
+			if (!isHovered)
+				paintTimer(g2, x0_, rowY, eventViewClip, timer, isHovered);
+		}
+		
+	}
+
+	private void paintTimer(final Graphics2D g2, final int x0_, final int rowY, final Rectangle eventViewClip, Timer timer, boolean isHovered) {
+		int yBegin = rowY+1;
+		int yEnd   = rowY+rowHeight-3;
+		int xBegin = x0_ + STATIONWIDTH + Math.round( (timer.begin_s_based - rowAnchorTime_s_based)/timeScale );
+		int xEnd   = x0_ + STATIONWIDTH + Math.round( (timer.  end_s_based - rowAnchorTime_s_based)/timeScale );
+		Integer center = null;
+		if (xBegin+3>xEnd) {
+			center = (xBegin+xEnd)/2;
+			xBegin = center - rowHeight/2;
+			xEnd   = center + rowHeight/2;
+		}
+		
+		Rectangle clip = new Rectangle(xBegin, yBegin, xEnd-xBegin, rowHeight-1-2).intersection(eventViewClip);
+		if (!clip.isEmpty()) {
+			g2.setClip(clip);
+			boolean isDisabled  = timer.timer.isDisabled();
+			boolean isRecording = timer.timer.isRecording();
+			g2.setColor(isHovered ? COLOR_ITMER_HOVERED : isDisabled ? COLOR_ITMER_DISABLED : isRecording ? COLOR_ITMER_RECORDING : COLOR_ITMER_JUST_ZAP);
+			if (center==null) {
+				g2.drawLine(xBegin, yBegin, xBegin, yEnd);
+				g2.drawLine(xEnd-1, yBegin, xEnd-1, yEnd);
+			} else
+				g2.drawLine(center, yBegin, center, yEnd);
+			
+			g2.drawLine(xBegin, yBegin, xEnd-1, yEnd);
+			g2.drawLine(xEnd-1, yBegin, xBegin, yEnd);
+		}
+	}
+
+	private void paintEvents(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle eventViewClip, final Vector<EPGViewEvent> events, HashMap<Long, Timer> timers) {
+		if (events == null || events.isEmpty()) return;
+		int eventTextOffsetX = 5;
+		for (EPGViewEvent event:events) {
+			int xBegin = x0_ + STATIONWIDTH + Math.round( (event.begin_s_based - rowAnchorTime_s_based)/timeScale );
+			int xEnd   = x0_ + STATIONWIDTH + Math.round( (event.  end_s_based - rowAnchorTime_s_based)/timeScale );
+			
+			Rectangle borderRectClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, rowHeight-1).intersection(eventViewClip);
+			if (!borderRectClip.isEmpty()) {
+				g2.setClip(borderRectClip);
+				g2.setColor(COLOR_EVENT_FRAME);
+				g2.drawRect(xBegin, rowY, xEnd-xBegin-2, rowHeight-2);
+			}
+			
+			Rectangle textClip = new Rectangle(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-1-2).intersection(eventViewClip);
+			if (!textClip.isEmpty()) {
+				g2.setClip(textClip);
+				if (hoveredEvent!=null && event.event==hoveredEvent.event) {
+					g2.setColor(COLOR_EVENT_HOVERED_BG);
+					g2.fillRect(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-3);
+					
+					if (timers!=null) {
+						Timer timer = timers.get(hoveredEvent.event.id);
+						if (timer!=null) {
+							paintTimer(g2, x0_, rowY, eventViewClip, timer, true);
+							g2.setClip(textClip);
+						}
+					}
+				}
+				
+				g2.setColor(COLOR_EVENT_TEXT);
+				int textX = xBegin+1+eventTextOffsetX;
+				if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
+				g2.drawString(event.title, textX, rowY+rowTextOffsetY);
+			}
+		}
 	}
 
 	private void paintRepaintCounter(final Graphics2D g2, final int x0_, final int y0_) {
@@ -422,83 +624,6 @@ class EPGView extends Canvas {
 			if (iQuarter==4) { iQuarter = 0; iHour++; }
 			xTick = xBase + Math.round( (iHour*3600 + iQuarter*900)/timeScale );
 		}
-	}
-
-	private void paintMainView(final Graphics2D g2, final int x0_, final int y0_, final int width, final int height) {
-		int fontHeight = 8; // default font size: 11  -->  fontHeight == 8
-		int rowTextOffsetY = (rowHeight-1-fontHeight)/2+fontHeight; 
-		
-		int y0 = y0_+HEADERHEIGHT-rowOffsetY;
-		Rectangle mainClip      = new Rectangle(x0_,              y0_+HEADERHEIGHT, width,              height-HEADERHEIGHT);
-		Rectangle eventViewClip = new Rectangle(x0_+STATIONWIDTH, y0_+HEADERHEIGHT, width-STATIONWIDTH, height-HEADERHEIGHT);
-		
-		for (int i=0; i<stations.size(); i++) {
-			SubService station = stations.get(i);
-			Vector<EPGViewEvent> events = station.isMarker() ? null : getEvents(station.service.stationID);
-			
-			int rowY = y0+rowHeight*i;
-			paintStation(g2, x0_, rowY, rowTextOffsetY, mainClip, station, i, events!=null);
-			paintEvents (g2, x0_, rowY, rowTextOffsetY, eventViewClip, events);
-		}
-	}
-
-	private void paintStation(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle mainClip, final SubService station, int stationIndex, final boolean hasEvents) {
-		int stationTextOffsetX = 10;
-		int nextRowY = rowY+rowHeight;
-		
-		Rectangle stationCellClip = new Rectangle(x0_, rowY, STATIONWIDTH, rowHeight).intersection(mainClip);
-		if (!stationCellClip.isEmpty()) {
-			g2.setClip(stationCellClip);
-			g2.setColor(COLOR_STATION_FRAME);
-			g2.drawLine(x0_               , nextRowY-1, x0_+STATIONWIDTH-1, nextRowY-1);
-			g2.drawLine(x0_+STATIONWIDTH-1, rowY      , x0_+STATIONWIDTH-1, nextRowY-1);
-		}
-		
-		Rectangle stationTextCellClip = new Rectangle(x0_, rowY, STATIONWIDTH-1, rowHeight-1).intersection(mainClip);
-		if (!stationTextCellClip.isEmpty()) {
-			g2.setClip(stationTextCellClip);
-			
-			if (!station.isMarker()) {
-				g2.setColor(hoveredStationIndex!=null && hoveredStationIndex.intValue()==stationIndex ? COLOR_STATION_BG_HOVERED : COLOR_STATION_BG);
-				g2.fillRect(x0_, rowY, STATIONWIDTH-1, rowHeight-1);
-			}
-			
-			if (currentStation!=null && currentStation.toIDStr().equals(station.service.stationID.toIDStr()))
-				g2.setColor(COLOR_STATION_TEXT_CURRENTLY_PLAYED);
-			else
-				g2.setColor(hasEvents || station.isMarker() ? COLOR_STATION_TEXT : COLOR_STATION_TEXT_ISEMPTY);
-			g2.drawString(station.name, x0_+stationTextOffsetX, rowY+rowTextOffsetY);
-		}
-	}
-
-	private void paintEvents(final Graphics2D g2, final int x0_, final int rowY, final int rowTextOffsetY, final Rectangle eventViewClip, final Vector<EPGViewEvent> events) {
-		int eventTextOffsetX = 5;
-		if (events!=null && !events.isEmpty())
-			for (EPGViewEvent event:events) {
-				int xBegin = x0_ + STATIONWIDTH + Math.round( (event.begin_s_based - rowAnchorTime_s_based)/timeScale );
-				int xEnd   = x0_ + STATIONWIDTH + Math.round( (event.  end_s_based - rowAnchorTime_s_based)/timeScale );
-				
-				Rectangle eventCellClip = new Rectangle(xBegin, rowY, xEnd-xBegin-1, rowHeight-1).intersection(eventViewClip);
-				if (!eventCellClip.isEmpty()) {
-					g2.setClip(eventCellClip);
-					g2.setColor(COLOR_EVENT_FRAME);
-					g2.drawRect(xBegin, rowY, xEnd-xBegin-2, rowHeight-2);
-				}
-				
-				Rectangle eventTextClip = new Rectangle(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-1-2).intersection(eventViewClip);
-				if (!eventTextClip.isEmpty()) {
-					g2.setClip(eventTextClip);
-					if (hoveredEvent!=null && event.event==hoveredEvent.event) {
-						g2.setColor(COLOR_EVENT_HOVERED_BG);
-						g2.fillRect(xBegin+1, rowY+1, xEnd-xBegin-3, rowHeight-3);
-					}
-					
-					g2.setColor(COLOR_EVENT_TEXT);
-					int textX = xBegin+1+eventTextOffsetX;
-					if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
-					g2.drawString(event.title, textX, rowY+rowTextOffsetY);
-				}
-			}
 	}
 
 	private void paintNowMarker(final Graphics2D g2, final int x0_, final int y0_, final int height) {

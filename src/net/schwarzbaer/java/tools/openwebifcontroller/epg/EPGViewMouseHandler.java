@@ -27,7 +27,7 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 	private final Vector<SubService> stations;
 	
 	private Integer hoveredRowIndex;
-	private EPGViewEvent hoveredEvent;
+	private EPGView.EPGViewEvent hoveredEvent;
 	private boolean isStationHovered;
 
 	public EPGViewMouseHandler(Window parent, EPGView epgView, JScrollBar epgViewHorizScrollBar, JScrollBar epgViewVertScrollBar, StationContextMenu stationContextMenu, Vector<SubService> stations) {
@@ -134,7 +134,7 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 
 	private boolean setHoveredEvent(Integer time_s_based) {
 		//System.out.printf("setHoveredEvent(%d,%d)%n", hoveredRowIndex,time_s_based);
-		EPGViewEvent newHoveredEvent = epgView.getEvent(hoveredRowIndex,time_s_based);
+		EPGView.EPGViewEvent newHoveredEvent = epgView.getEvent(hoveredRowIndex,time_s_based);
 		if (hoveredEvent!=null || newHoveredEvent!=null) {
 			hoveredEvent = newHoveredEvent;
 			//System.out.printf("HoveredEvent: [%d] %s%n", hoveredRowIndex, hoveredEvent);

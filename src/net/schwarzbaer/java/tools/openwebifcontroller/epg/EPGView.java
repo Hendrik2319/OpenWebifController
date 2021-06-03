@@ -12,6 +12,9 @@ import java.awt.Shape;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -154,22 +157,28 @@ class EPGView extends Canvas {
 		String shortdesc = event.event.shortdesc;
 		if (shortdesc!=null && (shortdesc.isEmpty() || shortdesc.equals(title)))
 			shortdesc = null;
+		String[] shortdescStrs = splitLines(shortdesc);
 		
 		float  stdFontSize =  stdFont.getSize()*1.2f;
 		float boldFontSize = boldFont.getSize()*1.2f;
 		
-		Rectangle2D timeRangeBounds =  stdFont.getStringBounds(timeRange, g2.getFontRenderContext());
-		Rectangle2D titleBounds     = boldFont.getStringBounds(title, g2.getFontRenderContext());
-		Rectangle2D shortdescBounds = shortdesc==null ? null : stdFont.getStringBounds(shortdesc, g2.getFontRenderContext());
+		FontRenderContext frc = g2.getFontRenderContext();
+		Rectangle2D timeRangeBounds =  stdFont.getStringBounds(timeRange, frc);
+		Rectangle2D titleBounds     = boldFont.getStringBounds(title, frc);
+		double shortdescWidth = 0;
+		for (String str:shortdescStrs) {
+			Rectangle2D bounds = stdFont.getStringBounds(str, frc);
+			shortdescWidth = Math.max(shortdescWidth, bounds.getWidth());
+		}
 		
 		int borderSpacing = 5;
-		int imgWidth  = 2*borderSpacing + (int) Math.ceil( Math.max( Math.max( timeRangeBounds.getWidth(), titleBounds.getWidth() ), shortdescBounds==null ? 0 : shortdescBounds.getWidth() ) );
-		int imgHeight = 2*borderSpacing + (int) Math.ceil( stdFontSize + boldFontSize+(shortdescBounds==null ? 0 : stdFontSize) );
-		int[] baselineOffset = new int[] {
-			borderSpacing + Math.round(  stdFontSize*0.75f ),
-			borderSpacing + Math.round( boldFontSize*0.75f + stdFontSize),
-			borderSpacing + Math.round(  stdFontSize*0.75f + stdFontSize + boldFontSize),
-		};
+		int imgWidth  = 2*borderSpacing + (int) Math.ceil( Math.max( Math.max( timeRangeBounds.getWidth(), titleBounds.getWidth() ), shortdescWidth ) );
+		int imgHeight = 2*borderSpacing + (int) Math.ceil( stdFontSize + boldFontSize + shortdescStrs.length*stdFontSize );
+		int[] baselineOffset = new int[2+shortdescStrs.length];
+		baselineOffset[0] = borderSpacing + Math.round( stdFontSize*0.75f );
+		baselineOffset[1] = borderSpacing + Math.round( stdFontSize + boldFontSize*0.75f);
+		for (int i=0; i<shortdescStrs.length; i++)
+			baselineOffset[i+2] = borderSpacing + Math.round(  stdFontSize + boldFontSize + stdFontSize*i + stdFontSize*0.75f);
 		
 		image = new BufferedImage(imgWidth, imgHeight, BufferedImage.TYPE_INT_ARGB);
 		g2 = image.createGraphics();
@@ -188,12 +197,23 @@ class EPGView extends Canvas {
 		g2.drawString(timeRange, borderSpacing, baselineOffset[0]);
 		g2.setFont(boldFont);
 		g2.drawString(title, borderSpacing, baselineOffset[1]);
-		if (shortdesc!=null) {
+		if (shortdescStrs.length>0) {
 			g2.setFont(stdFont);
-			g2.drawString(shortdesc, borderSpacing, baselineOffset[2]);
+			for (int i=0; i<shortdescStrs.length; i++)
+				g2.drawString(shortdescStrs[i], borderSpacing, baselineOffset[2+i]);
 		}
 		
 		return image;
+	}
+
+	private String[] splitLines(String str) {
+		if (str==null) return new String[0];
+		Vector<String> lines = new Vector<>();
+		String line;
+		try (BufferedReader reader = new BufferedReader( new StringReader(str) )) {
+			while ( (line=reader.readLine())!=null ) lines.add(line);
+		} catch (IOException e) { e.printStackTrace(); }
+		return lines.toArray(new String[lines.size()]);
 	}
 
 	public void setHoveredEvent(EPGViewEvent hoveredEvent) {

@@ -283,10 +283,10 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 			}
 		});
 		
-		reconfigureEPGViewVertScrollBar();
-		reconfigureEPGViewHorizScrollBar();
 		if (this.epg.isEmpty()) loadEPGThread.start();
 		else updateEPGView();
+		reconfigureEPGViewVertScrollBar();
+		reconfigureEPGViewHorizScrollBar();
 		epgViewRepainter.start();
 		
 	}

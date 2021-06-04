@@ -29,9 +29,12 @@ import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
+import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
 import net.schwarzbaer.java.tools.openwebifcontroller.Timers;
+import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.EPGViewEvent;
+import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.Timer;
 
 public class EPGDialog extends StandardDialog implements Timers.DataUpdateListener {
 	private static final long serialVersionUID = 8634962178940555542L;
@@ -96,31 +99,36 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	}
 	
 	private final EPG epg;
+	private final Timers timers;
 	private final Vector<SubService> stations;
 	private final LoadEPGThread loadEPGThread;
 	private final EPGView epgView;
 	private final JScrollBar epgViewVertScrollBar;
 	private final JScrollBar epgViewHorizScrollBar;
-	private OpenWebifController.Updater epgViewRepainter;
+	private final OpenWebifController.Updater epgViewRepainter;
 	private int leadTime_s;
 	private int rangeTime_s;
 
-	public static void showDialog(Window parent, String title, String baseURL, EPG epg, net.schwarzbaer.java.lib.openwebif.Timers timers, Vector<SubService> subservices, ExternCommands externCommands) {
+	public static void showDialog(Window parent, String title, String baseURL, EPG epg, Timers timers, Vector<SubService> subservices, ExternCommands externCommands) {
 		new EPGDialog(parent, title, ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, subservices, externCommands)
 			.showDialog();
 	}
 	
 	public interface ExternCommands {
-		void zapToStation(String baseURL, StationID stationID);
+		void zapToStation (String baseURL, StationID stationID);
 		void streamStation(String baseURL, StationID stationID);
+		void addTimer     (String baseURL, String sRef, int eventID, TimerType type);
+		void deleteTimer  (String baseURL, String sRef, long begin, long end);
+		void toggleTimer  (String baseURL, String sRef, long begin, long end);
 	}
 
 	public EPGDialog(
 			Window parent, String title, ModalityType modality, boolean repeatedUseOfDialogObject,
-			String baseURL, EPG epg, net.schwarzbaer.java.lib.openwebif.Timers timers, Vector<SubService> stations,
+			String baseURL, EPG epg, Timers timers, Vector<SubService> stations,
 			ExternCommands externCommands) {
 		super(parent, title, modality, repeatedUseOfDialogObject);
 		this.epg = epg;
+		this.timers = timers;
 		this.stations = stations;
 		
 		JLabel statusOutput = new JLabel("");
@@ -133,7 +141,7 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 		};
 		epgView = new EPGView(this.stations);
 		epgViewRepainter = new OpenWebifController.Updater(20, epgView::repaint);
-		timersHasUpdated(timers, false);
+		timersHasUpdated(this.timers.timers, false);
 		
 		int rowHeight = OpenWebifController.settings.getInt(ValueKey.EPGDialog_RowHeight, -1);
 		if (rowHeight<0) rowHeight = epgView.getRowHeight();
@@ -210,7 +218,8 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 		//epgViewHorizScrollBar.setValues(epgView.getRowOffsetY(), epgView.getRowViewHeight(), 0, epgView.getContentHeight());
 		
 		StationContextMenu stationContextMenu = externCommands==null ? null : new StationContextMenu(externCommands, baseURL);
-		new EPGViewMouseHandler(this,epgView,epgViewHorizScrollBar,epgViewVertScrollBar,stationContextMenu,this.stations);
+		EventContextMenu eventContextMenu = externCommands==null ? null : new EventContextMenu(externCommands, baseURL, epgView);
+		new EPGViewMouseHandler(this, epgView, epgViewHorizScrollBar, epgViewVertScrollBar, eventContextMenu, stationContextMenu, this.stations);
 		
 		JButton closeButton = OpenWebifController.createButton("Close", true, e->closeDialog());
 		
@@ -336,7 +345,9 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 			Dimension size = OpenWebifController.settings.getDimension(ValueKey.EPGDialogWidth,ValueKey.EPGDialogHeight);
 			setPositionAndSize(null, size);
 		}
+		timers.addListener(this);
 		super.showDialog();
+		timers.removeListener(this);
 	}
 
 	public void setCurrentStation(StationID stationID) {
@@ -366,6 +377,64 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	private void timersHasUpdated(net.schwarzbaer.java.lib.openwebif.Timers timers, boolean repaintEPGView) {
 		Vector<EPGView.Timer> convertedTimers = epgView.convertTimers(timers.timers);
 		epgView.setTimers(convertedTimers);
+		if (repaintEPGView) epgView.repaint();
+	}
+
+	static class EventContextMenu extends ContextMenu {
+		private static final long serialVersionUID = -8844749957308284885L;
+		
+		private final ExternCommands externCommands;
+		private final String baseURL;
+		private final EPGView epgView;
+		
+		private final JMenuItem miAddRecordTimer;
+		private final JMenuItem miAddZapTimer;
+		private final JMenuItem miAddRecordNZapTimer;
+		private final JMenuItem miToggleTimer;
+		private final JMenuItem miDeleteTimer;
+		
+		private EPGViewEvent event;
+		private Timer timer;
+
+		EventContextMenu(ExternCommands externCommands, String baseURL, EPGView epgView) {
+			this.externCommands = externCommands;
+			this.baseURL = baseURL;
+			this.epgView = epgView;
+			event = null;
+			timer = null;
+			add(miAddRecordTimer     = OpenWebifController.createMenuItem("Add Record Timer"      , e->addTimer(TimerType.Record)));
+			add(miAddZapTimer        = OpenWebifController.createMenuItem("Add Zap Timer"         , e->addTimer(TimerType.ZapOnly)));
+			add(miAddRecordNZapTimer = OpenWebifController.createMenuItem("Add Record'N'Zap Timer", e->addTimer(TimerType.RecordAndZap)));
+			add(miToggleTimer        = OpenWebifController.createMenuItem("Toggle Timer"          , e->toggleTimer()));
+			add(miDeleteTimer        = OpenWebifController.createMenuItem("Delete Timer"          , e->deleteTimer()));
+		}
+		
+		private void addTimer(TimerType type) { externCommands.addTimer   (baseURL, event.event.sref, event.event.id.intValue(), type); }
+		private void deleteTimer()            { externCommands.deleteTimer(baseURL, event.event.sref, timer.timer.begin, timer.timer.end); }
+		private void toggleTimer()            { externCommands.toggleTimer(baseURL, event.event.sref, timer.timer.begin, timer.timer.end); }
+
+		public void setEvent(EPGView.EPGViewEvent event) {
+			this.event = event;
+			boolean isEventOK = this.event!=null &&
+				this.event.event!=null &&
+				this.event.event.sref!=null &&
+				this.event.event.id!=null;
+			if (isEventOK)
+				timer = epgView.getTimer(this.event.event.sref, this.event.event.id);
+			else
+				timer = null;
+			
+			miAddRecordTimer    .setEnabled(isEventOK && timer==null);
+			miAddZapTimer       .setEnabled(isEventOK && timer==null);
+			miAddRecordNZapTimer.setEnabled(isEventOK && timer==null);
+			miToggleTimer       .setEnabled(isEventOK && timer!=null);
+			miDeleteTimer       .setEnabled(isEventOK && timer!=null);
+			miAddRecordTimer    .setText(!isEventOK  ? "Add Record Timer"       : String.format("Add "+"Record"      +" Timer for Event \"%s\"", this.event.title));
+			miAddZapTimer       .setText(!isEventOK  ? "Add Zap Timer"          : String.format("Add "+"Zap"         +" Timer for Event \"%s\"", this.event.title));
+			miAddRecordNZapTimer.setText(!isEventOK  ? "Add Record'N'Zap Timer" : String.format("Add "+"Record'N'Zap"+" Timer for Event \"%s\"", this.event.title));
+			miToggleTimer       .setText(timer==null ? "Toggle Timer"           : String.format("Toggle Timer \"%s\"", timer.name));
+			miDeleteTimer       .setText(timer==null ? "Delete Timer"           : String.format("Delete Timer \"%s\"", timer.name));
+		}
 	}
 
 	static class StationContextMenu extends ContextMenu {

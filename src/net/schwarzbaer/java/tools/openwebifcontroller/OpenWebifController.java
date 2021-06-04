@@ -60,6 +60,7 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
+import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
 import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
@@ -249,7 +250,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		
 	}
 
-	private final StandardMainWindow mainWindow;
+	public  final StandardMainWindow mainWindow;
 	private final JFileChooser exeFileChooser;
 	private final Movies movies;
 	private final BouquetsNStations bouquetsNStations;
@@ -354,6 +355,17 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			pd.setTaskTitle(taskTitle);
 			pd.setIndeterminate(true);
 		});
+	}
+
+	public void showMessageResponse(OpenWebifTools.MessageResponse response, String title) {
+		String message = response==null ? "<No Response>" : toString(response);
+		JOptionPane.showMessageDialog(mainWindow, message, title, JOptionPane.INFORMATION_MESSAGE);
+		
+		System.out.println(title+":");
+		if (response!=null)
+			response.printTo(System.out);
+		else
+			System.out.println("<No Response>");
 	}
 
 	static abstract class AbstractContolPanel<ValueStructType> extends JPanel {
@@ -487,8 +499,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		}
 
 		@Override protected void updatePanel(OpenWebifTools.MessageResponse values) {
-			String message = OpenWebifController.toString(values);
-			JOptionPane.showMessageDialog(main.mainWindow, message, "Message Response", JOptionPane.INFORMATION_MESSAGE);
+			main.showMessageResponse(values, "Message Response");
 		}
 
 		@Override
@@ -827,28 +838,55 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		out.add(level+1, "", event.longdesc );
 	}
 
+	@Override
+	public void addTimer(String baseURL, String sRef, int eventID, TimerType type) {
+		runWithProgressDialog("Add Timer", pd->{
+			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
+				setIndeterminateProgressTask(pd, taskTitle);
+			});
+			showMessageResponse(response, "Add Timer");
+			timers.readData(baseURL,pd);
+		});
+	}
+	@Override
+	public void deleteTimer(String baseURL, String sRef, long begin, long end) {
+		runWithProgressDialog("Delete Timer", pd->{
+			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.deleteTimer(baseURL, sRef, begin, end, taskTitle->{
+				setIndeterminateProgressTask(pd, taskTitle);
+			});
+			showMessageResponse(response, "Delete Timer");
+			timers.readData(baseURL,pd);
+		});
+	}
+	@Override
+	public void toggleTimer(String baseURL, String sRef, long begin, long end) {
+		runWithProgressDialog("Toggle Timer", pd->{
+			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.toggleTimer(baseURL, sRef, begin, end, taskTitle->{
+				setIndeterminateProgressTask(pd, taskTitle);
+			});
+			showMessageResponse(response, "Toggle Timer");
+			timers.readData(baseURL,pd);
+		});
+	}
+	
 	public void zapToStation(StationID stationID) {
 		if (stationID==null) return;
-		
-		String baseURL = getBaseURL();
-		if (baseURL==null) return;
-		
-		zapToStation(baseURL, stationID);
+		zapToStation(getBaseURL(), stationID);
 	}
 	@Override public void zapToStation(String baseURL, StationID stationID) {
+		if (stationID==null) return;
+		if (baseURL==null) return;
 		MessageResponse response = OpenWebifTools.zapToStation(baseURL, stationID);
 		if (response!=null) response.printTo(System.out);
 	}
 
 	public void streamStation(StationID stationID) {
 		if (stationID==null) return;
-		
-		String baseURL = getBaseURL();
-		if (baseURL==null) return;
-		
-		streamStation(baseURL, stationID);
+		streamStation(getBaseURL(), stationID);
 	}
 	@Override public void streamStation(String baseURL, StationID stationID) {
+		if (stationID==null) return;
+		if (baseURL==null) return;
 		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
 		openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
 	}
@@ -857,12 +895,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		String baseURL = getBaseURL();
 		if (baseURL==null) return;
 		
-		
-		EPGDialog epgDialog = new EPGDialog(mainWindow, "EPG", ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers.timers, subservices, this);
+		EPGDialog epgDialog = new EPGDialog(mainWindow, "EPG", ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, subservices, this);
 		if (setEPGDialog!=null) setEPGDialog.accept(epgDialog);
-		timers.addListener(epgDialog);
 		epgDialog.showDialog();
-		timers.removeListener(epgDialog);
 	}
 	
 	public void openUrlInVideoPlayer(String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL", url); }

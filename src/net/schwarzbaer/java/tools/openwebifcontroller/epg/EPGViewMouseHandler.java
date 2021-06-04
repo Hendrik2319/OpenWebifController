@@ -15,6 +15,7 @@ import net.schwarzbaer.gui.TextAreaDialog;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.EventContextMenu;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.StationContextMenu;
 
 class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWheelListener{
@@ -23,6 +24,7 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 	private final EPGView epgView;
 	private final JScrollBar epgViewHorizScrollBar;
 	private final JScrollBar epgViewVertScrollBar;
+	private final EventContextMenu eventContextMenu;
 	private final StationContextMenu stationContextMenu;
 	private final Vector<SubService> stations;
 	
@@ -30,11 +32,12 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 	private EPGView.EPGViewEvent hoveredEvent;
 	private boolean isStationHovered;
 
-	public EPGViewMouseHandler(Window parent, EPGView epgView, JScrollBar epgViewHorizScrollBar, JScrollBar epgViewVertScrollBar, StationContextMenu stationContextMenu, Vector<SubService> stations) {
+	public EPGViewMouseHandler(Window parent, EPGView epgView, JScrollBar epgViewHorizScrollBar, JScrollBar epgViewVertScrollBar, EventContextMenu eventContextMenu, StationContextMenu stationContextMenu, Vector<SubService> stations) {
 		this.parent = parent;
 		this.epgView = epgView;
 		this.epgViewHorizScrollBar = epgViewHorizScrollBar;
 		this.epgViewVertScrollBar = epgViewVertScrollBar;
+		this.eventContextMenu = eventContextMenu;
 		this.stationContextMenu = stationContextMenu;
 		this.stations = stations;
 		this.epgView.addMouseListener(this);
@@ -94,7 +97,7 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 				if (dataPos.time_s_based==null)
 					repaintEPGView |= clearHoveredEvent();
 				else
-					repaintEPGView |= setHoveredEvent(dataPos.time_s_based);
+					repaintEPGView |= setHoveredEvent(dataPos.time_s_based, point);
 				
 			} else {
 				
@@ -110,12 +113,19 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 				else if (hoveredEvent!=null && hoveredEvent.covers(dataPos.time_s_based))
 					repaintEPGView |= epgView.toolTip.updatePosition(point);
 				else
-					repaintEPGView |= setHoveredEvent(dataPos.time_s_based);
+					repaintEPGView |= setHoveredEvent(dataPos.time_s_based, point);
 			}
 			
 			if (repaintEPGView)
 				epgView.repaint();
 		}
+	}
+
+	private void showEventContextMenu(MouseEvent e) {
+		if (eventContextMenu == null) return;
+		if (hoveredEvent == null) return;
+		eventContextMenu.setEvent(hoveredEvent);
+		eventContextMenu.show(epgView, e.getX(), e.getY());
 	}
 
 	private void showStationContextMenu(MouseEvent e) {
@@ -135,14 +145,14 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 		return true;
 	}
 
-	private boolean setHoveredEvent(Integer time_s_based) {
+	private boolean setHoveredEvent(Integer time_s_based, Point point) {
 		//System.out.printf("setHoveredEvent(%d,%d)%n", hoveredRowIndex,time_s_based);
 		EPGView.EPGViewEvent newHoveredEvent = epgView.getEvent(hoveredRowIndex,time_s_based);
 		if (hoveredEvent!=null || newHoveredEvent!=null) {
 			hoveredEvent = newHoveredEvent;
 			//System.out.printf("HoveredEvent: [%d] %s%n", hoveredRowIndex, hoveredEvent);
 			epgView.setHoveredEvent(hoveredEvent);
-			epgView.toolTip.hide();
+			epgView.toolTip.updateContent(point, hoveredEvent);
 			return true;
 		}
 		return false;
@@ -159,16 +169,11 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 				String text = out.generateOutput();
 				TextAreaDialog.showText(parent, hoveredEvent.title, 700, 500, true, text);
 			}
-			//if (isStationHovered) {
-			//	showStationContextMenu(e);
-			//}
 			break;
 			
-			// TODO: ToolTip by Click -> ToolTip by HoverTimer (mouseEntered -> start Timer, mouseExited -> stop Timer)
 		case MouseEvent.BUTTON3:
 			if (hoveredEvent!=null) {
-				epgView.toolTip.updateContent(e.getPoint(),hoveredEvent);
-				epgView.repaint();
+				showEventContextMenu(e);
 			}
 			if (isStationHovered) {
 				showStationContextMenu(e);
@@ -178,8 +183,8 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 		}
 	}
 
-	@Override public void mouseExited (MouseEvent e) { /*System.out.printf("mouseExited : %d, %d%n", e.getX(), e.getY());*/ clearHoveredItem(); }
-	@Override public void mouseEntered(MouseEvent e) { /*System.out.printf("mouseEntered: %d, %d%n", e.getX(), e.getY());*/ updateHoveredItem(e.getPoint()); }
+	@Override public void mouseExited (MouseEvent e) { /*System.out.printf("mouseExited : %d, %d%n", e.getX(), e.getY());*/ clearHoveredItem(); epgView.toolTip.deactivate(); }
+	@Override public void mouseEntered(MouseEvent e) { /*System.out.printf("mouseEntered: %d, %d%n", e.getX(), e.getY());*/ updateHoveredItem(e.getPoint()); epgView.toolTip.activate(); }
 	
 	@Override public void mouseDragged(MouseEvent e) { updateHoveredItem(e.getPoint()); }
 	@Override public void mouseMoved  (MouseEvent e) { updateHoveredItem(e.getPoint()); }

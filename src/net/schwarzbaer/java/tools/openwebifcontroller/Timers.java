@@ -2,13 +2,11 @@ package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.Vector;
 
 import javax.swing.BorderFactory;
+import javax.swing.JMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
@@ -16,12 +14,13 @@ import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableColumn;
-import javax.swing.table.TableColumnModel;
 
+import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
+import net.schwarzbaer.gui.TextAreaDialog;
+import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
@@ -41,6 +40,7 @@ public class Timers extends JSplitPane {
 	
 	public net.schwarzbaer.java.lib.openwebif.Timers timers;
 	private TimersTableModel tableModel;
+	private Timer selectedTimer;
 
 	public Timers(OpenWebifController main) {
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
@@ -59,14 +59,24 @@ public class Timers extends JSplitPane {
 			if (tableModel == null) return;
 			int rowV = table.getSelectedRow();
 			int rowM = table.convertRowIndexToModel(rowV);
-			showValues(tableModel.getRow(rowM));
+			selectedTimer = tableModel.getRow(rowM);
+			showValues(selectedTimer);
 		});
-		table.addMouseListener(new MouseAdapter() {
-			@Override public void mouseClicked(MouseEvent e) {
-				if (e.getButton()==MouseEvent.BUTTON3) {
-					showColumnWidths();
-				}
-			}
+		
+		ContextMenu tableContextMenu = new ContextMenu();
+		tableContextMenu.addTo(table);
+		
+		JMenuItem miShowSelectedRow;
+		tableContextMenu.add(miShowSelectedRow = OpenWebifController.createMenuItem("Show Details of Selected Timer", e->{
+			String text = generateOutput(selectedTimer);
+			TextAreaDialog.showText(main.mainWindow, "Details of Selected Timer", 800, 800, true, text);
+		}));
+		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
+			System.out.printf("Column Widths: %s%n", TimersTableModel.getColumnWidthsAsString(table));
+		}));
+		
+		tableContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
+			miShowSelectedRow.setEnabled(selectedTimer!=null);
 		});
 		
 		textArea = new JTextArea();
@@ -97,18 +107,6 @@ public class Timers extends JSplitPane {
 			sb.append(String.format("    [%d] %s <Type:%d> \"%s\"%n", i+1, timeStr, entry.type, entry.text));
 		}
 		textArea.setText(sb.toString());
-	}
-
-	private void showColumnWidths() {
-		TableColumnModel columnModel = table.getColumnModel();
-		if (columnModel==null) return;
-		int[] widths = new int[columnModel.getColumnCount()];
-		for (int i=0; i<widths.length; i++) {
-			TableColumn column = columnModel.getColumn(i);
-			if (column==null) widths[i] = -1;
-			else widths[i] = column.getWidth();
-		}
-		System.out.printf("Column Widths: %s%n", Arrays.toString(widths));
 	}
 
 	public void readData(String baseURL, ProgressDialog pd) {
@@ -233,7 +231,7 @@ public class Timers extends JSplitPane {
 			//	if ()
 			//	return new DefaultTableCellRenderer();
 			//});
-			// TODO Auto-generated method stub
+			// TODO Auto-generated method stub: setAllDefaultRenderers
 			
 		}
 
@@ -289,6 +287,51 @@ public class Timers extends JSplitPane {
 			return null;
 		}
 	
+	}
+
+	private static String generateOutput(Timer timer) {
+		ValueListOutput output = new ValueListOutput();
+		output.add(0, "isAutoTimer"        , "%s (%d)", timer.isAutoTimer==1, timer.isAutoTimer);
+		output.add(0, "tags"               , timer.tags               );
+		output.add(0, "serviceref"         , timer.serviceref         );
+		output.add(0, "servicename"        , timer.servicename        );
+		output.add(0, "name"               , timer.name               );
+		output.add(0, "dirname"            , timer.dirname            );
+		output.add(0, "filename"           , timer.filename           );
+		output.add(0, "realbegin"          , timer.realbegin          );
+		output.add(0, "realend"            , timer.realend            );
+		output.add(0, "begin"              , timer.begin              );
+		output.add(0, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(           timer.begin       *1000 , Locale.GERMANY,  true,  true, false, true, false) );
+		output.add(0, "end"                , timer.end                );
+		output.add(0, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(           timer.end         *1000 , Locale.GERMANY,  true,  true, false, true, false) );
+		output.add(0, "duration"           , timer.duration);
+		output.add(0, ""                   , "%s", DateTimeFormatter.getDurationStr(timer.duration));
+		output.add(0, "startprepare"       , timer.startprepare       );
+		output.add(0, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(Math.round(timer.startprepare*1000), Locale.GERMANY,  true,  true, false, true, false) );
+		output.add(0, "nextactivation"     , timer.nextactivation     );
+		if (timer.nextactivation!=null)
+			output.add(0, ""               , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(timer.nextactivation.longValue()*1000, Locale.GERMANY,  true,  true, false, true, false) );
+		output.add(0, "eit"                , timer.eit                );
+		output.add(0, "justplay"           , "%s (%d)", timer.justplay  ==1, timer.justplay  );
+		output.add(0, "always_zap"         , "%s (%d)", timer.always_zap==1, timer.always_zap);
+		output.add(0, "disabled"           , "%s (%d)", timer.disabled  ==1, timer.disabled  );
+		output.add(0, "cancelled"          , timer.cancelled          );
+		output.add(0, "afterevent"         , timer.afterevent         );
+		output.add(0, "allow_duplicate"    , "%s (%d)", timer.allow_duplicate==1, timer.allow_duplicate);
+		output.add(0, "asrefs"             , timer.asrefs             );
+		output.add(0, "autoadjust"         , timer.autoadjust         );
+		output.add(0, "backoff"            , timer.backoff            );
+		output.add(0, "dontsave"           , "%s (%d)", timer.dontsave==1, timer.dontsave);
+		output.add(0, "firsttryprepare"    , timer.firsttryprepare    );
+		output.add(0, "pipzap"             , timer.pipzap             );
+		output.add(0, "repeated"           , timer.repeated           );
+		output.add(0, "state"              , timer.state              );
+		output.add(0, "toggledisabled"     , "%s (%d)", timer.toggledisabled==1, timer.toggledisabled);
+		output.add(0, "toggledisabledimg"  , timer.toggledisabledimg  );
+		output.add(0, "vpsplugin_enabled"  , timer.vpsplugin_enabled  );
+		output.add(0, "vpsplugin_overwrite", timer.vpsplugin_overwrite);
+		output.add(0, "vpsplugin_time"     , timer.vpsplugin_time     );
+		return output.generateOutput();
 	}
 
 }

@@ -12,36 +12,69 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.Vector;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.EPGViewEvent;
 
-public class ToolTip {
+public abstract class ToolTip {
 	private static final Color COLOR_TOOLTIP_BG    = new Color(0xFFFFD0);
 	private static final Color COLOR_TOOLTIP_FRAME = Color.BLACK;
 	private static final Color COLOR_TOOLTIP_TEXT  = Color.BLACK;
 	
 	private BufferedImage image;
 	private Point pos;
+	private final ScheduledExecutorService activator;
+	private ScheduledFuture<?> activatorTaskHandle;
+	private boolean isActive;
 	
 	ToolTip() {
 		image = null;
 		pos = null;
+		activator = Executors.newSingleThreadScheduledExecutor();
+		activatorTaskHandle = null;
+		isActive = false;
+	}
+	
+	protected abstract void repaintView();
+
+	public synchronized void activate() {
+		if (activatorTaskHandle!=null) return;
+		activatorTaskHandle = activator.schedule(()->{
+			synchronized (ToolTip.this) {
+				isActive = true;
+				activatorTaskHandle = null;
+			}
+			repaintView();
+		}, 2, TimeUnit.SECONDS);
 	}
 
-	public void updateContent(Point point, EPGViewEvent event) {
-		image = event==null ? null : createToolTip(event);
-		pos = new Point(point);
+	public synchronized void deactivate() {
+		isActive = false;
+		if (activatorTaskHandle==null) return;
+		activatorTaskHandle.cancel(false);
+		activatorTaskHandle = null;
 	}
 
-	public boolean updatePosition(Point point) {
+	public synchronized void hide() {
+		image=null;
+	}
+
+	public synchronized boolean updatePosition(Point point) {
 		boolean posChanged = pos==null || !pos.equals(point);
 		pos = new Point(point);
 		return image!=null && posChanged;
 	}
 
-	public void hide() {
-		image=null;
+	public void updateContent(Point point, EPGViewEvent event) {
+		BufferedImage newImage = event==null ? null : createToolTip(event);
+		synchronized (this) {
+			image = newImage;
+			pos = new Point(point);
+		}
 	}
 
 	private BufferedImage createToolTip(EPGViewEvent event) {
@@ -124,7 +157,17 @@ public class ToolTip {
 	}
 
 	public void paint(final Graphics2D g2, final int x, final int y, final int width, final int height) {
-		if (image!=null && pos!=null) {
+		BufferedImage image;
+		Point pos;
+		boolean isActive;
+		
+		synchronized (this) {
+			image = this.image;
+			pos = this.pos;
+			isActive = this.isActive;
+		}
+		
+		if (image!=null && pos!=null && isActive) {
 			int toolTipWidth  = image.getWidth();
 			int toolTipHeight = image.getHeight();
 			int distToPosX = 15;

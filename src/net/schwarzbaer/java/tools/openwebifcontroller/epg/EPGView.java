@@ -98,7 +98,7 @@ class EPGView extends Canvas {
 		hoveredEvent = null;
 		currentStation = null;
 		hoveredStationIndex = null;
-		toolTip = new ToolTip();
+		toolTip = new ToolTip() { @Override protected void repaintView() { repaint(); } };
 		
 		setBorder(BorderFactory.createLineBorder(Color.GRAY));
 	}
@@ -216,6 +216,12 @@ class EPGView extends Canvas {
 	
 	synchronized HashMap<Long, Timer> getTimers(StationID stationID) {
 		return timers.get(stationID.toIDStr(true));
+	}
+	
+	synchronized Timer getTimer(String sRef, long eventID) {
+		HashMap<Long, Timer> stationTimers = timers.get(sRef);
+		if (stationTimers==null) return null;
+		return stationTimers.get(eventID);
 	}
 
 	static class EPGViewEvent {

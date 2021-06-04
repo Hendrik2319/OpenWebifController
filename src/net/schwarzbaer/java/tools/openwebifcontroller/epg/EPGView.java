@@ -11,10 +11,6 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.Rectangle2D;
-import java.awt.image.BufferedImage;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.StringReader;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -45,10 +41,6 @@ class EPGView extends Canvas {
 	private static final Color COLOR_EVENT_FRAME      = Color.BLACK;
 	private static final Color COLOR_EVENT_TEXT       = Color.BLACK;
 	
-	private static final Color COLOR_TOOLTIP_BG    = new Color(0xFFFFD0);
-	private static final Color COLOR_TOOLTIP_FRAME = Color.BLACK;
-	private static final Color COLOR_TOOLTIP_TEXT  = Color.BLACK;
-	
 	private static final Color COLOR_TIMESCALE_LINES = Color.GRAY;
 	private static final Color COLOR_TIMESCALE_TEXT  = Color.BLACK;
 	
@@ -77,10 +69,9 @@ class EPGView extends Canvas {
 	private int scaleTicksBaseTime_s_based;
 	private EPGViewEvent hoveredEvent;
 	private int repaintCounter;
-	private BufferedImage toolTip;
-	private Point toolTipPos;
 	private StationID currentStation;
 	private Integer hoveredStationIndex;
+	public final ToolTip toolTip;
 	
 	EPGView(Vector<SubService> stations) {
 		this.stations = stations;
@@ -105,10 +96,9 @@ class EPGView extends Canvas {
 		events = new HashMap<>();
 		timers = new HashMap<>();
 		hoveredEvent = null;
-		toolTip = null;
-		toolTipPos = null;
 		currentStation = null;
 		hoveredStationIndex = null;
+		toolTip = new ToolTip();
 		
 		setBorder(BorderFactory.createLineBorder(Color.GRAY));
 	}
@@ -119,101 +109,6 @@ class EPGView extends Canvas {
 
 	public void setCurrentStation(StationID stationID) {
 		currentStation = stationID;
-	}
-
-	public void showToolTip(Point point) {
-		if (hoveredEvent!=null)
-			toolTip = createToolTip(hoveredEvent);
-		toolTipPos = new Point(point);
-	}
-
-	public boolean updateToolTip(Point point) {
-		boolean posChanged = toolTipPos==null || !toolTipPos.equals(point);
-		toolTipPos = new Point(point);
-		return toolTip!=null && posChanged;
-	}
-
-	public void hideToolTip() {
-		toolTip=null;
-	}
-
-	private BufferedImage createToolTip(EPGViewEvent event) {
-		Graphics2D g2;
-		BufferedImage image;
-		Font stdFont, boldFont;
-		
-		image = new BufferedImage(10, 10, BufferedImage.TYPE_INT_ARGB);
-		g2 = image.createGraphics();
-		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
-		stdFont = g2.getFont();
-		boldFont = stdFont.deriveFont(Font.BOLD);
-		
-		String begin = event.event.begin;
-		String end   = event.event.end;
-		if (begin==null) begin = OpenWebifController.dateTimeFormatter.getTimeStr( event.event.begin_timestamp                          *1000, false, false, false, true, false);
-		if (end  ==null) end   = OpenWebifController.dateTimeFormatter.getTimeStr((event.event.begin_timestamp+event.event.duration_sec)*1000, false, false, false, true, false);
-		String timeRange = String.format("%s - %s", begin, end);
-		String title     = event.event.title;
-		String shortdesc = event.event.shortdesc;
-		if (shortdesc!=null && (shortdesc.isEmpty() || shortdesc.equals(title)))
-			shortdesc = null;
-		String[] shortdescStrs = splitLines(shortdesc);
-		
-		float  stdFontSize =  stdFont.getSize()*1.2f;
-		float boldFontSize = boldFont.getSize()*1.2f;
-		
-		FontRenderContext frc = g2.getFontRenderContext();
-		Rectangle2D timeRangeBounds =  stdFont.getStringBounds(timeRange, frc);
-		Rectangle2D titleBounds     = boldFont.getStringBounds(title, frc);
-		double shortdescWidth = 0;
-		for (String str:shortdescStrs) {
-			Rectangle2D bounds = stdFont.getStringBounds(str, frc);
-			shortdescWidth = Math.max(shortdescWidth, bounds.getWidth());
-		}
-		
-		int borderSpacing = 5;
-		int imgWidth  = 2*borderSpacing + (int) Math.ceil( Math.max( Math.max( timeRangeBounds.getWidth(), titleBounds.getWidth() ), shortdescWidth ) );
-		int imgHeight = 2*borderSpacing + (int) Math.ceil( stdFontSize + boldFontSize + shortdescStrs.length*stdFontSize );
-		int[] baselineOffset = new int[2+shortdescStrs.length];
-		baselineOffset[0] = borderSpacing + Math.round( stdFontSize*0.75f );
-		baselineOffset[1] = borderSpacing + Math.round( stdFontSize + boldFontSize*0.75f);
-		for (int i=0; i<shortdescStrs.length; i++)
-			baselineOffset[i+2] = borderSpacing + Math.round(  stdFontSize + boldFontSize + stdFontSize*i + stdFontSize*0.75f);
-		
-		image = new BufferedImage(imgWidth, imgHeight, BufferedImage.TYPE_INT_ARGB);
-		g2 = image.createGraphics();
-		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
-		stdFont = g2.getFont();
-		boldFont = stdFont.deriveFont(Font.BOLD);
-		
-		g2.setColor(COLOR_TOOLTIP_BG);
-		g2.fillRect(0, 0, imgWidth, imgHeight);
-		g2.setColor(COLOR_TOOLTIP_FRAME);
-		g2.drawRect(0, 0, imgWidth-1, imgHeight-1);
-		//g2.drawString("ToolTip Dummy", 10, 20);
-		
-		g2.setColor(COLOR_TOOLTIP_TEXT);
-		g2.setFont(stdFont);
-		g2.drawString(timeRange, borderSpacing, baselineOffset[0]);
-		g2.setFont(boldFont);
-		g2.drawString(title, borderSpacing, baselineOffset[1]);
-		if (shortdescStrs.length>0) {
-			g2.setFont(stdFont);
-			for (int i=0; i<shortdescStrs.length; i++)
-				g2.drawString(shortdescStrs[i], borderSpacing, baselineOffset[2+i]);
-		}
-		
-		return image;
-	}
-
-	private String[] splitLines(String str) {
-		if (str==null) return new String[0];
-		Vector<String> lines = new Vector<>();
-		String line;
-		try (BufferedReader reader = new BufferedReader( new StringReader(str) )) {
-			while ( (line=reader.readLine())!=null ) lines.add(line);
-		} catch (IOException e) { e.printStackTrace(); }
-		return lines.toArray(new String[lines.size()]);
 	}
 
 	public void setHoveredEvent(EPGViewEvent hoveredEvent) {
@@ -467,7 +362,7 @@ class EPGView extends Canvas {
 		g2.setClip(oldClip);
 		
 		paintNowMarker(g2, x0_, y0_,        height);
-		paintToolTip  (g2, x0_, y0_, width, height);
+		toolTip.paint (g2, x0_, y0_, width, height);
 	}
 
 	private void paintMainView(final Graphics2D g2, final int x0_, final int y0_, final int width, final int height) {
@@ -679,45 +574,4 @@ class EPGView extends Canvas {
 			g2.drawLine(xNow, y0_+HEADERHEIGHT, xNow, y0_+height-1);
 		}
 	}
-
-	private void paintToolTip(final Graphics2D g2, final int x0_, final int y0_, final int width, final int height) {
-		if (toolTip!=null && toolTipPos!=null) {
-			int toolTipWidth  = toolTip.getWidth();
-			int toolTipHeight = toolTip.getHeight();
-			int distToPosX = 15;
-			int distToPosY = 10;
-			int distToBorder = 10;
-			int imgX;
-			int imgY;
-			
-			if (toolTipPos.x+distToPosX+toolTipWidth+distToBorder < x0_+width)
-				imgX = toolTipPos.x+distToPosX; // right of pos
-			else if (x0_ < toolTipPos.x-distToPosX-toolTipWidth-distToBorder)
-				imgX = toolTipPos.x-distToPosX-toolTipWidth; // left of pos
-			else if (width < toolTipWidth)
-				imgX = x0_;
-			else if (width < toolTipWidth+2*distToBorder)
-				imgX = (width-toolTipWidth)/2; // centered
-			else if (toolTipPos.x < x0_+width/2)
-				imgX = x0_+width - distToBorder - toolTipWidth; // on right border
-			else
-				imgX = x0_+distToBorder; // on left border
-			
-			if (toolTipPos.y+distToPosY+toolTipHeight+distToBorder < y0_+height)
-				imgY = toolTipPos.y+distToPosY; // right of pos
-			else if (y0_ < toolTipPos.y-distToPosY-toolTipHeight-distToBorder)
-				imgY = toolTipPos.y-distToPosY-toolTipHeight; // left of pos
-			else if (height < toolTipHeight )
-				imgY = y0_;
-			else if (height < toolTipHeight+2*distToBorder)
-				imgY = (height-toolTipHeight)/2; // centered
-			else if (toolTipPos.y < y0_+height/2)
-				imgY = y0_+height - distToBorder - toolTipHeight; // on right border
-			else
-				imgY = y0_+distToBorder; // on left border
-			
-			g2.drawImage(toolTip, imgX, imgY, null);
-		}
-	}
-	
 }

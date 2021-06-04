@@ -68,7 +68,7 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 			hoveredEvent = null;
 			//System.out.printf("HoveredEvent: [%d] %s%n", hoveredRowIndex, hoveredEvent);
 			epgView.setHoveredEvent(hoveredEvent);
-			epgView.hideToolTip();
+			epgView.toolTip.hide();
 			return true;
 		}
 		return false;
@@ -101,14 +101,14 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 				if (!dataPos.isStationSelected)
 					repaintEPGView |= clearHoveredStation();
 				else if (isStationHovered)
-					repaintEPGView |= epgView.updateToolTip(point);
+					repaintEPGView |= epgView.toolTip.updatePosition(point);
 				else
 					repaintEPGView |= setHoveredStation(dataPos);
 				
 				if (dataPos.time_s_based==null)
 					repaintEPGView |= clearHoveredEvent();
 				else if (hoveredEvent!=null && hoveredEvent.covers(dataPos.time_s_based))
-					repaintEPGView |= epgView.updateToolTip(point);
+					repaintEPGView |= epgView.toolTip.updatePosition(point);
 				else
 					repaintEPGView |= setHoveredEvent(dataPos.time_s_based);
 			}
@@ -118,17 +118,20 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 		}
 	}
 
+	private void showStationContextMenu(MouseEvent e) {
+		if (stationContextMenu == null) return;
+		if (hoveredRowIndex == null) return;
+		SubService station = stations.get(hoveredRowIndex);
+		if (!station.isMarker()) {
+			stationContextMenu.setStationID(station.name, station.service.stationID);
+			stationContextMenu.show(epgView, e.getX(), e.getY());
+		}
+	}
+
 	private boolean setHoveredStation(EPGView.DataPos dataPos) {
 		//System.out.printf("setHoveredStation(%d) [isStationHovered:%s, dataPos:%s]%n", hoveredRowIndex, isStationHovered, dataPos);
 		epgView.setHoveredStation(hoveredRowIndex);
 		isStationHovered = true;
-		if (stationContextMenu!=null) {
-			SubService station = stations.get(hoveredRowIndex);
-			if (!station.isMarker()) {
-				stationContextMenu.setStationID(station.name, station.service.stationID);
-				stationContextMenu.setVisible(false);
-			}
-		}
 		return true;
 	}
 
@@ -139,7 +142,7 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 			hoveredEvent = newHoveredEvent;
 			//System.out.printf("HoveredEvent: [%d] %s%n", hoveredRowIndex, hoveredEvent);
 			epgView.setHoveredEvent(hoveredEvent);
-			epgView.hideToolTip();
+			epgView.toolTip.hide();
 			return true;
 		}
 		return false;
@@ -156,14 +159,15 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 				String text = out.generateOutput();
 				TextAreaDialog.showText(parent, hoveredEvent.title, 700, 500, true, text);
 			}
-			if (isStationHovered) {
-				showStationContextMenu(e);
-			}
+			//if (isStationHovered) {
+			//	showStationContextMenu(e);
+			//}
 			break;
 			
+			// TODO: ToolTip by Click -> ToolTip by HoverTimer (mouseEntered -> start Timer, mouseExited -> stop Timer)
 		case MouseEvent.BUTTON3:
 			if (hoveredEvent!=null) {
-				epgView.showToolTip(e.getPoint());
+				epgView.toolTip.updateContent(e.getPoint(),hoveredEvent);
 				epgView.repaint();
 			}
 			if (isStationHovered) {
@@ -174,16 +178,8 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 		}
 	}
 
-	private void showStationContextMenu(MouseEvent e) {
-		if (stationContextMenu == null) return;
-		if (hoveredRowIndex == null) return;
-		SubService station = stations.get(hoveredRowIndex);
-		if (!station.isMarker())
-			stationContextMenu.show(epgView, e.getX(), e.getY());
-	}
-	
-	@Override public void mouseExited (MouseEvent e) { clearHoveredItem(); }
-	@Override public void mouseEntered(MouseEvent e) { updateHoveredItem(e.getPoint()); }
+	@Override public void mouseExited (MouseEvent e) { /*System.out.printf("mouseExited : %d, %d%n", e.getX(), e.getY());*/ clearHoveredItem(); }
+	@Override public void mouseEntered(MouseEvent e) { /*System.out.printf("mouseEntered: %d, %d%n", e.getX(), e.getY());*/ updateHoveredItem(e.getPoint()); }
 	
 	@Override public void mouseDragged(MouseEvent e) { updateHoveredItem(e.getPoint()); }
 	@Override public void mouseMoved  (MouseEvent e) { updateHoveredItem(e.getPoint()); }

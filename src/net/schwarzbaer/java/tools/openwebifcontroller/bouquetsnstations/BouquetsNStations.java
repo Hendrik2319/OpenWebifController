@@ -18,6 +18,7 @@ import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -41,7 +42,6 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
-import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
 
 public class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
@@ -55,6 +55,7 @@ public class BouquetsNStations extends JPanel {
 	private final FileChooser m3uFileChooser;
 	private final FileChooser txtFileChooser;
 	private final OpenWebifController.Updater periodicUpdater10s;
+	private final Vector<BouquetsNStationsListener> bouquetsNStationsListeners;
 	
 	private BSTreeNode.RootNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
@@ -67,7 +68,6 @@ public class BouquetsNStations extends JPanel {
 	private boolean updateCurrentStationPeriodically;
 	private CurrentStation currentStationData;
 	private final Vector<BSTreeNode.StationNode> selectedStationNodes;
-	private EPGDialog epgDialog;
 
 	public BouquetsNStations(OpenWebifController main, StandardMainWindow mainWindow) {
 		super(new BorderLayout());
@@ -75,6 +75,8 @@ public class BouquetsNStations extends JPanel {
 		
 		this.main = main;
 		this.mainWindow = mainWindow;
+		
+		bouquetsNStationsListeners = new Vector<>();
 		bsTreeRoot = null;
 		bsTreeModel = null;
 		PICON_LOADER.clear();
@@ -211,12 +213,8 @@ public class BouquetsNStations extends JPanel {
 		JMenuItem miShowEPGforBouquet;
 		treeContextMenu.add(miShowEPGforBouquet = OpenWebifController.createMenuItem("Show EPG for Bouquet", e->{
 			if (clickedBouquetNode==null) return;
-			Vector<Bouquet.SubService> subservices = clickedBouquetNode.bouquet.subservices;
-			
-			this.main.openEPGDialog(subservices, dlg->epgDialog=dlg);
-			epgDialog = null;
+			this.main.openEPGDialog(clickedBouquetNode.bouquet);
 		}));
-		epgDialog = null;
 		
 		treeContextMenu.addSeparator();
 		
@@ -306,6 +304,23 @@ public class BouquetsNStations extends JPanel {
 			periodicUpdater10s.start();
 	}
 
+	public Bouquet showBouquetSelector(Component parent) {
+		if (bsTreeRoot==null) return null;
+		Vector<Bouquet> bouquets = bsTreeRoot.bouquetData.bouquets;
+		Object result = JOptionPane.showInputDialog(
+				parent,
+				"Select a Bouquet:",
+				"Select a Bouquet",
+				JOptionPane.QUESTION_MESSAGE,
+				null,
+				bouquets.toArray(new Bouquet[bouquets.size()]),
+				null
+		);
+		if (result instanceof Bouquet)
+			return (Bouquet) result;
+		return null;
+	}
+
 	private boolean shouldPeriodicUpdaterRun() {
 		return updatePlayableStatesPeriodically ||
 				updateCurrentStationPeriodically;
@@ -337,13 +352,17 @@ public class BouquetsNStations extends JPanel {
 		currentStationData = OpenWebifTools.getCurrentStation(baseURL, setIndeterminateProgressTask);
 		updateCurrentlyPlayedStationNodes(true);
 		
-		if (epgDialog!=null) {
+		if (!bouquetsNStationsListeners.isEmpty()) {
 			if (currentStationData!=null && currentStationData.stationInfo!=null)
-				epgDialog.setCurrentStation(currentStationData.stationInfo.stationID);
+				for (BouquetsNStationsListener listener:bouquetsNStationsListeners)
+					listener.setCurrentStation(currentStationData.stationInfo.stationID);
 			else
-				epgDialog.setCurrentStation(null);
+				for (BouquetsNStationsListener listener:bouquetsNStationsListeners)
+					listener.setCurrentStation(null);
 		}
 	}
+	
+	
 
 	private void updateCurrentlyPlayedStationNodes(boolean isCurrentlyPlayed) {
 		if (bsTreeRoot == null) return;
@@ -456,7 +475,16 @@ public class BouquetsNStations extends JPanel {
 		OpenWebifController.generateOutput(out, 0, currentStationData);
 		return out.generateOutput();
 	}
+	
+	public interface BouquetsNStationsListener {
 
+		void setCurrentStation(StationID stationID);
+		
+	}
+	
+	public void    addListener(BouquetsNStationsListener listener) { bouquetsNStationsListeners.   add(listener); }
+	public void removeListener(BouquetsNStationsListener listener) { bouquetsNStationsListeners.remove(listener); }
+	
 	static class StatusOut {
 		
 		private final JLabel comp;

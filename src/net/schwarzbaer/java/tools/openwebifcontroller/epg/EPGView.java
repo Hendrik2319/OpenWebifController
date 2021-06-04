@@ -449,13 +449,23 @@ class EPGView extends Canvas {
 			boolean isRecording = timer.timer.isRecording();
 			g2.setColor(isHovered ? COLOR_ITMER_HOVERED : isDisabled ? COLOR_ITMER_DISABLED : isRecording ? COLOR_ITMER_RECORDING : COLOR_ITMER_JUST_ZAP);
 			if (center==null) {
+				g2.drawLine(xBegin, yBegin, xEnd-1, yBegin);
 				g2.drawLine(xBegin, yBegin, xBegin, yEnd);
+				g2.drawLine(xBegin, yEnd  , xEnd-1, yEnd);
 				g2.drawLine(xEnd-1, yBegin, xEnd-1, yEnd);
-			} else
+				
+				int yMid = (yEnd+yBegin)/2;
+				g2.drawLine(xBegin, yBegin, xBegin+rowHeight/2, yMid);
+				g2.drawLine(xBegin, yEnd  , xBegin+rowHeight/2, yMid);
+				g2.drawLine(xEnd-1, yBegin, xEnd-1-rowHeight/2, yMid);
+				g2.drawLine(xEnd-1, yEnd  , xEnd-1-rowHeight/2, yMid);
+				
+			} else {
 				g2.drawLine(center, yBegin, center, yEnd);
+				g2.drawLine(xBegin, yBegin, xEnd-1, yEnd);
+				g2.drawLine(xEnd-1, yBegin, xBegin, yEnd);
+			}
 			
-			g2.drawLine(xBegin, yBegin, xEnd-1, yEnd);
-			g2.drawLine(xEnd-1, yBegin, xBegin, yEnd);
 		}
 	}
 

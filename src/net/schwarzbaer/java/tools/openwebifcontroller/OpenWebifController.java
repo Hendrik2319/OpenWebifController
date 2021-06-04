@@ -2,7 +2,6 @@ package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -305,12 +304,22 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		
+		JPanel epgControlPanel = new JPanel(new BorderLayout());
+		epgControlPanel.setBorder(BorderFactory.createTitledBorder("EPG"));
+		epgControlPanel.add(createButton("Show EPG", true, e->{
+			Bouquet bouquet = bouquetsNStations.showBouquetSelector(mainWindow);
+			if (bouquet==null) return;
+			openEPGDialog(bouquet);
+		}));
+		
 		JPanel toolBar = new JPanel(new GridBagLayout());
 		GridBagConstraints c = new GridBagConstraints();
+		c.fill = GridBagConstraints.BOTH;
 		c.weightx = 0;
 		toolBar.add(powerContol    = new PowerContol   (this), c);
 		toolBar.add(volumeContol   = new VolumeContol  (this), c);
 		toolBar.add(messageControl = new MessageControl(this), c);
+		toolBar.add(epgControlPanel, c);
 		c.weightx = 1;
 		toolBar.add(new JLabel(""), c);
 		
@@ -487,7 +496,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			
 			GridBagConstraints c = new GridBagConstraints();
 			c.weightx = 0;
-			c.weighty = 0;
+			c.weighty = 1;
 			c.fill = GridBagConstraints.BOTH;
 			
 			add(btnSend, c);
@@ -525,7 +534,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			
 			GridBagConstraints c = new GridBagConstraints();
 			c.weightx = 0;
-			c.weighty = 0;
+			c.weighty = 1;
 			c.fill = GridBagConstraints.BOTH;
 			
 			add(btnPower = createButton("Toggle StandBy", CommandIcons.OnOff.getIcon(), CommandIcons.OnOff_Dis.getIcon(), true, e->{
@@ -578,7 +587,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			
 			GridBagConstraints c = new GridBagConstraints();
 			c.weightx = 0;
-			c.weighty = 0;
+			c.weighty = 1;
 			c.fill = GridBagConstraints.BOTH;
 			
 			add(txtVolume  = new JTextField("mute",7), c);
@@ -891,13 +900,10 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
 	}
 
-	public void openEPGDialog(Vector<Bouquet.SubService> subservices, Consumer<EPGDialog> setEPGDialog) {
+	public void openEPGDialog(Bouquet bouquet) {
 		String baseURL = getBaseURL();
 		if (baseURL==null) return;
-		
-		EPGDialog epgDialog = new EPGDialog(mainWindow, "EPG", ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, subservices, this);
-		if (setEPGDialog!=null) setEPGDialog.accept(epgDialog);
-		epgDialog.showDialog();
+		EPGDialog.showDialog(mainWindow, baseURL, epg, timers, bouquetsNStations, bouquet, this);
 	}
 	
 	public void openUrlInVideoPlayer(String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL", url); }

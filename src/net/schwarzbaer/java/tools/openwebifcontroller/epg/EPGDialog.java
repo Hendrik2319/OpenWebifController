@@ -25,6 +25,7 @@ import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.StandardDialog;
+import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
@@ -33,10 +34,12 @@ import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
 import net.schwarzbaer.java.tools.openwebifcontroller.Timers;
+import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
+import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BouquetsNStationsListener;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.EPGViewEvent;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.Timer;
 
-public class EPGDialog extends StandardDialog implements Timers.DataUpdateListener {
+public class EPGDialog extends StandardDialog implements Timers.DataUpdateListener, BouquetsNStationsListener {
 	private static final long serialVersionUID = 8634962178940555542L;
 	
 	private enum LeadTime {
@@ -100,6 +103,7 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	
 	private final EPG epg;
 	private final Timers timers;
+	private final BouquetsNStations bouquetsNStations;
 	private final Vector<SubService> stations;
 	private final LoadEPGThread loadEPGThread;
 	private final EPGView epgView;
@@ -109,8 +113,8 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	private int leadTime_s;
 	private int rangeTime_s;
 
-	public static void showDialog(Window parent, String title, String baseURL, EPG epg, Timers timers, Vector<SubService> subservices, ExternCommands externCommands) {
-		new EPGDialog(parent, title, ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, subservices, externCommands)
+	public static void showDialog(Window parent, String baseURL, EPG epg, Timers timers, BouquetsNStations bouquetsNStations, Bouquet bouquet, ExternCommands externCommands) {
+		new EPGDialog(parent, ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, bouquetsNStations, bouquet, externCommands)
 			.showDialog();
 	}
 	
@@ -123,13 +127,14 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	}
 
 	public EPGDialog(
-			Window parent, String title, ModalityType modality, boolean repeatedUseOfDialogObject,
-			String baseURL, EPG epg, Timers timers, Vector<SubService> stations,
+			Window parent, ModalityType modality, boolean repeatedUseOfDialogObject,
+			String baseURL, EPG epg, Timers timers, BouquetsNStations bouquetsNStations, Bouquet bouquet,
 			ExternCommands externCommands) {
-		super(parent, title, modality, repeatedUseOfDialogObject);
+		super(parent, getTitle(bouquet), modality, repeatedUseOfDialogObject);
 		this.epg = epg;
 		this.timers = timers;
-		this.stations = stations;
+		this.bouquetsNStations = bouquetsNStations;
+		this.stations = bouquet.subservices;
 		
 		JLabel statusOutput = new JLabel("");
 		statusOutput.setBorder(BorderFactory.createLoweredSoftBevelBorder());
@@ -286,6 +291,11 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 		
 	}
 
+	private static String getTitle(Bouquet bouquet) {
+		if (bouquet==null) return "EPG";
+		return String.format("EPG for \"%s\"", bouquet.name);
+	}
+
 	private void reconfigureEPGViewVertScrollBar() {
 		int value   = epgView.getRowOffsetY_px();
 		int visible = epgView.getRowViewHeight_px();
@@ -346,10 +356,13 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 			setPositionAndSize(null, size);
 		}
 		timers.addListener(this);
+		bouquetsNStations.addListener(this);
 		super.showDialog();
 		timers.removeListener(this);
+		bouquetsNStations.removeListener(this);
 	}
 
+	@Override
 	public void setCurrentStation(StationID stationID) {
 		epgView.setCurrentStation(stationID);
 	}

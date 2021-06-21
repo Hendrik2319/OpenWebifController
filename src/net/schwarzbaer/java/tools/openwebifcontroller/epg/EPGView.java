@@ -386,8 +386,25 @@ class EPGView extends Canvas {
 			
 			int rowY = y0+rowHeight*i;
 			paintStation(g2, x0_, rowY, rowTextOffsetY, mainClip, station, i, events!=null);
+			if (station.isMarker()) paintMarkerBar(g2, x0_, rowY, width, eventViewClip);
 			paintTimers (g2, x0_, rowY, rowTextOffsetY, eventViewClip, timers);
 			paintEvents (g2, x0_, rowY, rowTextOffsetY, eventViewClip, events, timers);
+		}
+	}
+
+	private void paintMarkerBar(final Graphics2D g2, final int x0_, final int rowY, final int width, final Rectangle eventViewClip) {
+		int xBase = x0_ + STATIONWIDTH + Math.round( (scaleTicksBaseTime_s_based - rowAnchorTime_s_based)/timeScale );
+		int iQuarter = 0;
+		int xTick = xBase;
+		int lastXTick = xTick;
+		g2.setClip(eventViewClip);
+		g2.setColor(COLOR_STATION_FRAME);
+		while (lastXTick<=x0_+width) {
+			if (xTick-1>x0_+STATIONWIDTH)
+				g2.drawLine(xTick-1, rowY, lastXTick, rowY+rowHeight-2);
+			iQuarter++;
+			lastXTick = xTick;
+			xTick = xBase + Math.round( iQuarter*900/timeScale );
 		}
 	}
 

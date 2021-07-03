@@ -151,16 +151,16 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				if (turnOn || turnOff || reboot || mute || stationswitch) {
 					if (baseURL==null) baseURL = getBaseURL_DontAskUser();
 					if (stationswitch) {
-						StationSwitch.start(baseURL,true);
+						StationSwitch.start(baseURL,false);
 						return;
 					}
 					if (baseURL==null) {
 						System.err.println("Can't execute task: No Base URL defined.");
 					} else {
-						if      (turnOff) PowerContol.setState(baseURL, Power.Commands.Standby, System.out);
-						else if (turnOn ) PowerContol.setState(baseURL, Power.Commands.Wakeup , System.out);
-						else if (reboot ) PowerContol.setState(baseURL, Power.Commands.Reboot , System.out);
-						else if (mute   ) VolumeContol.setVolMute(baseURL, System.out);
+						if      (turnOff) PowerControl.setState(baseURL, Power.Commands.Standby, System.out);
+						else if (turnOn ) PowerControl.setState(baseURL, Power.Commands.Wakeup , System.out);
+						else if (reboot ) PowerControl.setState(baseURL, Power.Commands.Reboot , System.out);
+						else if (mute   ) VolumeControl.setVolMute(baseURL, System.out);
 					}
 					return;
 				}
@@ -264,8 +264,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	private final Movies movies;
 	private final BouquetsNStations bouquetsNStations;
 	private final Timers timers;
-	private final VolumeContol volumeContol;
-	private final PowerContol powerContol;
+	private final VolumeControl volumeControl;
+	private final PowerControl powerControl;
 	private final MessageControl messageControl;
 	private final EPG epg;
 
@@ -275,7 +275,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		exeFileChooser.setMultiSelectionEnabled(false);
 		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
 		
-		mainWindow = createMainWindow("OpenWebif Controller");
+		mainWindow = createMainWindow("OpenWebif Controller",false);
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new Timers(this);
@@ -319,7 +319,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		stationSwitchPanel.add(createButton("Show Station Switch", true, e->{
 			String baseURL = getBaseURL();
 			if (baseURL==null) return;
-			StationSwitch.start(baseURL,false);
+			StationSwitch.start(baseURL,true);
 		}));
 		
 		JPanel epgControlPanel = new JPanel(new BorderLayout());
@@ -330,13 +330,22 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			openEPGDialog(bouquet);
 		}));
 		
+		AbstractControlPanel.ExternCommands controlPanelCommands = new AbstractControlPanel.ExternCommands() {
+			@Override public void showMessageResponse(MessageResponse response, String title) {
+				OpenWebifController.this.showMessageResponse(response, title);
+			}
+			@Override public String getBaseURL() {
+				return OpenWebifController.this.getBaseURL();
+			}
+		};
+		
 		JPanel toolBar = new JPanel(new GridBagLayout());
 		GridBagConstraints c = new GridBagConstraints();
 		c.fill = GridBagConstraints.BOTH;
 		c.weightx = 0;
-		toolBar.add(powerContol    = new PowerContol   (this), c);
-		toolBar.add(volumeContol   = new VolumeContol  (this), c);
-		toolBar.add(messageControl = new MessageControl(this), c);
+		toolBar.add(powerControl   = new PowerControl  (controlPanelCommands, true, false, false), c);
+		toolBar.add(volumeControl  = new VolumeControl (controlPanelCommands, true, false, false), c);
+		toolBar.add(messageControl = new MessageControl(controlPanelCommands), c);
 		toolBar.add(epgControlPanel, c);
 		toolBar.add(stationSwitchPanel, c);
 		c.weightx = 1;
@@ -359,8 +368,11 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		});
 	}
 	
-	static StandardMainWindow createMainWindow(String title) {
-		StandardMainWindow mainWindow = new StandardMainWindow(title);
+	static StandardMainWindow createMainWindow(String title, boolean asSubWindow) {
+		StandardMainWindow.DefaultCloseOperation defaultCloseOperation;
+		if (asSubWindow) defaultCloseOperation = StandardMainWindow.DefaultCloseOperation.DISPOSE_ON_CLOSE;
+		else             defaultCloseOperation = StandardMainWindow.DefaultCloseOperation.EXIT_ON_CLOSE;
+		StandardMainWindow mainWindow = new StandardMainWindow(title, defaultCloseOperation);
 		mainWindow.setIconImagesFromResource("/AppIcons/AppIcon","16.png","24.png","32.png","48.png","64.png");
 		return mainWindow;
 	}
@@ -373,8 +385,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
 			timers           .readData(baseURL,pd);
-			powerContol   .initialize(baseURL,pd);
-			volumeContol  .initialize(baseURL,pd);
+			powerControl  .initialize(baseURL,pd);
+			volumeControl .initialize(baseURL,pd);
 			messageControl.initialize(baseURL,pd);
 		});
 	}
@@ -394,8 +406,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	}
 
 	public void showMessageResponse(OpenWebifTools.MessageResponse response, String title) {
+		showMessageResponse(mainWindow, response, title);
+	}
+	public static void showMessageResponse(Component parentComponent, OpenWebifTools.MessageResponse response, String title) {
 		String message = response==null ? "<No Response>" : toString(response);
-		JOptionPane.showMessageDialog(mainWindow, message, title, JOptionPane.INFORMATION_MESSAGE);
+		if (parentComponent!=null)
+			JOptionPane.showMessageDialog(parentComponent, message, title, JOptionPane.INFORMATION_MESSAGE);
 		
 		System.out.println(title+":");
 		if (response!=null)
@@ -404,16 +420,23 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			System.out.println("<No Response>");
 	}
 
-	static abstract class AbstractContolPanel<ValueStructType> extends JPanel {
+	static abstract class AbstractControlPanel<ValueStructType> extends JPanel {
 		private static final long serialVersionUID = 1376060978837360833L;
 		
-		protected final OpenWebifController main;
+		interface ExternCommands {
+			String getBaseURL();
+			void showMessageResponse(MessageResponse response, String title);
+		}
+		
+		protected final ExternCommands externCommands;
 		private final String controlLabel;
 		private final BiFunction<String, Consumer<String>, ValueStructType> updateCommand;
 	
-		AbstractContolPanel(LayoutManager layout, OpenWebifController main, String controlLabel, BiFunction<String, Consumer<String>, ValueStructType> updateCommand) {
+		AbstractControlPanel(LayoutManager layout, ExternCommands externCommands, String controlLabel, String borderTitle, BiFunction<String, Consumer<String>, ValueStructType> updateCommand) {
 			super(layout);
-			this.main = main;
+			if (borderTitle!=null)
+				setBorder(BorderFactory.createTitledBorder(borderTitle));
+			this.externCommands = externCommands;
 			this.controlLabel = controlLabel;
 			this.updateCommand = updateCommand;
 		}
@@ -441,7 +464,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			callCommand(pd, commandLabel, false, commandFcn);
 		}
 		protected void callCommand(ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
-			String baseURL = main.getBaseURL();
+			String baseURL = externCommands.getBaseURL();
 			if (baseURL==null) return;
 			callCommand(baseURL, pd, commandLabel, withDelayedUpdate, commandFcn);
 		}
@@ -479,7 +502,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		protected abstract void setPanelEnable(boolean enabled);
 	}
 
-	static class MessageControl extends AbstractContolPanel<OpenWebifTools.MessageResponse> {
+	static class MessageControl extends AbstractControlPanel<OpenWebifTools.MessageResponse> {
 		private static final long serialVersionUID = 139846886828802469L;
 		private final JButton btnSend;
 		private final JButton btnGetAnswer;
@@ -490,9 +513,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		private Integer timeOut;
 		private OpenWebifTools.MessageType messageType;
 
-		MessageControl(OpenWebifController main) {
-			super(new GridBagLayout(),main,"MessageControl",null);
-			setBorder(BorderFactory.createTitledBorder("Messages"));
+		MessageControl(ExternCommands externCommands) {
+			super(new GridBagLayout(),externCommands,"MessageControl","Messages",null);
 			
 			timeOut = null;
 			messageType = OpenWebifTools.MessageType.INFO;
@@ -535,7 +557,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		}
 
 		@Override protected void updatePanel(OpenWebifTools.MessageResponse values) {
-			main.showMessageResponse(values, "Message Response");
+			externCommands.showMessageResponse(values, "Message Response");
 		}
 
 		@Override
@@ -548,33 +570,43 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		}
 	}
 
-	static class PowerContol extends AbstractContolPanel<Power.Values> {
+	static class PowerControl extends AbstractControlPanel<Power.Values> {
 		private static final long serialVersionUID = 3842993673551313089L;
 		
+		private final boolean isSmall;
 		private final JButton btnPower;
 		private final JComboBox<Power.Commands> cmbbxSetOtherState;
 		private final JButton btnUpdate;
 		
-		PowerContol(OpenWebifController main) {
-			super(new GridBagLayout(),main,"PowerContol",Power::getState);
-			setBorder(BorderFactory.createTitledBorder("Power"));
+		PowerControl(ExternCommands externCommands, boolean withBorder, boolean isStretchable, boolean isSmall) {
+			super(new GridBagLayout(),externCommands,"PowerContol",withBorder?"Power":null,Power::getState);
+			this.isSmall = isSmall;
 			
 			GridBagConstraints c = new GridBagConstraints();
 			c.weightx = 0;
 			c.weighty = 1;
 			c.fill = GridBagConstraints.BOTH;
 			
-			add(btnPower = createButton("Toggle StandBy", CommandIcons.OnOff.getIcon(), CommandIcons.OnOff_Dis.getIcon(), true, e->{
+			if (this.isSmall && isStretchable) c.weightx = 1;
+			add(btnPower = createButton(isSmall ? null : "Toggle StandBy", CommandIcons.OnOff.getIcon(), CommandIcons.OnOff_Dis.getIcon(), true, e->{
 				callCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle));
 			}), c);
+			if (this.isSmall && isStretchable) c.weightx = 0;
 			
-			Vector<Power.Commands> items = new Vector<>(Arrays.asList(Power.Commands.values()));
-			items.remove(Power.Commands.ToggleStandBy);
-			add(cmbbxSetOtherState = createComboBox(items, Power.Commands.Wakeup, cmd->{
-				callCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->Power.setState(baseURL, cmd, setTaskTitle));
-			}), c);
-			
-			add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true), c);
+			if (!this.isSmall) {
+				if (isStretchable) c.weightx = 1;
+				Vector<Power.Commands> items = new Vector<>(Arrays.asList(Power.Commands.values()));
+				items.remove(Power.Commands.ToggleStandBy);
+				add(cmbbxSetOtherState = createComboBox(items, Power.Commands.Wakeup, cmd->{
+					callCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->Power.setState(baseURL, cmd, setTaskTitle));
+				}), c);
+				if (isStretchable) c.weightx = 0;
+				
+				add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true), c);
+			} else {
+				cmbbxSetOtherState = null;
+				btnUpdate = null;
+			}
 		}
 
 		static void setState(String baseURL, Power.Commands cmd, PrintStream out) {
@@ -585,20 +617,23 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 
 		@Override protected void updatePanel(Power.Values values) {
 			if (values==null) return;
-			if (values.instandby) btnPower.setText("Switch On");
-			else btnPower.setText("Switch to Standby");
+			if (!isSmall) {
+				if (values.instandby) btnPower.setText("Switch On");
+				else btnPower.setText("Switch to Standby");
+			}
 		}
 
 		@Override protected void setPanelEnable(boolean enabled) {
-			btnPower.setEnabled(enabled);
-			cmbbxSetOtherState.setEnabled(enabled);
-			btnUpdate.setEnabled(enabled);
+			if (btnPower          !=null) btnPower          .setEnabled(enabled);
+			if (cmbbxSetOtherState!=null) cmbbxSetOtherState.setEnabled(enabled);
+			if (btnUpdate         !=null) btnUpdate         .setEnabled(enabled);
 		}
 	}
 
-	static class VolumeContol extends AbstractContolPanel<Volume.Values> {
+	static class VolumeControl extends AbstractControlPanel<Volume.Values> {
 		private static final long serialVersionUID = 6164405483744214580L;
 		
+		private final boolean isSmall;
 		private final JTextField txtVolume;
 		private final JSlider sldrVolume;
 		private final Color defaultTextColor;
@@ -608,41 +643,62 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		private final JButton btnUpdate;
 		private boolean ignoreSldrVolumeEvents;
 		
-		VolumeContol(OpenWebifController main) {
-			super(new GridBagLayout(),main,"VolumeContol",Volume::getState);
-			setBorder(BorderFactory.createTitledBorder("Volume"));
+		VolumeControl(ExternCommands externCommands, boolean withBorder, boolean isStretchable, boolean isSmall) {
+			super(new GridBagLayout(),externCommands,"VolumeContol",withBorder?"Volume":null,Volume::getState);
+			this.isSmall = isSmall;
 			
 			GridBagConstraints c = new GridBagConstraints();
 			c.weightx = 0;
 			c.weighty = 1;
 			c.fill = GridBagConstraints.BOTH;
 			
-			add(txtVolume  = new JTextField("mute",7), c);
-			add(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c);
+			if (!this.isSmall) {
+				add(txtVolume  = new JTextField("mute",8), c);
+				if (isStretchable) c.weightx = 1;
+				add(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c);
+				if (isStretchable) c.weightx = 0;
+			} else {
+				txtVolume = null;
+				sldrVolume = null;
+			}
+			
+			if (this.isSmall && isStretchable) c.weightx = 1;
 			add(btnVolDown = createButton("-", true, e->setVolDown(null)), c);
 			add(btnVolUp   = createButton("+", true, e->setVolUp  (null)), c);
-			add(btnVolMute = createButton("Mute", CommandIcons.Muted.getIcon(), CommandIcons.Muted_Dis.getIcon(), true, e->setVolMute(null)), c);
-			add(btnUpdate  = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), false), c);
+			add(btnVolMute = createButton(isSmall ? null : "Mute", CommandIcons.Muted.getIcon(), CommandIcons.Muted_Dis.getIcon(), true, e->setVolMute(null)), c);
+			if (this.isSmall && isStretchable) c.weightx = 0;
 			
-			txtVolume.setEditable(false);
-			txtVolume.setHorizontalAlignment(JTextField.CENTER);
-			defaultTextColor = txtVolume.getForeground();
+			if (!this.isSmall)
+				add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), false), c);
+			else
+				btnUpdate = null;
+			
+			if (txtVolume!=null) {
+				txtVolume.setEditable(false);
+				txtVolume.setMinimumSize(new Dimension(65,10));
+				txtVolume.setHorizontalAlignment(JTextField.CENTER);
+				defaultTextColor = txtVolume.getForeground();
+			} else
+				defaultTextColor = null;
 			
 			ignoreSldrVolumeEvents = false;
-			sldrVolume.addChangeListener(e -> {
-				if (ignoreSldrVolumeEvents) return;
-				
-				int value = sldrVolume.getValue();
-				txtVolume.setText(Integer.toString(value));
-				
-				if (sldrVolume.getValueIsAdjusting()) {
-					txtVolume.setForeground(Color.GRAY);
+			if (sldrVolume!=null) {
+				sldrVolume.setMinimumSize(new Dimension(65,10));
+				sldrVolume.addChangeListener(e -> {
+					if (ignoreSldrVolumeEvents) return;
 					
-				} else {
-					txtVolume.setForeground(defaultTextColor);
-					setVol(value,null);
-				}
-			});
+					int value = sldrVolume.getValue();
+					if (txtVolume!=null) txtVolume.setText(Integer.toString(value));
+					
+					if (sldrVolume.getValueIsAdjusting()) {
+						if (txtVolume!=null) txtVolume.setForeground(Color.GRAY);
+						
+					} else {
+						if (txtVolume!=null) txtVolume.setForeground(defaultTextColor);
+						setVol(value,null);
+					}
+				});
+			}
 		}
 	
 		static void setVolMute(String baseURL, PrintStream out) {
@@ -656,34 +712,39 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 
 		@Override protected void updatePanel(Volume.Values values) {
 			if (values==null) {
-				txtVolume.setText("???");
+				if (txtVolume!=null) txtVolume.setText("???");
 			} else {
 				String format;
 				if (values.ismute) {
 					format = "mute (%d)";
 					btnVolMute.setIcon(CommandIcons.UnMuted.getIcon());
 					btnVolMute.setDisabledIcon(CommandIcons.UnMuted_Dis.getIcon());
-					btnVolMute.setText("UnMute");
+					if (!isSmall) btnVolMute.setText("UnMute");
 				} else {
 					format = "%d";
 					btnVolMute.setIcon(CommandIcons.Muted.getIcon());
 					btnVolMute.setDisabledIcon(CommandIcons.Muted_Dis.getIcon());
-					btnVolMute.setText("Mute");
+					if (!isSmall) btnVolMute.setText("Mute");
 				}
-				txtVolume.setText(String.format(format, values.current));
-				ignoreSldrVolumeEvents = true;
-				sldrVolume.setValue((int) values.current);
-				ignoreSldrVolumeEvents = false;
+				
+				if (txtVolume!=null)
+					txtVolume.setText(String.format(format, values.current));
+				
+				if (sldrVolume!=null) {
+					ignoreSldrVolumeEvents = true;
+					sldrVolume.setValue((int) values.current);
+					ignoreSldrVolumeEvents = false;
+				}
 			}
 		}
 
 		@Override protected void setPanelEnable(boolean enabled) {
-			txtVolume .setEnabled(enabled);
-			sldrVolume.setEnabled(enabled);
-			btnVolUp  .setEnabled(enabled);
-			btnVolDown.setEnabled(enabled);
-			btnVolMute.setEnabled(enabled);
-			btnUpdate .setEnabled(enabled);
+			if (txtVolume !=null) txtVolume .setEnabled(enabled);
+			if (sldrVolume!=null) sldrVolume.setEnabled(enabled);
+			if (btnVolUp  !=null) btnVolUp  .setEnabled(enabled);
+			if (btnVolDown!=null) btnVolDown.setEnabled(enabled);
+			if (btnVolMute!=null) btnVolMute.setEnabled(enabled);
+			if (btnUpdate !=null) btnUpdate .setEnabled(enabled);
 		}
 	}
 

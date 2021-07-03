@@ -19,24 +19,31 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.PowerControl;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.VolumeControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 
 class StationSwitch {
 
-	static void start(String baseURL, boolean setLookAndFeel) {
-		if (setLookAndFeel)
+	static void start(String baseURL, boolean asSubWindow) {
+		if (!asSubWindow)
 			try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 			catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
 		
-		new StationSwitch().initialize(baseURL);
+		new StationSwitch(asSubWindow).initialize(baseURL);
 	}
 
 	private final StandardMainWindow mainWindow;
+	private final JPanel stationPanel;
+	private final PowerControl powerControl;
+	private final VolumeControl volumeControl;
 	private final JButton btnReload;
 	private final JButton btnAddStation;
 	private final JLabel labBouquet;
@@ -46,18 +53,30 @@ class StationSwitch {
 	private String baseURL;
 	private BouquetData bouquetData;
 	private Bouquet.SubService selectedStation;
-	private JPanel stationPanel;
 	
-	StationSwitch() {
+	StationSwitch(boolean asSubWindow) {
 		baseURL = null;
 		bouquetData = null;
 		selectedStation = null;
 		
-		mainWindow = OpenWebifController.createMainWindow("Station Switch");
+		mainWindow = OpenWebifController.createMainWindow("Station Switch",asSubWindow);
 		stationPanel = new JPanel(new GridLayout(0,1));
 		
+		OpenWebifController.AbstractControlPanel.ExternCommands controlPanelCommands = new OpenWebifController.AbstractControlPanel.ExternCommands() {
+			@Override public void showMessageResponse(MessageResponse response, String title) {
+				OpenWebifController.showMessageResponse(mainWindow, response, title);
+			}
+			@Override public String getBaseURL() {
+				return baseURL!=null ? baseURL : (baseURL = OpenWebifController.getBaseURL(true, mainWindow));
+			}
+		};
+		
+		powerControl  = new OpenWebifController.PowerControl (controlPanelCommands,false,true,true);
+		volumeControl = new OpenWebifController.VolumeControl(controlPanelCommands,false,true,true);
+		
 		btnReload = OpenWebifController.createButton(null, CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true, e->{
-			initialize(baseURL);
+			OpenWebifController.runWithProgressDialog(mainWindow, "Reload Bouquet Data", this::initializeBouquetData);
+			mainWindow.pack();
 		});
 		
 		btnAddStation = OpenWebifController.createButton("Add", false, e->{
@@ -104,23 +123,36 @@ class StationSwitch {
 		labBouquet.setEnabled(false);
 		cmbbxBouquet.setEnabled(false);
 		
+		GridBagConstraints c;
+		JPanel controllerPanel = new JPanel(new GridBagLayout());
+		c = new GridBagConstraints();
+		c.fill = GridBagConstraints.BOTH;
+		c.weightx = 1;
+		controllerPanel.add(powerControl ,c);
+		controllerPanel.add(volumeControl,c);
 		
 		JPanel configPanel = new JPanel(new GridBagLayout());
-		GridBagConstraints c = new GridBagConstraints();
+		c = new GridBagConstraints();
 		c.fill = GridBagConstraints.BOTH;
 		c.insets = new Insets(1, 1, 1, 1);
 		
+		c.gridwidth = GridBagConstraints.REMAINDER;
+		c.weightx = 1;
+		configPanel.add(controllerPanel,c);
+		c.gridwidth = 1;
+		c.weightx = 0;
+		
 		c.gridheight = 2;
 		configPanel.add(btnReload,c);
-		
 		c.gridheight = 1;
+		
 		configPanel.add(labBouquet,c);
 		c.gridwidth = GridBagConstraints.REMAINDER;
 		c.weightx = 1;
 		configPanel.add(cmbbxBouquet,c);
+		c.gridwidth = 1;
 		c.weightx = 0;
 		
-		c.gridwidth = 1;
 		configPanel.add(labStation,c);
 		c.weightx = 1;
 		configPanel.add(cmbbxStation,c);
@@ -139,20 +171,28 @@ class StationSwitch {
 	private void initialize(String baseURL) {
 		if (baseURL==null) baseURL = OpenWebifController.getBaseURL(true, mainWindow);
 		this.baseURL = baseURL;
+		
+		OpenWebifController.runWithProgressDialog(mainWindow, "Initialize", pd->{
+			if (this.baseURL!=null) {
+				powerControl .initialize(this.baseURL,pd);
+				volumeControl.initialize(this.baseURL,pd);
+			}
+			initializeBouquetData(pd);
+		});
+		mainWindow.pack();
+	}
+
+	private void initializeBouquetData(ProgressDialog pd) {
 		this.bouquetData = null;
-		stationPanel.removeAll();
 		
 		if (this.baseURL!=null)
-			OpenWebifController.runWithProgressDialog(mainWindow, "Initialize", pd->{
-				bouquetData = OpenWebifTools.readBouquets(this.baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Station Switch: "+taskTitle));
-			});
+			bouquetData = OpenWebifTools.readBouquets(this.baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquet Data: "+taskTitle));
 		
 		cmbbxBouquet.setModel  (bouquetData==null ? new DefaultComboBoxModel<Bouquet>() : new DefaultComboBoxModel<Bouquet>(bouquetData.bouquets));
 		cmbbxBouquet.setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
 		labBouquet  .setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
 		cmbbxBouquet.setSelectedItem(null);
-		
-		mainWindow.pack();
+		stationPanel.removeAll();
 	}
 
 }

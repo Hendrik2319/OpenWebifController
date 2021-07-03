@@ -2,6 +2,7 @@ package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -14,13 +15,16 @@ import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.ListCellRenderer;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
+import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
@@ -107,8 +111,9 @@ class StationSwitch {
 		labStation = new JLabel("Station: ");
 		cmbbxStation = OpenWebifController.createComboBox((Bouquet.SubService subService)->{
 			selectedStation = subService;
-			btnAddStation.setEnabled(selectedStation!=null);
+			btnAddStation.setEnabled(selectedStation!=null && !selectedStation.isMarker());
 		});
+		cmbbxStation.setRenderer(new StationSwitch.StationListRenderer());
 		labStation.setEnabled(false);
 		cmbbxStation.setEnabled(false);
 		
@@ -193,6 +198,20 @@ class StationSwitch {
 		labBouquet  .setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
 		cmbbxBouquet.setSelectedItem(null);
 		stationPanel.removeAll();
+	}
+
+	private static class StationListRenderer implements ListCellRenderer<Bouquet.SubService> {
+		
+		Tables.LabelRendererComponent rendererComp = new Tables.LabelRendererComponent();
+		
+		@Override
+		public Component getListCellRendererComponent(JList<? extends Bouquet.SubService> list, Bouquet.SubService value, int index, boolean isSelected, boolean hasFocus) {
+			String valueStr = value==null ? "" : value.toString();
+			if (value!=null && value.isMarker()) valueStr = String.format("--  %s  --", valueStr);
+			rendererComp.configureAsListCellRendererComponent(list, null, valueStr, index, isSelected, hasFocus, null, ()->value!=null && value.isMarker() ? Color.GRAY : list.getForeground());
+			return rendererComp;
+		}
+	
 	}
 
 }

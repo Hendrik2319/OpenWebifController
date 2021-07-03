@@ -69,7 +69,7 @@ public class Timers extends JSplitPane {
 		JMenuItem miShowSelectedRow;
 		tableContextMenu.add(miShowSelectedRow = OpenWebifController.createMenuItem("Show Details of Selected Timer", e->{
 			String text = generateOutput(selectedTimer);
-			TextAreaDialog.showText(main.mainWindow, "Details of Selected Timer", 800, 800, true, text);
+			TextAreaDialog.showText(this.main.mainWindow, "Details of Selected Timer", 800, 800, true, text);
 		}));
 		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 			System.out.printf("Column Widths: %s%n", TimersTableModel.getColumnWidthsAsString(table));
@@ -111,7 +111,7 @@ public class Timers extends JSplitPane {
 
 	public void readData(String baseURL, ProgressDialog pd) {
 		if (baseURL==null) return;
-		timers = OpenWebifTools.readTimers(baseURL, taskTitle -> main.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));
+		timers = OpenWebifTools.readTimers(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));
 		if (timers==null) {
 			tableModel = null;
 			table.setModel(new DefaultTableModel());

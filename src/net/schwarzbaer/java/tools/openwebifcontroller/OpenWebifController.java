@@ -2,11 +2,13 @@ package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.LayoutManager;
 import java.awt.Point;
+import java.awt.Window;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
@@ -90,7 +92,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		public Icon getIcon() { return CommandIconsIS.getCachedIcon(this); }
 	}
 	
-	public static AppSettings settings;
+	public static AppSettings settings = new AppSettings();
 	public static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();
 
 	public static void main(String[] args) {
@@ -114,6 +116,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				System.out.println("  -on|-off                   Turns STB ON or OFF (=StandBy)");
 				System.out.println("  -mute                      Turns volume off");
 				System.out.println("  --reboot                   Restarts STB (Linux & GUI)");
+				System.out.println("  --stationswitch            Start StationSwitch");
 				
 			} else {
 				String baseURL = null;
@@ -121,6 +124,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				boolean turnOff = false;
 				boolean reboot = false;
 				boolean mute = false;
+				boolean stationswitch = false;
 				for (int i=0; i<args.length; i++) {
 					String str = args[i];
 					if ( (str.equalsIgnoreCase("--baseurl") || str.equalsIgnoreCase("-b")) && i+1 < args.length) {
@@ -138,18 +142,25 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 						
 					} else if (str.equalsIgnoreCase("--reboot")) {
 						reboot = true;
+						
+					} else if (str.equalsIgnoreCase("--stationswitch")) {
+						stationswitch = true;
 					}
 				}
 				
-				if (turnOn || turnOff || reboot) {
+				if (turnOn || turnOff || reboot || mute || stationswitch) {
 					if (baseURL==null) baseURL = getBaseURL_DontAskUser();
+					if (stationswitch) {
+						StationSwitch.start(baseURL,true);
+						return;
+					}
 					if (baseURL==null) {
 						System.err.println("Can't execute task: No Base URL defined.");
 					} else {
 						if      (turnOff) PowerContol.setState(baseURL, Power.Commands.Standby, System.out);
 						else if (turnOn ) PowerContol.setState(baseURL, Power.Commands.Wakeup , System.out);
 						else if (reboot ) PowerContol.setState(baseURL, Power.Commands.Reboot , System.out);
-						else if (mute   ) VolumeContol.setVolMute(baseURL, System.out);;
+						else if (mute   ) VolumeContol.setVolMute(baseURL, System.out);
 					}
 					return;
 				}
@@ -160,7 +171,6 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
 		
-		settings = new AppSettings();
 		new OpenWebifController()
 			.initialize();
 	}
@@ -265,7 +275,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		exeFileChooser.setMultiSelectionEnabled(false);
 		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
 		
-		mainWindow = new StandardMainWindow("OpenWebif Controller");
+		mainWindow = createMainWindow("OpenWebif Controller");
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new Timers(this);
@@ -304,6 +314,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		
+		JPanel stationSwitchPanel = new JPanel(new BorderLayout());
+		stationSwitchPanel.setBorder(BorderFactory.createTitledBorder("Station Switch"));
+		stationSwitchPanel.add(createButton("Show Station Switch", true, e->{
+			String baseURL = getBaseURL();
+			if (baseURL==null) return;
+			StationSwitch.start(baseURL,false);
+		}));
+		
 		JPanel epgControlPanel = new JPanel(new BorderLayout());
 		epgControlPanel.setBorder(BorderFactory.createTitledBorder("EPG"));
 		epgControlPanel.add(createButton("Show EPG", true, e->{
@@ -320,6 +338,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		toolBar.add(volumeContol   = new VolumeContol  (this), c);
 		toolBar.add(messageControl = new MessageControl(this), c);
 		toolBar.add(epgControlPanel, c);
+		toolBar.add(stationSwitchPanel, c);
 		c.weightx = 1;
 		toolBar.add(new JLabel(""), c);
 		
@@ -327,7 +346,6 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		contentPane.add(tabPanel,BorderLayout.CENTER);
 		contentPane.add(toolBar,BorderLayout.NORTH);
 		
-		mainWindow.setIconImagesFromResource("/AppIcons/AppIcon","16.png","24.png","32.png","48.png","64.png");
 		mainWindow.startGUI(contentPane, menuBar);
 		
 		if (settings.isSet(AppSettings.ValueGroup.WindowPos )) mainWindow.setLocation(settings.getWindowPos ());
@@ -341,8 +359,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		});
 	}
 	
+	static StandardMainWindow createMainWindow(String title) {
+		StandardMainWindow mainWindow = new StandardMainWindow(title);
+		mainWindow.setIconImagesFromResource("/AppIcons/AppIcon","16.png","24.png","32.png","48.png","64.png");
+		return mainWindow;
+	}
+	
 	private void initialize() {
-		ProgressDialog.runWithProgressDialog(mainWindow, "Initialize", 400, pd->{
+		runWithProgressDialog("Initialize", pd->{
 			String baseURL = getBaseURL();
 			if (baseURL==null) return;
 			
@@ -356,10 +380,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	}
 	
 	public void runWithProgressDialog(String title, Consumer<ProgressDialog> action) {
-		ProgressDialog.runWithProgressDialog(mainWindow, title, 400, action);
+		runWithProgressDialog(mainWindow, title, action);
+	}
+	public static void runWithProgressDialog(Window parent, String title, Consumer<ProgressDialog> action) {
+		ProgressDialog.runWithProgressDialog(parent, title, 400, action);
 	}
 	
-	public void setIndeterminateProgressTask(ProgressDialog pd, String taskTitle) {
+	public static void setIndeterminateProgressTask(ProgressDialog pd, String taskTitle) {
 		SwingUtilities.invokeLater(()->{
 			pd.setTaskTitle(taskTitle);
 			pd.setIndeterminate(true);
@@ -425,7 +452,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		protected void callCommand(String baseURL, ProgressDialog pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
 			setPanelEnable(false);
 			new Thread(()->{
-				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->main.setIndeterminateProgressTask(pd, String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle));
+				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->setIndeterminateProgressTask(pd, String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle));
 				
 				ValueStructType values, valuesPre = commandFcn.apply(baseURL, setTaskTitle);
 				
@@ -549,7 +576,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			
 			add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true), c);
 		}
-		
+
 		static void setState(String baseURL, Power.Commands cmd, PrintStream out) {
 			Power.Values values = Power.setState(baseURL, cmd, str->out.printf("PowerContol: %s%n", str));
 			if (values==null) out.printf("PowerContol: No Answer%n");
@@ -703,6 +730,10 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			@Override public void focusGained(FocusEvent e) {}
 		});
 		return comp;
+	}
+
+	public static <E> JComboBox<E> createComboBox(Consumer<E> setValue) {
+		return confirureComboBox(new JComboBox<E>(), null, setValue);
 	}
 
 	public static <E> JComboBox<E> createComboBox(E[] items, E initialValue, Consumer<E> setValue) {
@@ -883,6 +914,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		zapToStation(getBaseURL(), stationID);
 	}
 	@Override public void zapToStation(String baseURL, StationID stationID) {
+		zapToStation(stationID, baseURL);
+	}
+	public static void zapToStation(StationID stationID, String baseURL) {
 		if (stationID==null) return;
 		if (baseURL==null) return;
 		MessageResponse response = OpenWebifTools.zapToStation(baseURL, stationID);
@@ -929,8 +963,11 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		return getBaseURL(true);
 	}
 	public String getBaseURL(boolean askUser) {
+		return getBaseURL(askUser, mainWindow);
+	}
+	public static String getBaseURL(boolean askUser, Component parent) {
 		if (!settings.contains(AppSettings.ValueKey.BaseURL) && askUser)
-			return askUserForBaseURL();
+			return askUserForBaseURL(parent);
 		return getBaseURL_DontAskUser();
 	}
 	public static String getBaseURL_DontAskUser() {
@@ -938,7 +975,10 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	}
 
 	private String askUserForBaseURL() {
-		String baseURL = JOptionPane.showInputDialog(mainWindow, "Set BaseURL:", "Set BaseURL", JOptionPane.QUESTION_MESSAGE);
+		return askUserForBaseURL(mainWindow);
+	}
+	private static String askUserForBaseURL(Component parent) {
+		String baseURL = JOptionPane.showInputDialog(parent, "Set BaseURL:", "Set BaseURL", JOptionPane.QUESTION_MESSAGE);
 		if (baseURL!=null)
 			settings.putString(AppSettings.ValueKey.BaseURL, baseURL);
 		return baseURL;

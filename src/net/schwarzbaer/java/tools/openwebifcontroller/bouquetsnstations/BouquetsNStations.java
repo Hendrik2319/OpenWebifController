@@ -4,6 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -16,6 +18,8 @@ import java.util.Vector;
 import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -111,7 +115,7 @@ public class BouquetsNStations extends JPanel {
 		
 		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
 			this.main.runWithProgressDialog("Reload Bouquets", pd->{
-				this.main.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: Get BaseURL");
+				OpenWebifController.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: Get BaseURL");
 				String baseURL = this.main.getBaseURL();
 				if (baseURL==null) return;
 				
@@ -123,12 +127,12 @@ public class BouquetsNStations extends JPanel {
 			if (bsTreeRoot==null) return;
 			
 			this.main.runWithProgressDialog("Save Stations to TabSeparated-File", pd -> {
-				this.main.setIndeterminateProgressTask(pd, "Choose Output File");
+				OpenWebifController.setIndeterminateProgressTask(pd, "Choose Output File");
 				
 				if (txtFileChooser.showSaveDialog(mainWindow)!=FileChooser.APPROVE_OPTION) return;
 				File outFile = txtFileChooser.getSelectedFile();
 				
-				this.main.setIndeterminateProgressTask(pd, "Write to Output File");
+				OpenWebifController.setIndeterminateProgressTask(pd, "Write to Output File");
 				try (PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outFile), StandardCharsets.UTF_8))) {
 					
 					for (Bouquet bouquet:bsTreeRoot.bouquetData.bouquets)
@@ -346,7 +350,7 @@ public class BouquetsNStations extends JPanel {
 	}
 
 	private void updateCurrentStation(String baseURL, ProgressDialog pd) {
-		Consumer<String> setIndeterminateProgressTask = pd==null ? null : taskTitle -> main.setIndeterminateProgressTask(pd, "CurrentStation: "+taskTitle);
+		Consumer<String> setIndeterminateProgressTask = pd==null ? null : taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "CurrentStation: "+taskTitle);
 		
 		updateCurrentlyPlayedStationNodes(false);
 		currentStationData = OpenWebifTools.getCurrentStation(baseURL, setIndeterminateProgressTask);
@@ -427,7 +431,7 @@ public class BouquetsNStations extends JPanel {
 	public void readData(String baseURL, ProgressDialog pd) {
 		if (baseURL==null) return;
 		
-		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> main.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: "+taskTitle));
+		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: "+taskTitle));
 		
 		if (bouquetData!=null) {
 			PICON_LOADER.clear();
@@ -484,6 +488,23 @@ public class BouquetsNStations extends JPanel {
 	
 	public void    addListener(BouquetsNStationsListener listener) { bouquetsNStationsListeners.   add(listener); }
 	public void removeListener(BouquetsNStationsListener listener) { bouquetsNStationsListeners.remove(listener); }
+
+	public static Icon getScaleIcon(BufferedImage img, int newHeight, Color bgColor) {
+		BufferedImage scaledImage = scaleImage(img, newHeight, bgColor);
+		return scaledImage==null ? null : new ImageIcon(scaledImage);
+	}
+
+	public static BufferedImage scaleImage(BufferedImage img, int newHeight, Color bgColor) {
+		if (img==null) return null;
+		int h = img.getHeight();
+		int w = img.getWidth();
+		int newWidth = (int) Math.round(w*newHeight / (double)h);
+		BufferedImage newImg = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g2 = newImg.createGraphics();
+		//g2.setRenderingHint(RenderingHints., hintValue);
+		g2.drawImage(img, 0,0, newWidth,newHeight, bgColor, null);
+		return newImg;
+	}
 	
 	static class StatusOut {
 		

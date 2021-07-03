@@ -1,7 +1,6 @@
 package net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations;
 
 import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -10,7 +9,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.SwingUtilities;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
@@ -164,20 +162,7 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 		}
 	
 		static Icon getIcon(BufferedImage piconImage) {
-			BufferedImage scaledImage = scaleImage(piconImage,ROW_HEIGHT,Color.BLACK);
-			return scaledImage==null ? null : new ImageIcon(scaledImage);
-		}
-
-		private static BufferedImage scaleImage(BufferedImage img, int newHeight, Color bgColor) {
-			if (img==null) return null;
-			int h = img.getHeight();
-			int w = img.getWidth();
-			int newWidth = (int) Math.round(w*newHeight / (double)h);
-			BufferedImage newImg = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
-			Graphics2D g2 = newImg.createGraphics();
-			//g2.setRenderingHint(RenderingHints., hintValue);
-			g2.drawImage(img, 0,0, newWidth,newHeight, bgColor, null);
-			return newImg;
+			return BouquetsNStations.getScaleIcon(piconImage, ROW_HEIGHT, Color.BLACK);
 		}
 	}
 }

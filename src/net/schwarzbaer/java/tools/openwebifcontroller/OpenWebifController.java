@@ -18,6 +18,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Vector;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -43,19 +44,25 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
+import javax.swing.JScrollPane;
 import javax.swing.JSlider;
+import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.BoxSettings;
+import net.schwarzbaer.java.lib.openwebif.BoxSettings.BoxSettingsValue;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
@@ -63,6 +70,7 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
+import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
 import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
@@ -272,8 +280,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	private final PowerControl powerControl;
 	private final MessageControl messageControl;
 	private final EPG epg;
+	public SystemInfo systemInfo;
+	public HashMap<String, BoxSettings.BoxSettingsValue> boxSettings;
+	private final SystemInfoPanel systemInfoPanel;
 
 	OpenWebifController() {
+		systemInfo = null;
+		boxSettings = null;
+		
 		exeFileChooser = new JFileChooser("./");
 		exeFileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
 		exeFileChooser.setMultiSelectionEnabled(false);
@@ -284,6 +298,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new Timers(this);
 		screenShot = new ScreenShot(this);
+		systemInfoPanel = new SystemInfoPanel();
 		
 		epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
@@ -292,6 +307,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		});
 		
 		JTabbedPane tabPanel = new JTabbedPane();
+		tabPanel.addTab("System", systemInfoPanel);
 		tabPanel.addTab("Movies", movies);
 		tabPanel.addTab("Bouquets 'n' Stations", bouquetsNStations);
 		tabPanel.addTab("Timers", timers);
@@ -388,6 +404,10 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			String baseURL = getBaseURL();
 			if (baseURL==null) return;
 			
+			boxSettings = BoxSettings.getSettings (baseURL, createProgressTaskFcn(pd, "BoxSettings"));
+			systemInfo  = SystemInfo.getSystemInfo(baseURL, createProgressTaskFcn(pd, "SystemInfo"));
+			SwingUtilities.invokeLater(systemInfoPanel::update);
+			
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
 			timers           .readData(baseURL,pd);
@@ -405,6 +425,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		ProgressDialog.runWithProgressDialog(parent, title, 400, action);
 	}
 	
+	public Consumer<String> createProgressTaskFcn(ProgressDialog pd, String moduleTitle) {
+		return taskTitle -> setIndeterminateProgressTask(pd, moduleTitle+": "+taskTitle);
+	}
 	public static void setIndeterminateProgressTask(ProgressDialog pd, String taskTitle) {
 		SwingUtilities.invokeLater(()->{
 			pd.setTaskTitle(taskTitle);
@@ -1082,5 +1105,97 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			settings.putFile(valueKey, executable);
 		}
 		return executable;
+	}
+	
+	private class SystemInfoPanel extends JSplitPane {
+		private static final long serialVersionUID = -8703742093758822234L;
+		
+		private final ExtendedTextArea leftTextView;
+		private final ExtendedTextArea rightTextView;
+
+		SystemInfoPanel() {
+			super(HORIZONTAL_SPLIT,true);
+			
+			JPanel  leftPanel = new JPanel(new BorderLayout());
+			JPanel rightPanel = new JPanel(new BorderLayout());
+			leftPanel .setBorder(BorderFactory.createTitledBorder("SystemInfo"));
+			rightPanel.setBorder(BorderFactory.createTitledBorder("Settings"));
+			
+			leftTextView  = new ExtendedTextArea(false);
+			rightTextView = new ExtendedTextArea(false);
+			leftPanel .add( leftTextView.createScrollPane(500,500),BorderLayout.CENTER);
+			rightPanel.add(rightTextView.createScrollPane(500,500),BorderLayout.CENTER);
+			
+			setLeftComponent(leftPanel);
+			setRightComponent(rightPanel);
+			setResizeWeight(0.5);
+		}
+		
+		public void update() {
+			fillLeftTextView();
+			fillRightTextView();
+		}
+
+		private void fillLeftTextView() {
+			ValueListOutput out = new ValueListOutput();
+			
+			
+			
+			// TODO Auto-generated method stub
+			leftTextView.setText(out.generateOutput());
+		}
+
+		private void fillRightTextView() {
+			ValueListOutput out = new ValueListOutput();
+			
+			Vector<String> keys = new Vector<>(boxSettings.keySet());
+			keys.sort(null);
+			for (String key:keys) {
+				BoxSettingsValue settingsValue = boxSettings.get(key);
+				if (settingsValue==null)
+					out.add(0, key, "%s", "<null>");
+				else
+					out.add(0, key, "%s", settingsValue.getValueStr());
+			}
+			
+			rightTextView.setText(out.generateOutput());
+		}
+		
+	}
+	
+	public static class ExtendedTextArea extends JTextArea {
+		private static final long serialVersionUID = 147034518545703683L;
+		
+		public ExtendedTextArea() {}
+		public ExtendedTextArea(boolean isEditable) {
+			setEditable(isEditable);
+		}
+
+		public JScrollPane createScrollPane(int width, int height) {
+			JScrollPane textViewScrollPane = new JScrollPane(this);
+			textViewScrollPane.setPreferredSize(new Dimension(width,height));
+			return textViewScrollPane;
+		}
+
+		public ContextMenu createContextMenu(OpenWebifController.AppSettings.ValueKey linewrapValueKey) {
+			boolean textViewLineWrap = OpenWebifController.settings.getBool(linewrapValueKey, false);
+			return createContextMenu(textViewLineWrap, isChecked -> OpenWebifController.settings.putBool(linewrapValueKey, isChecked));
+		}
+
+		public ContextMenu createContextMenu(boolean activateLineWrap, Consumer<Boolean> setLineWrap) {
+			ContextMenu contextMenu = new ContextMenu();
+			contextMenu.addTo(this);
+			
+			setLineWrap(activateLineWrap);
+			setWrapStyleWord(activateLineWrap);
+			contextMenu.add(OpenWebifController.createCheckBoxMenuItem("Line Wrap", activateLineWrap, isChecked->{
+				setLineWrap(isChecked);
+				setWrapStyleWord(isChecked);
+				if (setLineWrap!=null) setLineWrap.accept(isChecked);
+			}) );
+			
+			return contextMenu;
+		}
+		
 	}
 }

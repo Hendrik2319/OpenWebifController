@@ -10,7 +10,6 @@ import javax.swing.JMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
@@ -24,6 +23,7 @@ import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.system.DateTimeFormatter;
 
 public class Timers extends JSplitPane {
@@ -35,7 +35,7 @@ public class Timers extends JSplitPane {
 
 	private final OpenWebifController main;
 	private final JTable table;
-	private final JTextArea textArea;
+	private final ExtendedTextArea textArea;
 	private final Vector<DataUpdateListener> dataUpdateListeners;
 	
 	public net.schwarzbaer.java.lib.openwebif.Timers timers;
@@ -79,15 +79,13 @@ public class Timers extends JSplitPane {
 			miShowSelectedRow.setEnabled(selectedTimer!=null);
 		});
 		
-		textArea = new JTextArea();
-		textArea.setEditable(false);
+		textArea = new ExtendedTextArea(false);
 		textArea.setLineWrap(true);
 		textArea.setWrapStyleWord(true);
 		
 		JScrollPane tableScrollPane = new JScrollPane(table);
-		JScrollPane textScrollPane = new JScrollPane(textArea);
 		tableScrollPane.setPreferredSize(new Dimension(1000,500));
-		textScrollPane .setPreferredSize(new Dimension(500,500));
+		JScrollPane textScrollPane = textArea.createScrollPane(500,500);
 		
 		setLeftComponent(tableScrollPane);
 		setRightComponent(textScrollPane);

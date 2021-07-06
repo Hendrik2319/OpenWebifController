@@ -19,7 +19,6 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
 import javax.swing.JTree;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -39,6 +38,7 @@ import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
 import net.schwarzbaer.system.DateTimeFormatter;
 
@@ -52,8 +52,8 @@ class Movies extends JSplitPane {
 	
 	private final JTree locationsTree;
 	private final JTable movieTable;
-	private final JTextArea movieInfo1;
-	private final JTextArea movieInfo2;
+	private final ExtendedTextArea movieInfo1;
+	private final ExtendedTextArea movieInfo2;
 	
 	private LocationTreeNode locationsRoot;
 	private DefaultTreeModel locationsTreeModel;
@@ -141,23 +141,17 @@ class Movies extends JSplitPane {
 		});
 		
 		
-		movieInfo1 = new JTextArea();
-		movieInfo1.setEditable(false);
+		movieInfo1 = new ExtendedTextArea(false);
 		//movieInfo1.setLineWrap(true);
 		//movieInfo1.setWrapStyleWord(true);
-		JScrollPane movieInfo1ScrollPane = new JScrollPane(movieInfo1);
-		movieInfo1ScrollPane.setPreferredSize(new Dimension(400,330));
 		
-		movieInfo2 = new JTextArea();
-		movieInfo2.setEditable(false);
+		movieInfo2 = new ExtendedTextArea(false);
 		movieInfo2.setLineWrap(true);
 		movieInfo2.setWrapStyleWord(true);
-		JScrollPane movieInfo2ScrollPane = new JScrollPane(movieInfo2);
-		movieInfo2ScrollPane.setPreferredSize(new Dimension(400,300));
 		
 		JPanel movieInfoPanel = new JPanel(new BorderLayout(3,3));
-		movieInfoPanel.add(movieInfo1ScrollPane,BorderLayout.NORTH);
-		movieInfoPanel.add(movieInfo2ScrollPane,BorderLayout.CENTER);
+		movieInfoPanel.add(movieInfo1.createScrollPane(400,330),BorderLayout.NORTH);
+		movieInfoPanel.add(movieInfo2.createScrollPane(400,300),BorderLayout.CENTER);
 		
 		JPanel rightPanel = new JPanel(new BorderLayout(3,3));
 		rightPanel.add(tableScrollPane,BorderLayout.CENTER);

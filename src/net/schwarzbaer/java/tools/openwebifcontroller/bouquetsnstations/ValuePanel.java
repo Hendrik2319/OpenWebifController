@@ -8,7 +8,6 @@ import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
 import javax.swing.tree.TreePath;
 
 import net.schwarzbaer.gui.ContextMenu;
@@ -17,11 +16,12 @@ import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 
 class ValuePanel {
 	private final Supplier<String> getBaseURL;
 	private final ImageView imageView;
-	private final JTextArea textView;
+	private final ExtendedTextArea textView;
 	final JSplitPane panel;
 	private TextUpdateTask runningTask;
 	private boolean updateEPGAlways;
@@ -41,17 +41,14 @@ class ValuePanel {
 		imageView.setBgColor(Color.BLACK);
 		imageView.reset();
 		
-		textView = new JTextArea();
-		textView.setEditable(false);
+		textView = new ExtendedTextArea(false);
+		JScrollPane textViewScrollPane = textView.createScrollPane(400,500);
 		
-		JScrollPane textViewScrollPane = new JScrollPane(textView);
-		textViewScrollPane.setPreferredSize(new Dimension(400,500));
-		
-		panel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,imageView,textViewScrollPane);
+		panel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, imageView, textViewScrollPane);
 		panel.setPreferredSize(new Dimension(300,500));
 		
-		ContextMenu textViewContextMenu = new ContextMenu();
-		textViewContextMenu.addTo(textView);
+		ContextMenu textViewContextMenu = textView.createContextMenu(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_TextViewLineWrap);
+		textViewContextMenu.addSeparator();
 		
 		JMenuItem miUpdateEPG;
 		JCheckBoxMenuItem miUpdateEPGAlways;
@@ -64,17 +61,6 @@ class ValuePanel {
 		textViewContextMenu.add(miUpdateEPG = OpenWebifController.createMenuItem("Update EPG Now", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
 			if (shownStationNode != null)
 				startEpgUpdate(shownStationNode, this.getBaseURL.get());
-		}) );
-		
-		textViewContextMenu.addSeparator();
-		
-		boolean textViewLineWrap = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_TextViewLineWrap, false);
-		textView.setLineWrap(textViewLineWrap);
-		textView.setWrapStyleWord(textViewLineWrap);
-		textViewContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Line Wrap", textViewLineWrap, isChecked->{
-			textView.setLineWrap(isChecked);
-			textView.setWrapStyleWord(isChecked);
-			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_TextViewLineWrap, isChecked);
 		}) );
 		
 		textViewContextMenu.addContextMenuInvokeListener((comp, x, y) -> {

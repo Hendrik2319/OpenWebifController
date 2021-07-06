@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -41,6 +42,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JSlider;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
@@ -88,6 +90,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	public enum CommandIcons {
 		Muted, UnMuted, Up, Down, OnOff, Reload, Image, Save,
 		Muted_Dis, UnMuted_Dis, Up_Dis, Down_Dis, OnOff_Dis, Reload_Dis, Image_Dis, Save_Dis,
+		LED_green, LED_yellow,
 		;
 		public Icon getIcon() { return CommandIconsIS.getCachedIcon(this); }
 	}
@@ -264,6 +267,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	private final Movies movies;
 	private final BouquetsNStations bouquetsNStations;
 	private final Timers timers;
+	private final ScreenShot screenShot;
 	private final VolumeControl volumeControl;
 	private final PowerControl powerControl;
 	private final MessageControl messageControl;
@@ -279,6 +283,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new Timers(this);
+		screenShot = new ScreenShot(this);
 		
 		epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
@@ -290,6 +295,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		tabPanel.addTab("Movies", movies);
 		tabPanel.addTab("Bouquets 'n' Stations", bouquetsNStations);
 		tabPanel.addTab("Timers", timers);
+		tabPanel.addTab("ScreenShot", screenShot);
 		tabPanel.setSelectedIndex(1);
 		
 		JMenuBar menuBar = new JMenuBar();
@@ -385,6 +391,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
 			timers           .readData(baseURL,pd);
+			screenShot    .initialize(baseURL,pd);
 			powerControl  .initialize(baseURL,pd);
 			volumeControl .initialize(baseURL,pd);
 			messageControl.initialize(baseURL,pd);
@@ -520,10 +527,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			messageType = OpenWebifTools.MessageType.INFO;
 			
 			txtfldMessage = createTextField("", 10, null);
-			txtfldTimeOut = createTextField("", 4, str->{
-				try { return Integer.parseInt(str); }
-				catch (NumberFormatException e1) { return null; }
-			}, n->n>0, n->timeOut=n);
+			txtfldTimeOut = createTextField("", 4, OpenWebifController::parseInt, n->n>0, n->timeOut=n);
 			
 			chkbxTimeOut = createCheckBox("Time Out", false, b->{
 				txtfldTimeOut.setEditable(b);
@@ -751,11 +755,17 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	static String getCurrentTimeStr() {
 		return dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
 	}
-
+	
+	public static JRadioButton createRadioButton(String text, ButtonGroup bg, boolean selected, Consumer<Boolean> setValue) {
+		JRadioButton comp = new JRadioButton(text,selected);
+		if (bg!=null) bg.add(comp);
+		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
+		return comp;
+	}
+	
 	public static JCheckBox createCheckBox(String text, boolean selected, Consumer<Boolean> setValue) {
 		JCheckBox comp = new JCheckBox(text, selected);
-		if (setValue!=null)
-			comp.addActionListener(e->setValue.accept(comp.isSelected()));
+		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
 		return comp;
 	}
 
@@ -769,6 +779,11 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			});
 		}
 		return comp;
+	}
+
+	public static Integer parseInt(String str) {
+		try { return Integer.parseInt(str); }
+		catch (NumberFormatException e1) { return null; }
 	}
 
 	public static <ValueType> JTextField createTextField(String initialValue, int columns, Function<String,ValueType> convert, Predicate<ValueType> isOk, Consumer<ValueType> setValue) {

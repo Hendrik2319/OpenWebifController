@@ -26,15 +26,17 @@ import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.Comman
 class ScreenShot extends JPanel {
 	private static final long serialVersionUID = 4685951556648091350L;
 	
+	private final RemoteControlPanel remoteControl;
 	private final ImageView screenshotView;
 	private final ScreenShotUpdater screenShotUpdater;
+	private final JButton updateButton;
+	
 	private OpenWebifTools.ScreenShotType content;
 	private OpenWebifTools.ScreenShotResolution resolution;
 
-	private JButton updateButton;
-
-	public ScreenShot(OpenWebifController main) {
+	public ScreenShot(OpenWebifController main, RemoteControlPanel remoteControl) {
 		super(new BorderLayout(3,3));
+		this.remoteControl = remoteControl;
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		// initial values
@@ -90,9 +92,9 @@ class ScreenShot extends JPanel {
 		
 		configPanel.add(updatePanel,c);
 		
-		
-		JPanel remoteControlPanel = new JPanel();
+		JPanel remoteControlPanel = new JPanel(new BorderLayout());
 		remoteControlPanel.setBorder(BorderFactory.createTitledBorder("Remote Control"));
+		remoteControlPanel.add(this.remoteControl.createScrollPane(),BorderLayout.CENTER);
 		
 		JPanel leftPanel = new JPanel(new BorderLayout(3,3));
 		leftPanel.add(configPanel,BorderLayout.NORTH);

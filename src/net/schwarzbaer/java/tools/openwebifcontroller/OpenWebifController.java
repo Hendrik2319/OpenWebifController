@@ -14,7 +14,6 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -70,7 +69,6 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
 import net.schwarzbaer.java.lib.openwebif.Power;
-import net.schwarzbaer.java.lib.openwebif.RemoteControl;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
@@ -285,7 +283,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	public SystemInfo systemInfo;
 	public HashMap<String, BoxSettings.BoxSettingsValue> boxSettings;
 	private final SystemInfoPanel systemInfoPanel;
-	private RemoteControl remoteControl;
+	private RemoteControlPanel remoteControl;
 
 	OpenWebifController() {
 		systemInfo = null;
@@ -300,7 +298,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new Timers(this);
-		screenShot = new ScreenShot(this);
+		screenShot = new ScreenShot(this, remoteControl = new RemoteControlPanel());
 		systemInfoPanel = new SystemInfoPanel();
 		
 		epg = new EPG(new EPG.Tools() {
@@ -410,17 +408,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			boxSettings = BoxSettings.getSettings (baseURL, createProgressTaskFcn(pd, "BoxSettings"));
 			systemInfo  = SystemInfo.getSystemInfo(baseURL, createProgressTaskFcn(pd, "SystemInfo"));
 			SwingUtilities.invokeLater(systemInfoPanel::update);
-			remoteControl = systemInfo==null ? null : new RemoteControl(systemInfo);
-			if (remoteControl!=null) {
-				Consumer<String> progressTaskFcn = createProgressTaskFcn(pd, "RemoteControl");
-				@SuppressWarnings("unused") BufferedImage remoteControlImage = remoteControl.getRemoteControlImage(baseURL, progressTaskFcn);
-				@SuppressWarnings("unused") RemoteControl.Key[] keys = remoteControl.getKeys(baseURL, progressTaskFcn);
-			}
 			
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
 			timers           .readData(baseURL,pd);
 			screenShot    .initialize(baseURL,pd);
+			remoteControl .initialize(baseURL,pd,systemInfo);
 			powerControl  .initialize(baseURL,pd);
 			volumeControl .initialize(baseURL,pd);
 			messageControl.initialize(baseURL,pd);

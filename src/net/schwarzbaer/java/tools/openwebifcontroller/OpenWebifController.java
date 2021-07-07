@@ -298,7 +298,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new Timers(this);
-		screenShot = new ScreenShot(this, remoteControl = new RemoteControlPanel());
+		screenShot = new ScreenShot(this, remoteControl = new RemoteControlPanel(this));
 		systemInfoPanel = new SystemInfoPanel();
 		
 		epg = new EPG(new EPG.Tools() {

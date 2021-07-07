@@ -7,7 +7,12 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
+import java.util.Vector;
 import java.util.function.Consumer;
 
 import javax.swing.JScrollPane;
@@ -15,32 +20,41 @@ import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.gui.Canvas;
 import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.RemoteControl;
+import net.schwarzbaer.java.lib.openwebif.RemoteControl.Key;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 
-public class RemoteControlPanel extends Canvas {
+public class RemoteControlPanel extends Canvas implements MouseListener, MouseMotionListener, MouseWheelListener {
 	private static final long serialVersionUID = 1313654798825197434L;
 	
+	private static final Color COLOR_KEY = new Color(0x80808080,true);
+	private static final Color COLOR_HOVEREDKEY = Color.YELLOW;
+	private static final String TEXT_NOKEY = "<none>";
+	
+	private final OpenWebifController main;
+	private final Vector<KeyPressListener> keyPressListeners = new Vector<>();
 	private RemoteControl remoteControl = null;
 	private BufferedImage remoteControlImage = null;
 	private RemoteControl.Key[] keys = null;
 	private JScrollPane scrollPane = null;
+	private RemoteControl.Key hoveredKey = null;
+	private Point lastMousePoint = null;
 	
-	RemoteControlPanel() {
-		setToolTipText("RemoteControl");
+	RemoteControlPanel(OpenWebifController main) {
+		this.main = main;
+		setToolTipText(TEXT_NOKEY);
+		addMouseListener(this);
+		addMouseMotionListener(this);
+		//addMouseWheelListener(this);
 	}
-
-	@Override
-	public String getToolTipText(MouseEvent event) {
-		// TODO Auto-generated method stub
-		return super.getToolTipText(event);
+	
+	public interface KeyPressListener {
+		void keyWasPressed();
 	}
-
-	@Override
-	public Point getToolTipLocation(MouseEvent event) {
-		// TODO Auto-generated method stub
-		return event.getPoint();
-	}
+	
+	public void    addKeyPressListener(KeyPressListener kpl) { keyPressListeners.   add(kpl); }
+	public void removeKeyPressListener(KeyPressListener kpl) { keyPressListeners.remove(kpl); }
 
 	public JScrollPane createScrollPane() {
 		scrollPane = new JScrollPane(this);
@@ -50,11 +64,90 @@ public class RemoteControlPanel extends Canvas {
 		scrollPane.getHorizontalScrollBar().setUnitIncrement(5);
 		scrollPane.getVerticalScrollBar  ().setUnitIncrement(5);
 		scrollPane.setBorder(null);
+		scrollPane.addMouseWheelListener(this);
 		return scrollPane;
 	}
 
+	private void printMouseEvent(MouseEvent e, String eventType) {
+		//System.out.printf("M(%10s,%d,%d) is %sconsumed%n", eventType.trim(), e.getX(), e.getY(), e.isConsumed() ? "" : "NOT ");
+	}
+
+	@Override public void mouseDragged   (MouseEvent      e) { updateHoveredKey(e.getPoint()); repaint(); printMouseEvent(e,"Dragged   "); }
+	@Override public void mouseMoved     (MouseEvent      e) { updateHoveredKey(e.getPoint()); repaint(); printMouseEvent(e,"Moved     "); }
+	@Override public void mouseClicked   (MouseEvent      e) { updateHoveredKey(e.getPoint()); repaint(); printMouseEvent(e,"Clicked   "); clickKey(); }
+	@Override public void mousePressed   (MouseEvent      e) { updateHoveredKey(e.getPoint()); repaint(); printMouseEvent(e,"Pressed   "); }
+	@Override public void mouseReleased  (MouseEvent      e) { updateHoveredKey(e.getPoint()); repaint(); printMouseEvent(e,"Released  "); }
+	@Override public void mouseEntered   (MouseEvent      e) { updateHoveredKey(e.getPoint()); repaint(); printMouseEvent(e,"Entered   "); }
+	@Override public void mouseExited    (MouseEvent      e) { hoveredKey = null;              repaint(); printMouseEvent(e,"Exited    "); }
+//	@Override public void mouseWheelMoved(MouseWheelEvent e) { lastMousePoint=null; updateHoveredKey(e.getPoint()); repaint(); printMouseEvent(e,"WheelMoved"); }
+	@Override public void mouseWheelMoved(MouseWheelEvent e) { lastMousePoint=null; hoveredKey = null;              repaint(); printMouseEvent(e,"WheelMoved"); }
+
+	private void clickKey() {
+		if (hoveredKey==null) return;
+		String baseURL = main.getBaseURL();
+		if (baseURL==null) return;
+		MessageResponse response = remoteControl.sendKeyPress(baseURL,hoveredKey,null);
+		OpenWebifController.showMessageResponse(null, response, "RemoteControl.sendKeyPress");
+		for (KeyPressListener kpl:keyPressListeners)
+			kpl.keyWasPressed();
+	}
+
+	@Override
+	public String getToolTipText(MouseEvent event) {
+		Point p = event.getPoint();
+		//System.out.printf("getToolTipText( %d,%d )%n", p.x,p.y);
+		updateHoveredKey(p);
+		if (hoveredKey==null) return TEXT_NOKEY;
+		return String.format("%s (%s)", hoveredKey.title, hoveredKey.keyCode);
+	}
+
+	private void updateHoveredKey(Point p) {
+		
+		if (lastMousePoint!=null && lastMousePoint.x==p.x && lastMousePoint.y==p.y)
+			return;
+		
+		lastMousePoint = p;
+		
+		if (hoveredKey!=null && !isOverKey(p,hoveredKey))
+			hoveredKey = null;
+		
+		if (hoveredKey==null && keys!=null) {
+			for (RemoteControl.Key key : keys) {
+				if (isOverKey(p,key)) {
+					hoveredKey = key;
+					//System.out.printf("Hovered Key: %s%n", hoveredKey);
+					break;
+				}
+			}
+		}
+	}
+
+	private boolean isOverKey(Point p, Key key) {
+		if (p==null) return false;
+		if (key==null) return false;
+		if (key.shape==null) return false;
+		
+		switch (key.shape.type) {
+		case Circle:
+			return key.shape.center.distanceSq(p) <= key.shape.radius*key.shape.radius;
+			
+		case Rect:
+			Point c1 = key.shape.corner1;
+			Point c2 = key.shape.corner2;
+			return p.x>=c1.x && p.y>=c1.y  &&  p.x<=c2.x && p.y<=c2.y;
+		}
+		
+		return false;
+	}
+
+	@Override
+	public Point getToolTipLocation(MouseEvent event) {
+		Point p = event.getPoint();
+		return new Point(p.x+16,p.y);
+	}
+
 	public void initialize(String baseURL, ProgressDialog pd, SystemInfo systemInfo) {
-		Consumer<String> progressTaskFcn = taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Remote Control: "+taskTitle);;
+		Consumer<String> progressTaskFcn = taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Remote Control: "+taskTitle);
 		remoteControl = systemInfo==null ? null : new RemoteControl(systemInfo);
 		if (remoteControl!=null) {
 			remoteControlImage = remoteControl.getRemoteControlImage(baseURL, progressTaskFcn);
@@ -92,28 +185,35 @@ public class RemoteControlPanel extends Canvas {
 		}
 	}
 
-	private void paintKeys(Graphics g, int x, int y) {
+	private void paintKeys(Graphics g, int x0, int y0) {
 		if (keys!=null) {
-			g.setColor(Color.MAGENTA);
-			for (RemoteControl.Key key : keys) {
-				if (key.shape==null) continue;
-				switch (key.shape.type) {
-				
-				case Circle:
-					Point c = key.shape.center;
-					int r = key.shape.radius;
-					g.drawOval(x+c.x-r, y+c.y-r, 2*r, 2*r);
-					break;
-					
-				case Rect:
-					Point c1_ = key.shape.corner1;
-					Point c2_ = key.shape.corner2;
-					Point c1 = new Point(Math.min(c1_.x,c2_.x), Math.min(c1_.y,c2_.y));
-					Point c2 = new Point(Math.max(c1_.x,c2_.x), Math.max(c1_.y,c2_.y));
-					g.drawRect(x+c1.x, y+c1.y, c2.x-c1.x, c2.y-c1.y);
-					break;
-				}
+			g.setColor(COLOR_KEY);
+			for (RemoteControl.Key key : keys)
+				if (key!=hoveredKey)
+					paintKey(g, x0, y0, key);
+			if (hoveredKey!=null) {
+				g.setColor(COLOR_HOVEREDKEY);
+				paintKey(g, x0, y0, hoveredKey);
 			}
+		}
+	}
+
+	private void paintKey(Graphics g, int x0, int y0, RemoteControl.Key key) {
+		if (key.shape==null) return;
+		
+		switch (key.shape.type) {
+		
+		case Circle:
+			Point c = key.shape.center;
+			int r = key.shape.radius;
+			g.drawOval(x0+c.x-r, y0+c.y-r, 2*r, 2*r);
+			break;
+			
+		case Rect:
+			Point c1 = key.shape.corner1;
+			Point c2 = key.shape.corner2;
+			g.drawRect(x0+c1.x, y0+c1.y, c2.x-c1.x, c2.y-c1.y);
+			break;
 		}
 	}
 	

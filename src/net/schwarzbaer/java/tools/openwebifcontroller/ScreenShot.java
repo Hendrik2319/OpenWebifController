@@ -37,11 +37,12 @@ class ScreenShot extends JPanel {
 	public ScreenShot(OpenWebifController main, RemoteControlPanel remoteControl) {
 		super(new BorderLayout(3,3));
 		this.remoteControl = remoteControl;
+		this.remoteControl.addKeyPressListener(this::updateScreenShot);
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		// initial values
 		content = OpenWebifTools.ScreenShotType.TVnOSD;
-		resolution = OpenWebifTools.ScreenShotResolution.R720;
+		resolution = OpenWebifTools.ScreenShotResolution.HighRes;
 		int updateInterval_s = 30;
 		
 		screenshotView = new ImageView(800,600);

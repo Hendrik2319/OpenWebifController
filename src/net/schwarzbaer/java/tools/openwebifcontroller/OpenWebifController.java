@@ -412,8 +412,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			movies.readInitialMovieList(baseURL,pd);
 			bouquetsNStations.readData(baseURL,pd);
 			timers           .readData(baseURL,pd);
-			screenShot    .initialize(baseURL,pd);
 			remoteControl .initialize(baseURL,pd,systemInfo);
+			screenShot    .initialize(baseURL,pd);
 			powerControl  .initialize(baseURL,pd);
 			volumeControl .initialize(baseURL,pd);
 			messageControl.initialize(baseURL,pd);

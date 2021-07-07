@@ -58,6 +58,7 @@ class ScreenShot extends JPanel {
 		updatePanel.setBorder(BorderFactory.createTitledBorder("Update"));
 		c = new GridBagConstraints();
 		c.fill = GridBagConstraints.BOTH;
+		c.weightx = 1;
 		
 		c.gridwidth = GridBagConstraints.REMAINDER;
 		updatePanel.add(OpenWebifController.createCheckBox("Automatic Update", false, b->{
@@ -66,7 +67,9 @@ class ScreenShot extends JPanel {
 		}),c);
 		
 		c.gridwidth = 1;
+		c.weightx = 0;
 		updatePanel.add(new JLabel("Interval (s): "),c);
+		c.weightx = 1;
 		c.gridwidth = GridBagConstraints.REMAINDER;
 		updatePanel.add(OpenWebifController.createTextField(Integer.toString(updateInterval_s), 6, OpenWebifController::parseInt, n->n>0, screenShotUpdater::changeInterval),c);
 		
@@ -76,6 +79,7 @@ class ScreenShot extends JPanel {
 		c = new GridBagConstraints();
 		c.fill = GridBagConstraints.BOTH;
 		c.gridwidth = GridBagConstraints.REMAINDER;
+		c.weightx = 1;
 		
 		ButtonGroup bgContent = new ButtonGroup();
 		configPanel.add(createGridPanel("Content",
@@ -114,6 +118,7 @@ class ScreenShot extends JPanel {
 	public void initialize(String baseURL, ProgressDialog pd) {
 		OpenWebifController.setIndeterminateProgressTask(pd, "ScreenShot: Read Image");
 		updateScreenShot(baseURL);
+		SwingUtilities.invokeLater(this::revalidate);
 	}
 
 	private void updateScreenShot(String baseURL) {

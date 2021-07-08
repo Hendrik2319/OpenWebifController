@@ -34,20 +34,20 @@ public class RemoteControlTool {
 	private final StandardMainWindow mainWindow;
 	
 	RemoteControlTool() {
-		mainWindow = new StandardMainWindow("RemoteControl Tool");
+		mainWindow = OpenWebifController.createMainWindow("RemoteControl Tool", false);
 		
-		JPanel firstCommandsPanel = new JPanel(new GridLayout(0,1,3,3));
-		firstCommandsPanel.setBorder(BorderFactory.createTitledBorder("Other Commands"));
-		firstCommandsPanel.add(createButton("Show Key Mappings", true, e->{
+		JPanel otherCommandsPanel = new JPanel(new GridLayout(0,1,3,3));
+		otherCommandsPanel.setBorder(BorderFactory.createTitledBorder("Other Commands"));
+		otherCommandsPanel.add(createButton("Show Key Mappings", true, e->{
 			String baseURL = OpenWebifController.getBaseURL(true, mainWindow);
 			if (baseURL==null) return;
 			showKeyMappings(baseURL);
 		}));
 		
-		JPanel secondCommandsPanel = new JPanel(new GridLayout(0,1,3,3));
-		secondCommandsPanel.setBorder(BorderFactory.createTitledBorder("RemoteControl Maps"));
+		JPanel remoteControlMapsPanel = new JPanel(new GridLayout(0,1,3,3));
+		remoteControlMapsPanel.setBorder(BorderFactory.createTitledBorder("RemoteControl Maps"));
 		for (String machine:machines)
-			secondCommandsPanel.add(createButton(String.format("Edit RemoteControl Map for \"%s\"",machine),true,e->{
+			remoteControlMapsPanel.add(createButton(String.format("Edit Map for \"%s\"",machine),true,e->{
 				String baseURL = OpenWebifController.getBaseURL(true, mainWindow);
 				if (baseURL==null) return;
 				
@@ -65,10 +65,11 @@ public class RemoteControlTool {
 		
 		JPanel contentPane = new JPanel(new BorderLayout(3,3));
 		contentPane.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
-		contentPane.add(firstCommandsPanel, BorderLayout.NORTH);
-		contentPane.add(secondCommandsPanel, BorderLayout.CENTER);
+		contentPane.add(remoteControlMapsPanel, BorderLayout.CENTER);
+		contentPane.add(otherCommandsPanel, BorderLayout.SOUTH);
 		
 		mainWindow.startGUI(contentPane);
+		mainWindow.setResizable(false);
 		
 	}
 

@@ -7,5 +7,6 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/JavaLib_JSON_Parser"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/CommonLib_Dialogs"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/JavaLib_OpenWebif"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ImageMapEditor"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

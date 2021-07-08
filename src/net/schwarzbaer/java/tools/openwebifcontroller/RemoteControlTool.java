@@ -28,6 +28,7 @@ public class RemoteControlTool {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
 		new RemoteControlTool();
+		// showKeyMappings();
 	}
 
 	private final StandardMainWindow mainWindow;
@@ -37,7 +38,11 @@ public class RemoteControlTool {
 		
 		JPanel firstCommandsPanel = new JPanel(new GridLayout(0,1,3,3));
 		firstCommandsPanel.setBorder(BorderFactory.createTitledBorder("Other Commands"));
-		firstCommandsPanel.add(createButton("Show Key Mappings", true, e->{ showKeyMappings(); }));
+		firstCommandsPanel.add(createButton("Show Key Mappings", true, e->{
+			String baseURL = OpenWebifController.getBaseURL(true, mainWindow);
+			if (baseURL==null) return;
+			showKeyMappings(baseURL);
+		}));
 		
 		JPanel secondCommandsPanel = new JPanel(new GridLayout(0,1,3,3));
 		secondCommandsPanel.setBorder(BorderFactory.createTitledBorder("RemoteControl Maps"));
@@ -87,8 +92,13 @@ public class RemoteControlTool {
 		return comp;
 	}
 
+	@SuppressWarnings("unused")
 	private static void showKeyMappings() {
 		String baseURL = OpenWebifController.getBaseURL_DontAskUser();
+		showKeyMappings(baseURL);
+	}
+
+	private static void showKeyMappings(String baseURL) {
 		System.out.printf("baseURL: \"%s\"%n", baseURL);
 		
 		HashMap<String,HashMap<String,Vector<String>>> keyMappings = new HashMap<>();

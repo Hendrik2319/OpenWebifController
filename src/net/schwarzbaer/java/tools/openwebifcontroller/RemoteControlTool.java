@@ -17,6 +17,7 @@ import javax.swing.UnsupportedLookAndFeelException;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.RemoteControl;
+import net.schwarzbaer.java.tools.imagemapeditor.Area;
 import net.schwarzbaer.java.tools.imagemapeditor.ImageMapEditor;
 import net.schwarzbaer.java.tools.imagemapeditor.ImageMapEditor.MapImage;
 
@@ -59,7 +60,7 @@ public class RemoteControlTool {
 				RemoteControl.Key[] keys = RemoteControl.getKeys(baseURL, machine, taskTitle -> System.out.printf("RemoteControlTool: %s%n", taskTitle));
 				if (keys==null) return;
 				
-				ImageMapEditor.Area[] areas = Arrays.stream(keys).map(this::convert).toArray(ImageMapEditor.Area[]::new);
+				Area[] areas = Arrays.stream(keys).map(this::convert).toArray(Area[]::new);
 				ImageMapEditor.show(String.format("RemoteControl Map for \"%s\"",machine), mapImage, new Vector<>(Arrays.asList(areas)));
 			}));
 		
@@ -73,15 +74,15 @@ public class RemoteControlTool {
 		
 	}
 
-	private ImageMapEditor.Area convert(RemoteControl.Key key) {
+	private Area convert(RemoteControl.Key key) {
 		String onclick = String.format("pressMenuRemote('%s');", key.keyCode);
-		return new ImageMapEditor.Area(convert(key.shape), key.title, onclick);
+		return new Area(convert(key.shape), key.title, onclick);
 	}
 
-	private ImageMapEditor.Area.Shape convert(RemoteControl.Key.Shape shape) {
+	private Area.Shape convert(RemoteControl.Key.Shape shape) {
 		switch (shape.type) {
-		case Circle: return new ImageMapEditor.Area.Shape(new Point(shape.center),shape.radius);
-		case Rect  : return new ImageMapEditor.Area.Shape(new Point(shape.corner1),new Point(shape.corner2));
+		case Circle: return new Area.Shape(new Point(shape.center),shape.radius);
+		case Rect  : return new Area.Shape(new Point(shape.corner1),new Point(shape.corner2));
 		}
 		throw new IllegalArgumentException();
 	}

@@ -61,7 +61,9 @@ public class RemoteControlTool {
 				if (keys==null) return;
 				
 				Area[] areas = Arrays.stream(keys).map(this::convert).toArray(Area[]::new);
-				ImageMapEditor.show(String.format("RemoteControl Map for \"%s\"",machine), mapImage, new Vector<>(Arrays.asList(areas)));
+				String title = String.format("RemoteControl Map for \"%s\"",machine);
+				String suggestedHtmlOutFileName = String.format("keymapping_%s.html", machine);
+				ImageMapEditor.show(title, mapImage, new Vector<>(Arrays.asList(areas)), suggestedHtmlOutFileName);
 			}));
 		
 		JPanel contentPane = new JPanel(new BorderLayout(3,3));

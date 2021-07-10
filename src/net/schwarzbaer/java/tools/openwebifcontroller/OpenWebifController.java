@@ -1141,123 +1141,126 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		private void fillLeftTextView() {
 			ValueListOutput out = new ValueListOutput();
 			
-			out.add(0, "Firmware");
-			/* String  */ out.add(1, "Image"              , systemInfo.info.friendlyimagedistro);
-			/* String  */ out.add(1, null                 , systemInfo.info.imagedistro        );
-			/* String  */ out.add(1, "Image Version"      , systemInfo.info.imagever           );
-			/* String  */ out.add(1, "OE Version"         , systemInfo.info.oever              );
-			/* String  */ out.add(1, "Enigma Version"     , systemInfo.info.enigmaver          );
-			/* String  */ out.add(1, "OpenWebif Version"  , systemInfo.info.webifver           );
-			/* String  */ out.add(1, "Kernel Verion"      , systemInfo.info.kernelver          );
-			/* String  */ out.add(1, "Driver Date"        , systemInfo.info.driverdate         );
-			
-			out.add(0, "");
-			out.add(0, "Hardware");
-			/* String  */ out.add(1, "Brand"        , systemInfo.info.brand       );
-			/* String  */ out.add(1, "Model"        , systemInfo.info.model       );
-			/* String  */ out.add(1, "Box Type"     , systemInfo.info.boxtype     );
-			/* String  */ out.add(1, "Machine Build", systemInfo.info.machinebuild);
-			
-			/* String  */ out.add(1, "Chipset"       , systemInfo.info.friendlychipsettext       );
-			/* String  */ out.add(1, null            , systemInfo.info.chipset                   );
-			/* String  */ out.add(1, "Chipset Descr.", systemInfo.info.friendlychipsetdescription);
-			
-			/* String  */ out.add(1, "mem1", systemInfo.info.mem1);
-			/* String  */ out.add(1, "mem2", systemInfo.info.mem2);
-			/* String  */ out.add(1, "mem3", systemInfo.info.mem3);
-			
-			out.add(0, "");
-			out.add(0, "Miscellaneous");
-			/* String  */ out.add(1, "Uptime"         , systemInfo.info.uptime                    );
-			/* long    */ out.add(1, "lcd"            , systemInfo.info.lcd                       );
-			/* long    */ out.add(1, "grabpip"        , systemInfo.info.grabpip                   );
-			/* boolean */ out.add(1, "timerautoadjust", systemInfo.info.timerautoadjust           );
-			/* boolean */ out.add(1, "timerpipzap"    , systemInfo.info.timerpipzap               );
-			/* boolean */ out.add(1, "transcoding"    , systemInfo.info.transcoding               );
-			/* String  */ out.add(1, "EX"             , systemInfo.info.EX);
-			
-			/* Null  */ //out.add(0, "label", systemInfo.info.fp_version);
-			
-			if (!systemInfo.info.streams.isEmpty()) {
+			if (systemInfo!=null && systemInfo.info!=null) {
+				out.add(0, "Firmware");
+				/* String  */ out.add(1, "Image"              , systemInfo.info.friendlyimagedistro);
+				/* String  */ out.add(1, null                 , systemInfo.info.imagedistro        );
+				/* String  */ out.add(1, "Image Version"      , systemInfo.info.imagever           );
+				/* String  */ out.add(1, "OE Version"         , systemInfo.info.oever              );
+				/* String  */ out.add(1, "Enigma Version"     , systemInfo.info.enigmaver          );
+				/* String  */ out.add(1, "OpenWebif Version"  , systemInfo.info.webifver           );
+				/* String  */ out.add(1, "Kernel Verion"      , systemInfo.info.kernelver          );
+				/* String  */ out.add(1, "Driver Date"        , systemInfo.info.driverdate         );
+				
 				out.add(0, "");
-				out.add(0, "Streams");
-				for (int i=0; i<systemInfo.info.streams.size(); i++) {
-					SystemInfo.Stream stream = systemInfo.info.streams.get(i);
-					out.add(1, "Stream "+(i+1));
-					/* String */ out.add(2, "Client IP"   , stream.ip       );
-					/* String */ out.add(2, "Station Name", stream.name     );
-					/* String */ out.add(2, "Station Ref" , stream.ref      );
-					/* String */ out.add(2, "Type"        , stream.type     );
-					/* String */ out.add(2, "Event Name"  , stream.eventname);
+				out.add(0, "Hardware");
+				/* String  */ out.add(1, "Brand"        , systemInfo.info.brand       );
+				/* String  */ out.add(1, "Model"        , systemInfo.info.model       );
+				/* String  */ out.add(1, "Box Type"     , systemInfo.info.boxtype     );
+				/* String  */ out.add(1, "Machine Build", systemInfo.info.machinebuild);
+				
+				/* String  */ out.add(1, "Chipset"       , systemInfo.info.friendlychipsettext       );
+				/* String  */ out.add(1, null            , systemInfo.info.chipset                   );
+				/* String  */ out.add(1, "Chipset Descr.", systemInfo.info.friendlychipsetdescription);
+				
+				/* String  */ out.add(1, "mem1", systemInfo.info.mem1);
+				/* String  */ out.add(1, "mem2", systemInfo.info.mem2);
+				/* String  */ out.add(1, "mem3", systemInfo.info.mem3);
+				
+				out.add(0, "");
+				out.add(0, "Miscellaneous");
+				/* String  */ out.add(1, "Uptime"         , systemInfo.info.uptime                    );
+				/* long    */ out.add(1, "lcd"            , systemInfo.info.lcd                       );
+				/* long    */ out.add(1, "grabpip"        , systemInfo.info.grabpip                   );
+				/* boolean */ out.add(1, "timerautoadjust", systemInfo.info.timerautoadjust           );
+				/* boolean */ out.add(1, "timerpipzap"    , systemInfo.info.timerpipzap               );
+				/* boolean */ out.add(1, "transcoding"    , systemInfo.info.transcoding               );
+				/* String  */ out.add(1, "EX"             , systemInfo.info.EX);
+				
+				/* Null  */ //out.add(0, "label", systemInfo.info.fp_version);
+				
+				if (!systemInfo.info.streams.isEmpty()) {
+					out.add(0, "");
+					out.add(0, "Streams");
+					for (int i=0; i<systemInfo.info.streams.size(); i++) {
+						SystemInfo.Stream stream = systemInfo.info.streams.get(i);
+						out.add(1, "Stream "+(i+1));
+						/* String */ out.add(2, "Client IP"   , stream.ip       );
+						/* String */ out.add(2, "Station Name", stream.name     );
+						/* String */ out.add(2, "Station Ref" , stream.ref      );
+						/* String */ out.add(2, "Type"        , stream.type     );
+						/* String */ out.add(2, "Event Name"  , stream.eventname);
+					}
+				}
+				
+				if (!systemInfo.info.hdd.isEmpty()) {
+					out.add(0, "");
+					out.add(0, "HDDs");
+					for (int i=0; i<systemInfo.info.hdd.size(); i++) {
+						SystemInfo.Hdd hdd = systemInfo.info.hdd.get(i);
+						out.add(1, "HDD "+(i+1));
+						/* String */ out.add(2, "Mount"              , hdd.mount            );
+						/* String */ out.add(2, "Model"              , hdd.model            );
+						/* String */ out.add(2, "Capacity"           , hdd.friendlycapacity );
+						/* String */ out.add(3, "[capacity]"         , hdd.capacity         );
+						/* String */ out.add(3, "[labelled capacity]", hdd.labelled_capacity);
+						/* String */ out.add(3, "[free]"             , hdd.free             );
+					}
+				}
+				
+				if (!systemInfo.info.tuners.isEmpty()) {
+					out.add(0, "");
+					out.add(0, "Tuners");
+					for (int i=0; i<systemInfo.info.tuners.size(); i++) {
+						SystemInfo.Tuner tuner = systemInfo.info.tuners.get(i);
+						out.add(1, "Tuner "+(i+1));
+						/* String */ out.add(2, "Name"     , tuner.name);
+						/* String */ out.add(2, "Type"     , tuner.type);
+						/* String */ out.add(2, "Live"     , tuner.live);
+						/* String */ out.add(2, "Recording", tuner.rec );
+					}
+				}
+				
+				if (!systemInfo.info.ifaces.isEmpty()) {
+					out.add(0, "");
+					out.add(0, "Interfaces");
+					for (int i=0; i<systemInfo.info.ifaces.size(); i++) {
+						SystemInfo.Interface iface = systemInfo.info.ifaces.get(i);
+						out.add(1, "Interface "+(i+1));
+						/* String  */ out.add(2, "Name"       , iface.name       );
+						/* String  */ out.add(2, "NIC"        , iface.friendlynic); 
+						/* String  */ out.add(2, "Link Speed" , iface.linkspeed  ); 
+						/* String  */ out.add(2, "MAC"        , iface.mac        ); 
+						/* boolean */ out.add(2, "DHCP"       , iface.dhcp       ); 
+						/* String  */ out.add(2, "IP"         , iface.ip         ); 
+						/* String  */ out.add(2, "Gateway"    , iface.gw         ); 
+						/* String  */ out.add(2, "Mask"       , iface.mask       ); 
+						/* long    */ out.add(2, "V4 Prefix"  , iface.v4prefix   );
+						/* String  */ out.add(2, "IPV4 Method", iface.ipv4method ); 
+						/* String  */ out.add(2, "IP Method"  , iface.ipmethod   ); 
+						/* String  */ out.add(2, "IPV6"       , iface.ipv6       ); 
+						
+						/* Null  */ //out.add(2, "firstpublic", iface.firstpublic); 
+					}
 				}
 			}
 			
-			if (!systemInfo.info.hdd.isEmpty()) {
-				out.add(0, "");
-				out.add(0, "HDDs");
-				for (int i=0; i<systemInfo.info.hdd.size(); i++) {
-					SystemInfo.Hdd hdd = systemInfo.info.hdd.get(i);
-					out.add(1, "HDD "+(i+1));
-					/* String */ out.add(2, "Mount"              , hdd.mount            );
-					/* String */ out.add(2, "Model"              , hdd.model            );
-					/* String */ out.add(2, "Capacity"           , hdd.friendlycapacity );
-					/* String */ out.add(3, "[capacity]"         , hdd.capacity         );
-					/* String */ out.add(3, "[labelled capacity]", hdd.labelled_capacity);
-					/* String */ out.add(3, "[free]"             , hdd.free             );
-				}
-			}
-			
-			if (!systemInfo.info.tuners.isEmpty()) {
-				out.add(0, "");
-				out.add(0, "Tuners");
-				for (int i=0; i<systemInfo.info.tuners.size(); i++) {
-					SystemInfo.Tuner tuner = systemInfo.info.tuners.get(i);
-					out.add(1, "Tuner "+(i+1));
-					/* String */ out.add(2, "Name"     , tuner.name);
-					/* String */ out.add(2, "Type"     , tuner.type);
-					/* String */ out.add(2, "Live"     , tuner.live);
-					/* String */ out.add(2, "Recording", tuner.rec );
-				}
-			}
-			
-			if (!systemInfo.info.ifaces.isEmpty()) {
-				out.add(0, "");
-				out.add(0, "Interfaces");
-				for (int i=0; i<systemInfo.info.ifaces.size(); i++) {
-					SystemInfo.Interface iface = systemInfo.info.ifaces.get(i);
-					out.add(1, "Interface "+(i+1));
-					/* String  */ out.add(2, "Name"       , iface.name       );
-					/* String  */ out.add(2, "NIC"        , iface.friendlynic); 
-					/* String  */ out.add(2, "Link Speed" , iface.linkspeed  ); 
-					/* String  */ out.add(2, "MAC"        , iface.mac        ); 
-					/* boolean */ out.add(2, "DHCP"       , iface.dhcp       ); 
-					/* String  */ out.add(2, "IP"         , iface.ip         ); 
-					/* String  */ out.add(2, "Gateway"    , iface.gw         ); 
-					/* String  */ out.add(2, "Mask"       , iface.mask       ); 
-					/* long    */ out.add(2, "V4 Prefix"  , iface.v4prefix   );
-					/* String  */ out.add(2, "IPV4 Method", iface.ipv4method ); 
-					/* String  */ out.add(2, "IP Method"  , iface.ipmethod   ); 
-					/* String  */ out.add(2, "IPV6"       , iface.ipv6       ); 
-					
-					/* Null  */ //out.add(2, "firstpublic", iface.firstpublic); 
-				}
-			}
-			
-			// TODO Auto-generated method stub
 			leftTextView.setText(out.generateOutput());
 		}
 
 		private void fillRightTextView() {
 			ValueListOutput out = new ValueListOutput();
 			
-			Vector<String> keys = new Vector<>(boxSettings.keySet());
-			keys.sort(null);
-			for (String key:keys) {
-				BoxSettingsValue settingsValue = boxSettings.get(key);
-				if (settingsValue==null)
-					out.add(0, key, "%s", "<null>");
-				else
-					out.add(0, key, "%s", settingsValue.getValueStr());
+			if (boxSettings!=null) {
+				Vector<String> keys = new Vector<>(boxSettings.keySet());
+				keys.sort(null);
+				for (String key:keys) {
+					BoxSettingsValue settingsValue = boxSettings.get(key);
+					if (settingsValue==null)
+						out.add(0, key, "%s", "<null>");
+					else
+						out.add(0, key, "%s", settingsValue.getValueStr());
+				}
 			}
 			
 			rightTextView.setText(out.generateOutput());

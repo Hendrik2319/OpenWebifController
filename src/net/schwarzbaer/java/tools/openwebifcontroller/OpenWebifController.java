@@ -337,13 +337,23 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		
-		JPanel stationSwitchPanel = new JPanel(new BorderLayout());
-		stationSwitchPanel.setBorder(BorderFactory.createTitledBorder("Station Switch"));
-		stationSwitchPanel.add(createButton("Show Station Switch", true, e->{
+		JMenu extrasMenu = menuBar.add(createMenu("Extras"));
+		extrasMenu.add(createMenuItem("Station Switch", e->{
 			String baseURL = getBaseURL();
 			if (baseURL==null) return;
 			StationSwitch.start(baseURL,true);
 		}));
+		extrasMenu.add(createMenuItem("Remote Control Tool", e->{
+			new RemoteControlTool(true);
+		}));
+		
+		//JPanel stationSwitchPanel = new JPanel(new BorderLayout());
+		//stationSwitchPanel.setBorder(BorderFactory.createTitledBorder("Station Switch"));
+		//stationSwitchPanel.add(createButton("Show Station Switch", true, e->{
+		//	String baseURL = getBaseURL();
+		//	if (baseURL==null) return;
+		//	StationSwitch.start(baseURL,true);
+		//}));
 		
 		JPanel epgControlPanel = new JPanel(new BorderLayout());
 		epgControlPanel.setBorder(BorderFactory.createTitledBorder("EPG"));
@@ -370,7 +380,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		toolBar.add(volumeControl  = new VolumeControl (controlPanelCommands, true, false, false), c);
 		toolBar.add(messageControl = new MessageControl(controlPanelCommands), c);
 		toolBar.add(epgControlPanel, c);
-		toolBar.add(stationSwitchPanel, c);
+		//toolBar.add(stationSwitchPanel, c);
 		c.weightx = 1;
 		toolBar.add(new JLabel(""), c);
 		

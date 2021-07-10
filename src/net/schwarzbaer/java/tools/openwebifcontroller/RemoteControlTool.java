@@ -32,14 +32,14 @@ public class RemoteControlTool {
 	public static void main(String[] args) {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
-		new RemoteControlTool();
+		new RemoteControlTool(false);
 		// showKeyMappings();
 	}
 
 	private final StandardMainWindow mainWindow;
 	
-	RemoteControlTool() {
-		mainWindow = OpenWebifController.createMainWindow("RemoteControl Tool", false);
+	RemoteControlTool(boolean asSubWindow) {
+		mainWindow = OpenWebifController.createMainWindow("RemoteControl Tool", asSubWindow);
 		Consumer<String> setIndeterminateProgressTask = taskTitle -> System.out.printf("RemoteControlTool: %s%n", taskTitle);
 		
 		JPanel otherCommandsPanel = new JPanel(new GridLayout(0,1,3,3));

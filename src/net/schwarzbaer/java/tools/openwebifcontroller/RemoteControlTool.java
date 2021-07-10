@@ -4,16 +4,20 @@ import java.awt.BorderLayout;
 import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.event.ActionListener;
+import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Vector;
+import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JPanel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import net.schwarzbaer.gui.FileChooser;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.RemoteControl;
@@ -36,6 +40,7 @@ public class RemoteControlTool {
 	
 	RemoteControlTool() {
 		mainWindow = OpenWebifController.createMainWindow("RemoteControl Tool", false);
+		Consumer<String> setIndeterminateProgressTask = taskTitle -> System.out.printf("RemoteControlTool: %s%n", taskTitle);
 		
 		JPanel otherCommandsPanel = new JPanel(new GridLayout(0,1,3,3));
 		otherCommandsPanel.setBorder(BorderFactory.createTitledBorder("Other Commands"));
@@ -52,12 +57,12 @@ public class RemoteControlTool {
 				String baseURL = OpenWebifController.getBaseURL(true, mainWindow);
 				if (baseURL==null) return;
 				
-				System.out.printf("RemoteControlTool: %s%n", "Load Image");
+				setIndeterminateProgressTask.accept("Load Image");
 				String remoteControlImageURL = RemoteControl.getRemoteControlImageURL(baseURL, machine);
 				MapImage mapImage = ImageMapEditor.MapImage.loadImage(remoteControlImageURL);
 				if (mapImage==null) return;
 				
-				RemoteControl.Key[] keys = RemoteControl.getKeys(baseURL, machine, taskTitle -> System.out.printf("RemoteControlTool: %s%n", taskTitle));
+				RemoteControl.Key[] keys = RemoteControl.getKeys(baseURL, machine, setIndeterminateProgressTask);
 				if (keys==null) return;
 				
 				Area[] areas = Arrays.stream(keys).map(this::convert).toArray(Area[]::new);
@@ -65,6 +70,24 @@ public class RemoteControlTool {
 				String suggestedHtmlOutFileName = String.format("keymapping_%s.html", machine);
 				ImageMapEditor.show(title, mapImage, new Vector<>(Arrays.asList(areas)), suggestedHtmlOutFileName);
 			}));
+		
+		FileChooser fileChooser = new FileChooser("KeyMapping File","html");
+		remoteControlMapsPanel.add(createButton("Edit Custom Map ...",true,e->{
+			if (fileChooser.showOpenDialog(mainWindow)!=JFileChooser.APPROVE_OPTION) return;
+			File file = fileChooser.getSelectedFile();
+			
+			RemoteControl.KeyMappingFile keyMapping = RemoteControl.KeyMappingFile.load(file, setIndeterminateProgressTask);
+			if (keyMapping==null) return;
+			
+			setIndeterminateProgressTask.accept("Load Image");
+			MapImage mapImage = ImageMapEditor.MapImage.loadImage(keyMapping.imageURL);
+			if (mapImage==null) return;
+			
+			Area[] areas = Arrays.stream(keyMapping.keys).map(this::convert).toArray(Area[]::new);
+			String title = String.format("RemoteControl Map \"%s\"", file);
+			String suggestedHtmlOutFileName = file.getName();
+			ImageMapEditor.show(title, mapImage, new Vector<>(Arrays.asList(areas)), suggestedHtmlOutFileName);
+		}));
 		
 		JPanel contentPane = new JPanel(new BorderLayout(3,3));
 		contentPane.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));

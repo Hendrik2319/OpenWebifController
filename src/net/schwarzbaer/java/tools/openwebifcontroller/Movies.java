@@ -485,8 +485,7 @@ class Movies extends JSplitPane {
 		@Override public int getIndex(TreeNode node) { return children.indexOf(node); }
 		@Override public boolean getAllowsChildren() { return true; }
 		@Override public boolean isLeaf() { return children.isEmpty(); }
-		@SuppressWarnings("rawtypes")
-		@Override public Enumeration children() { return children.elements(); }
+		@Override public Enumeration<LocationTreeNode> children() { return children.elements(); }
 	}
 
 	static class MovieTableModel extends Tables.SimplifiedTableModel<MovieTableModel.ColumnID> {

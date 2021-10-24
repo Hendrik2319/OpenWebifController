@@ -53,8 +53,7 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 	@Override public int getIndex(TreeNode node) { return children.indexOf(node); }
 	@Override public boolean getAllowsChildren() { return true; }
 	@Override public boolean isLeaf() { return children.isEmpty(); }
-	@SuppressWarnings("rawtypes")
-	@Override public Enumeration children() { return children.elements(); }
+	@Override public Enumeration<ChildType> children() { return children.elements(); }
 	
 	static class StationList {
 		private final HashMap<String,Vector<StationNode>> stations;

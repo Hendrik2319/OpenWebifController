@@ -31,6 +31,7 @@ import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
@@ -309,7 +310,7 @@ class Movies extends JSplitPane {
 		});
 	}
 
-	private MovieList getMovieList(String baseURL, String dir, ProgressDialog pd) {
+	private MovieList getMovieList(String baseURL, String dir, ProgressView pd) {
 		if (baseURL==null) return null;
 		
 		MovieList movieList = OpenWebifTools.readMovieList(baseURL, dir, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Movies: "+taskTitle));
@@ -317,7 +318,7 @@ class Movies extends JSplitPane {
 		return movieList;
 	}
 
-	void readInitialMovieList(String baseURL, ProgressDialog pd) {
+	void readInitialMovieList(String baseURL, ProgressView pd) {
 		MovieList movieList = getMovieList(baseURL, null, pd);
 		
 		if (movieList!=null) {

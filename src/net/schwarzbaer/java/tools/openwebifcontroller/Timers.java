@@ -15,7 +15,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 import net.schwarzbaer.gui.ContextMenu;
-import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.gui.Tables;
 import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.gui.TextAreaDialog;
@@ -107,7 +107,7 @@ public class Timers extends JSplitPane {
 		textArea.setText(sb.toString());
 	}
 
-	public void readData(String baseURL, ProgressDialog pd) {
+	public void readData(String baseURL, ProgressView pd) {
 		if (baseURL==null) return;
 		timers = OpenWebifTools.readTimers(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));
 		if (timers==null) {

@@ -36,6 +36,7 @@ import javax.swing.tree.TreeSelectionModel;
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.FileChooser;
 import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.TextAreaDialog;
 import net.schwarzbaer.gui.ValueListOutput;
@@ -428,7 +429,7 @@ public class BouquetsNStations extends JPanel {
 		}
 	}
 
-	public void readData(String baseURL, ProgressDialog pd) {
+	public void readData(String baseURL, ProgressView pd) {
 		if (baseURL==null) return;
 		
 		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: "+taskTitle));

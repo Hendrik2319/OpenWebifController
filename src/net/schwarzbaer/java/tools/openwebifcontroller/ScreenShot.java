@@ -19,7 +19,7 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.gui.ImageView;
-import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 
@@ -116,7 +116,7 @@ class ScreenShot extends JPanel {
 		return panel;
 	}
 
-	public void initialize(String baseURL, ProgressDialog pd) {
+	public void initialize(String baseURL, ProgressView pd) {
 		OpenWebifController.setIndeterminateProgressTask(pd, "ScreenShot: Read Image");
 		updateScreenShot(baseURL);
 		SwingUtilities.invokeLater(this::revalidate);

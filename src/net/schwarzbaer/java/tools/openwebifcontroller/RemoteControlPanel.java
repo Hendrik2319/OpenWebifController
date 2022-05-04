@@ -19,7 +19,7 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.gui.Canvas;
-import net.schwarzbaer.gui.ProgressDialog;
+import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.RemoteControl;
 import net.schwarzbaer.java.lib.openwebif.RemoteControl.Key;
@@ -146,7 +146,7 @@ public class RemoteControlPanel extends Canvas implements MouseListener, MouseMo
 		return new Point(p.x+16,p.y);
 	}
 
-	public void initialize(String baseURL, ProgressDialog pd, SystemInfo systemInfo) {
+	public void initialize(String baseURL, ProgressView pd, SystemInfo systemInfo) {
 		Consumer<String> progressTaskFcn = taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Remote Control: "+taskTitle);
 		remoteControl = systemInfo==null ? null : new RemoteControl(systemInfo);
 		if (remoteControl!=null) {

@@ -448,27 +448,30 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			addTask("BaseURL", pd->{
 				setIndeterminateProgressTask(pd, "Get BaseURL");
 				baseURL = getBaseURL();
+				return baseURL!=null;
 			});
 			addTask("Box Settings", pd->{
-				if (baseURL==null) return;
+				if (baseURL==null) return false;
 				boxSettings = BoxSettings.getSettings (baseURL, createProgressTaskFcn(pd, "BoxSettings"));
+				return true;
 			});
 			addTask("System Info", pd->{
-				if (baseURL==null) return;
+				if (baseURL==null) return false;
 				systemInfo  = SystemInfo.getSystemInfo(baseURL, createProgressTaskFcn(pd, "SystemInfo"));
 				SwingUtilities.invokeLater(systemInfoPanel::update);
+				return true;
 			});
 			
-			addTask("Movies"               , pd->{ if (baseURL!=null) movies.readInitialMovieList(baseURL,pd); });
-			addTask("Bouquets 'n' Stations", pd->{ if (baseURL!=null) bouquetsNStations.readData(baseURL,pd); });
-			addTask("Timers"               , pd->{ if (baseURL!=null) timers           .readData(baseURL,pd); });
-			addTask("Remote Control"       , pd->{ if (baseURL!=null) remoteControl .initialize(baseURL,pd,systemInfo); });
-			addTask("ScreenShot"           , pd->{ if (baseURL!=null) screenShot    .initialize(baseURL,pd); });
-			addTask("Power Control"        , pd->{ if (baseURL!=null) powerControl  .initialize(baseURL,pd); });
-			addTask("Volume Control"       , pd->{ if (baseURL!=null) volumeControl .initialize(baseURL,pd); });
-			addTask("Message Control"      , pd->{ if (baseURL!=null) messageControl.initialize(baseURL,pd); });
+			addTask("Movies"               , true, false, pd->{ if (baseURL==null) return false; movies.readInitialMovieList(baseURL,pd); return true; });
+			addTask("Bouquets 'n' Stations", true, false, pd->{ if (baseURL==null) return false; bouquetsNStations.readData(baseURL,pd); return true; });
+			addTask("Timers"               , true, false, pd->{ if (baseURL==null) return false; timers           .readData(baseURL,pd); return true; });
+			addTask("Remote Control"       , true,  true, pd->{ if (baseURL==null) return false; remoteControl .initialize(baseURL,pd,systemInfo); return true; });
+			addTask("ScreenShot"           , true, false, pd->{ if (baseURL==null) return false; screenShot    .initialize(baseURL,pd); return true; });
+			addTask("Power Control"        , true,  true, pd->{ if (baseURL==null) return false; powerControl  .initialize(baseURL,pd); return true; });
+			addTask("Volume Control"       , true,  true, pd->{ if (baseURL==null) return false; volumeControl .initialize(baseURL,pd); return true; });
+			addTask("Message Control"      , true,  true, pd->{ if (baseURL==null) return false; messageControl.initialize(baseURL,pd); return true; });
 			
-			setPositionAndSize(null,null);
+			finishGUI();
 		}
 	}
 	
@@ -557,29 +560,35 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			callCommand(baseURL, pd, commandLabel, false, commandFcn);
 		}
 		protected void callCommand(String baseURL, ProgressView pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
-			setPanelEnable(false);
-			new Thread(()->{
-				Consumer<String> setTaskTitle = pd==null ? null : taskTitle->setIndeterminateProgressTask(pd, String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle));
-				
-				ValueStructType values, valuesPre = commandFcn.apply(baseURL, setTaskTitle);
-				
-				if (withDelayedUpdate && updateCommand!=null) {
-					synchronized (this) {
-						long time_ms = System.currentTimeMillis();
-						for (long dur=time_ms+500-System.currentTimeMillis(); dur>5; dur=time_ms+500-System.currentTimeMillis()) {
-							try { wait(dur); }
-							catch (InterruptedException e) { System.err.printf("InterruptedException while waiting for AbstractContolPanel.Update: %s%n", e.getMessage()); }
-						}
+			if (pd != null)
+				callCommand(baseURL, withDelayedUpdate, commandFcn, taskTitle->setIndeterminateProgressTask(pd, String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle)));
+			else
+				new Thread(()->callCommand(baseURL, withDelayedUpdate, commandFcn, null)).start();
+		}
+
+		private void callCommand(String baseURL, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn, Consumer<String> setTaskTitle) {
+			SwingUtilities.invokeLater(()->{
+				setPanelEnable(false);
+			});
+			
+			ValueStructType values, valuesPre = commandFcn.apply(baseURL, setTaskTitle);
+			
+			if (withDelayedUpdate && updateCommand!=null) {
+				synchronized (this) {
+					long time_ms = System.currentTimeMillis();
+					for (long dur=time_ms+500-System.currentTimeMillis(); dur>5; dur=time_ms+500-System.currentTimeMillis()) {
+						try { wait(dur); }
+						catch (InterruptedException e) { System.err.printf("InterruptedException while waiting for AbstractContolPanel.Update: %s%n", e.getMessage()); }
 					}
-					values = updateCommand.apply(baseURL, setTaskTitle);
-				} else
-					values = valuesPre;
-				
-				SwingUtilities.invokeLater(()->{
-					updatePanel(values);
-					setPanelEnable(true);
-				});
-			}).start();
+				}
+				values = updateCommand.apply(baseURL, setTaskTitle);
+			} else
+				values = valuesPre;
+			
+			SwingUtilities.invokeLater(()->{
+				updatePanel(values);
+				setPanelEnable(true);
+			});
 		}
 		
 		protected abstract void updatePanel(ValueStructType values);
@@ -660,7 +669,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		private final JButton btnUpdate;
 		
 		PowerControl(ExternCommands externCommands, boolean withBorder, boolean isStretchable, boolean isSmall) {
-			super(new GridBagLayout(),externCommands,"PowerContol",withBorder?"Power":null,Power::getState);
+			super(new GridBagLayout(),externCommands,"PowerControl",withBorder?"Power":null,Power::getState);
 			this.isSmall = isSmall;
 			
 			GridBagConstraints c = new GridBagConstraints();
@@ -691,9 +700,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		}
 
 		static void setState(String baseURL, Power.Commands cmd, PrintStream out) {
-			Power.Values values = Power.setState(baseURL, cmd, str->out.printf("PowerContol: %s%n", str));
-			if (values==null) out.printf("PowerContol: No Answer%n");
-			else              out.printf("PowerContol: In Standby = %s%n", values.instandby);
+			Power.Values values = Power.setState(baseURL, cmd, str->out.printf("PowerControl: %s%n", str));
+			if (values==null) out.printf("PowerControl: No Answer%n");
+			else              out.printf("PowerControl: In Standby = %s%n", values.instandby);
 		}
 
 		@Override protected void updatePanel(Power.Values values) {
@@ -725,7 +734,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		private boolean ignoreSldrVolumeEvents;
 		
 		VolumeControl(ExternCommands externCommands, boolean withBorder, boolean isStretchable, boolean isSmall) {
-			super(new GridBagLayout(),externCommands,"VolumeContol",withBorder?"Volume":null,Volume::getState);
+			super(new GridBagLayout(),externCommands,"VolumeControl",withBorder?"Volume":null,Volume::getState);
 			this.isSmall = isSmall;
 			
 			GridBagConstraints c = new GridBagConstraints();
@@ -783,7 +792,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		}
 	
 		static void setVolMute(String baseURL, PrintStream out) {
-			Volume.setVolMute(baseURL,str->out.printf("PowerContol: %s%n", str));
+			Volume.setVolMute(baseURL,str->out.printf("VolumeControl: %s%n", str));
 		}
 		
 		private void setVolUp  (     ProgressView pd) { callCommand(pd, "VolUp"  , Volume::setVolUp  ); }

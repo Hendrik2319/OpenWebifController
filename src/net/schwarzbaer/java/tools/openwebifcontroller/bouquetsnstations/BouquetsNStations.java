@@ -429,6 +429,10 @@ public class BouquetsNStations extends JPanel {
 		}
 	}
 
+	public boolean hasData() {
+		return bsTreeRoot!=null && bsTreeModel!=null;
+	}
+
 	public void readData(String baseURL, ProgressView pd) {
 		if (baseURL==null) return;
 		

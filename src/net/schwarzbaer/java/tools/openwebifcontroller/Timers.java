@@ -107,6 +107,10 @@ public class Timers extends JSplitPane {
 		textArea.setText(sb.toString());
 	}
 
+	public boolean hasData() {
+		return timers!=null;
+	}
+
 	public void readData(String baseURL, ProgressView pd) {
 		if (baseURL==null) return;
 		timers = OpenWebifTools.readTimers(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));

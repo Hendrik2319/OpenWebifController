@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -339,6 +340,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		
+		JMenu updatesMenu = menuBar.add(createMenu("Init / Updates"));
+		fillUpdatesMenu(updatesMenu);
+		
 		JMenu extrasMenu = menuBar.add(createMenu("Extras"));
 		extrasMenu.add(createMenuItem("Station Switch", e->{
 			String baseURL = getBaseURL();
@@ -360,6 +364,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		JPanel epgControlPanel = new JPanel(new BorderLayout());
 		epgControlPanel.setBorder(BorderFactory.createTitledBorder("EPG"));
 		epgControlPanel.add(createButton("Show EPG", true, e->{
+			if (!timers.hasData()) return;
 			Bouquet bouquet = bouquetsNStations.showBouquetSelector(mainWindow);
 			if (bouquet==null) return;
 			openEPGDialog(bouquet);
@@ -462,17 +467,41 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				return true;
 			});
 			
-			addTask("Movies"               , true, false, pd->{ if (baseURL==null) return false; movies.readInitialMovieList(baseURL,pd); return true; });
-			addTask("Bouquets 'n' Stations", true, false, pd->{ if (baseURL==null) return false; bouquetsNStations.readData(baseURL,pd); return true; });
-			addTask("Timers"               , true, false, pd->{ if (baseURL==null) return false; timers           .readData(baseURL,pd); return true; });
+			addTask("Movies"               , true, false, pd->{ if (baseURL==null) return false; movies.readInitialMovieList(baseURL,pd);          return true; });
+			addTask("Bouquets 'n' Stations", true, false, pd->{ if (baseURL==null) return false; bouquetsNStations.readData(baseURL,pd);           return true; });
+			addTask("Timers"               , true, false, pd->{ if (baseURL==null) return false; timers           .readData(baseURL,pd);           return true; });
 			addTask("Remote Control"       , true,  true, pd->{ if (baseURL==null) return false; remoteControl .initialize(baseURL,pd,systemInfo); return true; });
-			addTask("ScreenShot"           , true, false, pd->{ if (baseURL==null) return false; screenShot    .initialize(baseURL,pd); return true; });
-			addTask("Power Control"        , true,  true, pd->{ if (baseURL==null) return false; powerControl  .initialize(baseURL,pd); return true; });
-			addTask("Volume Control"       , true,  true, pd->{ if (baseURL==null) return false; volumeControl .initialize(baseURL,pd); return true; });
-			addTask("Message Control"      , true,  true, pd->{ if (baseURL==null) return false; messageControl.initialize(baseURL,pd); return true; });
+			addTask("ScreenShot"           , true, false, pd->{ if (baseURL==null) return false; screenShot    .initialize(baseURL,pd);            return true; });
+			addTask("Power Control"        ,              pd->{ if (baseURL==null) return false; powerControl  .initialize(baseURL,pd);            return true; });
+			addTask("Volume Control"       ,              pd->{ if (baseURL==null) return false; volumeControl .initialize(baseURL,pd);            return true; });
+			addTask("Message Control"      ,              pd->{ if (baseURL==null) return false; messageControl.initialize(baseURL,pd);            return true; });
 			
 			finishGUI();
 		}
+	}
+	
+	private void fillUpdatesMenu(JMenu updatesMenu) {
+		updatesMenu.add(createMenuItem("BoxSettings", e->getBaseURLAndRunWithProgressDialog("Init/Update BoxSettings", (pd, baseURL)->{
+			boxSettings = BoxSettings.getSettings (baseURL, createProgressTaskFcn(pd, "BoxSettings"));
+		})));
+		updatesMenu.add(createMenuItem("SystemInfo", e->getBaseURLAndRunWithProgressDialog("Init/Update SystemInfo", (pd, baseURL)->{
+			systemInfo  = SystemInfo.getSystemInfo(baseURL, createProgressTaskFcn(pd, "SystemInfo"));
+			SwingUtilities.invokeLater(systemInfoPanel::update);
+		})));
+		updatesMenu.add(createMenuItem("Movies"               , e->getBaseURLAndRunWithProgressDialog("Init/Update Movies"               , (pd, baseURL)->{ movies.readInitialMovieList(baseURL,pd);          })));
+		updatesMenu.add(createMenuItem("Bouquets 'n' Stations", e->getBaseURLAndRunWithProgressDialog("Init/Update Bouquets 'n' Stations", (pd, baseURL)->{ bouquetsNStations.readData(baseURL,pd);           })));
+		updatesMenu.add(createMenuItem("Timers"               , e->getBaseURLAndRunWithProgressDialog("Init/Update Timers"               , (pd, baseURL)->{ timers           .readData(baseURL,pd);           })));
+		updatesMenu.add(createMenuItem("Remote Control"       , e->getBaseURLAndRunWithProgressDialog("Init/Update Remote Control"       , (pd, baseURL)->{ remoteControl .initialize(baseURL,pd,systemInfo); })));
+		updatesMenu.add(createMenuItem("ScreenShot"           , e->getBaseURLAndRunWithProgressDialog("Init/Update ScreenShot"           , (pd, baseURL)->{ screenShot    .initialize(baseURL,pd);            })));
+		//updatesMenu.add(createMenuItem("Power Control"        , e->getBaseURLAndRunWithProgressDialog("Init/Update Power Control"        , (pd, baseURL)->{ powerControl  .initialize(baseURL,pd);            })));
+		//updatesMenu.add(createMenuItem("Volume Control"       , e->getBaseURLAndRunWithProgressDialog("Init/Update Volume Control"       , (pd, baseURL)->{ volumeControl .initialize(baseURL,pd);            })));
+		//updatesMenu.add(createMenuItem("Message Control"      , e->getBaseURLAndRunWithProgressDialog("Init/Update Message Control"      , (pd, baseURL)->{ messageControl.initialize(baseURL,pd);            })));
+	}
+	
+	private void getBaseURLAndRunWithProgressDialog(String dlgTitle, BiConsumer<ProgressDialog,String> action) {
+		String baseURL = getBaseURL();
+		if (baseURL != null)
+			runWithProgressDialog(dlgTitle, pd->action.accept(pd, baseURL));
 	}
 	
 	public void runWithProgressDialog(String title, Consumer<ProgressDialog> action) {
@@ -1099,6 +1128,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	public void openEPGDialog(Bouquet bouquet) {
 		String baseURL = getBaseURL();
 		if (baseURL==null) return;
+		if (!timers.hasData()) return;
 		EPGDialog.showDialog(mainWindow, baseURL, epg, timers, bouquetsNStations, bouquet, this);
 	}
 	

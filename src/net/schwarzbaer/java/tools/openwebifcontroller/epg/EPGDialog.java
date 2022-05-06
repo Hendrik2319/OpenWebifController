@@ -114,6 +114,15 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	private int rangeTime_s;
 
 	public static void showDialog(Window parent, String baseURL, EPG epg, Timers timers, BouquetsNStations bouquetsNStations, Bouquet bouquet, ExternCommands externCommands) {
+		if (parent           ==null) throw new IllegalArgumentException();
+		if (baseURL          ==null) throw new IllegalArgumentException();
+		if (epg              ==null) throw new IllegalArgumentException();
+		if (timers           ==null) throw new IllegalArgumentException();
+		if (bouquetsNStations==null) throw new IllegalArgumentException();
+		if (bouquet          ==null) throw new IllegalArgumentException();
+		if (externCommands   ==null) throw new IllegalArgumentException();
+		if (!timers           .hasData()) throw new IllegalStateException();
+		if (!bouquetsNStations.hasData()) throw new IllegalStateException();
 		new EPGDialog(parent, ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, bouquetsNStations, bouquet, externCommands)
 			.showDialog();
 	}

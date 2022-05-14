@@ -48,7 +48,7 @@ class StationSwitch {
 	private final JPanel stationPanel;
 	private final PowerControl powerControl;
 	private final VolumeControl volumeControl;
-	private final JButton btnReload;
+	private final JButton btnBouquetData;
 	private final JButton btnAddStation;
 	private final JLabel labBouquet;
 	private final JComboBox<Bouquet> cmbbxBouquet;
@@ -77,11 +77,14 @@ class StationSwitch {
 		
 		powerControl  = new OpenWebifController.PowerControl (controlPanelCommands,false,true,true);
 		volumeControl = new OpenWebifController.VolumeControl(controlPanelCommands,false,true,true);
+		powerControl.addUpdateTask(baseURL -> volumeControl.initialize(baseURL,null));
 		
-		btnReload = OpenWebifController.createButton(null, CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true, e->{
-			OpenWebifController.runWithProgressDialog(mainWindow, "Reload Bouquet Data", this::initializeBouquetData);
+		btnBouquetData = OpenWebifController.createButton(null, CommandIcons.Download.getIcon(), CommandIcons.Download_Dis.getIcon(), true, e->{
+			String title = (bouquetData == null ? "Load" : "Reload") +" Bouquet Data";
+			OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeBouquetData);
 			mainWindow.pack();
 		});
+		btnBouquetData.setToolTipText("Load Bouquet Data");
 		
 		btnAddStation = OpenWebifController.createButton("Add", false, e->{
 			Bouquet.SubService station = selectedStation;
@@ -148,7 +151,7 @@ class StationSwitch {
 		c.weightx = 0;
 		
 		c.gridheight = 2;
-		configPanel.add(btnReload,c);
+		configPanel.add(btnBouquetData,c);
 		c.gridheight = 1;
 		
 		configPanel.add(labBouquet,c);
@@ -182,7 +185,7 @@ class StationSwitch {
 				powerControl .initialize(this.baseURL,pd);
 				volumeControl.initialize(this.baseURL,pd);
 			}
-			initializeBouquetData(pd);
+			//initializeBouquetData(pd);
 		});
 		mainWindow.pack();
 	}
@@ -193,6 +196,8 @@ class StationSwitch {
 		if (this.baseURL!=null)
 			bouquetData = OpenWebifTools.readBouquets(this.baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquet Data: "+taskTitle));
 		
+		btnBouquetData.setToolTipText("Reload Bouquet Data");
+		OpenWebifController.setIcon(btnBouquetData, CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon());
 		cmbbxBouquet.setModel  (bouquetData==null ? new DefaultComboBoxModel<Bouquet>() : new DefaultComboBoxModel<Bouquet>(bouquetData.bouquets));
 		cmbbxBouquet.setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
 		labBouquet  .setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());

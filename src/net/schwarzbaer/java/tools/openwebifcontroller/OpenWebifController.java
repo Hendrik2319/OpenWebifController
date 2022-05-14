@@ -30,6 +30,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.Icon;
@@ -97,10 +98,10 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		public Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
 	}
 	
-	private static IconSource.CachedIcons<CommandIcons> CommandIconsIS = IconSource.createCachedIcons(16, 16, 8, "/images/CommandIcons.png", CommandIcons.values());
+	private static IconSource.CachedIcons<CommandIcons> CommandIconsIS = IconSource.createCachedIcons(16, 16, 10, "/images/CommandIcons.png", CommandIcons.values());
 	public enum CommandIcons {
-		Muted, UnMuted, Up, Down, OnOff, Reload, Image, Save,
-		Muted_Dis, UnMuted_Dis, Up_Dis, Down_Dis, OnOff_Dis, Reload_Dis, Image_Dis, Save_Dis,
+		Muted, UnMuted, Up, Down, Power_IsOn, Power_IsOff, Reload, Download, Image, Save,
+		Muted_Dis, UnMuted_Dis, Up_Dis, Down_Dis, Power_IsOn_Dis, Power_IsOff_Dis, Reload_Dis, Download_Dis, Image_Dis, Save_Dis,
 		LED_green, LED_yellow,
 		;
 		public Icon getIcon() { return CommandIconsIS.getCachedIcon(this); }
@@ -696,10 +697,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		private final JButton btnPower;
 		private final JComboBox<Power.Commands> cmbbxSetOtherState;
 		private final JButton btnUpdate;
+		private final Vector<UpdateTask> updateTasks;
 		
 		PowerControl(ExternCommands externCommands, boolean withBorder, boolean isStretchable, boolean isSmall) {
 			super(new GridBagLayout(),externCommands,"PowerControl",withBorder?"Power":null,Power::getState);
 			this.isSmall = isSmall;
+			updateTasks = new Vector<>();
 			
 			GridBagConstraints c = new GridBagConstraints();
 			c.weightx = 0;
@@ -707,8 +710,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			c.fill = GridBagConstraints.BOTH;
 			
 			if (this.isSmall && isStretchable) c.weightx = 1;
-			add(btnPower = createButton(isSmall ? null : "Toggle StandBy", CommandIcons.OnOff.getIcon(), CommandIcons.OnOff_Dis.getIcon(), true, e->{
-				callCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle));
+			add(btnPower = createButton(isSmall ? null : "Toggle StandBy", CommandIcons.Power_IsOn.getIcon(), CommandIcons.Power_IsOn_Dis.getIcon(), true, e->{
+				callCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->{
+					Power.Values state = Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle);
+					for (UpdateTask ut : updateTasks) ut.update(baseURL);
+					return state;
+				});
 			}), c);
 			if (this.isSmall && isStretchable) c.weightx = 0;
 			
@@ -717,7 +724,11 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				Vector<Power.Commands> items = new Vector<>(Arrays.asList(Power.Commands.values()));
 				items.remove(Power.Commands.ToggleStandBy);
 				add(cmbbxSetOtherState = createComboBox(items, Power.Commands.Wakeup, cmd->{
-					callCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->Power.setState(baseURL, cmd, setTaskTitle));
+					callCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->{
+						Power.Values state = Power.setState(baseURL, cmd, setTaskTitle);
+						for (UpdateTask ut : updateTasks) ut.update(baseURL);
+						return state;
+					});
 				}), c);
 				if (isStretchable) c.weightx = 0;
 				
@@ -726,6 +737,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				cmbbxSetOtherState = null;
 				btnUpdate = null;
 			}
+		}
+		
+		interface UpdateTask {
+			void update(String baseURL);
+		}
+		
+		void addUpdateTask(UpdateTask updateTask) {
+			updateTasks.add(updateTask);
 		}
 
 		static void setState(String baseURL, Power.Commands cmd, PrintStream out) {
@@ -740,6 +759,10 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				if (values.instandby) btnPower.setText("Switch On");
 				else btnPower.setText("Switch to Standby");
 			}
+			if (values.instandby)
+				setIcon(btnPower, CommandIcons.Power_IsOff.getIcon(), CommandIcons.Power_IsOff_Dis.getIcon());
+			else
+				setIcon(btnPower, CommandIcons.Power_IsOn.getIcon(), CommandIcons.Power_IsOn_Dis.getIcon());
 		}
 
 		@Override protected void setPanelEnable(boolean enabled) {
@@ -771,13 +794,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			c.weighty = 1;
 			c.fill = GridBagConstraints.BOTH;
 			
+			txtVolume = new JTextField("mute",8);
 			if (!this.isSmall) {
-				add(txtVolume  = new JTextField("mute",8), c);
+				add(txtVolume, c);
 				if (isStretchable) c.weightx = 1;
 				add(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c);
 				if (isStretchable) c.weightx = 0;
 			} else {
-				txtVolume = null;
 				sldrVolume = null;
 			}
 			
@@ -785,6 +808,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			add(btnVolDown = createButton("-", true, e->setVolDown(null)), c);
 			add(btnVolUp   = createButton("+", true, e->setVolUp  (null)), c);
 			add(btnVolMute = createButton(isSmall ? null : "Mute", CommandIcons.Muted.getIcon(), CommandIcons.Muted_Dis.getIcon(), true, e->setVolMute(null)), c);
+			if (this.isSmall) add(txtVolume, c);
 			if (this.isSmall && isStretchable) c.weightx = 0;
 			
 			if (!this.isSmall)
@@ -953,11 +977,15 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		return createButton(text, icon, null, enabled, al);
 	}
 	public static JButton createButton(String text, Icon icon, Icon disabledIcon, boolean enabled, ActionListener al) {
-		JButton comp = new JButton(text,icon);
-		if (disabledIcon!=null) comp.setDisabledIcon(disabledIcon);
+		JButton comp = new JButton(text);
+		setIcon(comp, icon, disabledIcon);
 		comp.setEnabled(enabled);
 		if (al!=null) comp.addActionListener(al);
 		return comp;
+	}
+	public static void setIcon(AbstractButton btn, Icon icon, Icon disabledIcon) {
+		if (icon        !=null) btn.setIcon        (icon        );
+		if (disabledIcon!=null) btn.setDisabledIcon(disabledIcon);
 	}
 
 	public static JCheckBoxMenuItem createCheckBoxMenuItem(String title, boolean isChecked, Consumer<Boolean> setValue) {

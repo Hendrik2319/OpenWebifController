@@ -1152,6 +1152,15 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
 		openUrlInVideoPlayer(url, String.format("stream station: %s", stationID.toIDStr()));
 	}
+	public static void streamStation(StationID stationID, String baseURL) {
+		if (stationID==null) return;
+		if (baseURL==null) return;
+		String url = OpenWebifTools.getStationStreamURL(baseURL, stationID);
+		openUrlInVideoPlayer_(url, String.format("stream station: %s", stationID.toIDStr()));
+	}
+	public static boolean canStreamStation() {
+		return hasVideoPlayer() && hasJavaVM();
+	}
 
 	public void openEPGDialog(Bouquet bouquet) {
 		String baseURL = getBaseURL();
@@ -1160,14 +1169,22 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		EPGDialog.showDialog(mainWindow, baseURL, epg, timers, bouquetsNStations, bouquet, this);
 	}
 	
-	public void openUrlInVideoPlayer(String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL", url); }
-	public void openFileInVideoPlayer(File file, String taskLabel) { openInVideoPlayer(taskLabel, "File", file.getAbsolutePath()); }
+	public static void openUrlInVideoPlayer_ (String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL" , url                   , getVideoPlayer_(), getJavaVM_()); }
+	public static void openFileInVideoPlayer_(File  file, String taskLabel) { openInVideoPlayer(taskLabel, "File", file.getAbsolutePath(), getVideoPlayer_(), getJavaVM_()); }
+	public void openUrlInVideoPlayer (String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL" , url                   ); }
+	public void openFileInVideoPlayer(File  file, String taskLabel) { openInVideoPlayer(taskLabel, "File", file.getAbsolutePath()); }
 
 	private void openInVideoPlayer(String taskLabel, String targetLabel, String target) {
 		File videoPlayer = getVideoPlayer();
 		if (videoPlayer==null) return;
 		
 		File javaVM = getJavaVM();
+		if (javaVM==null) return;
+		
+		openInVideoPlayer(taskLabel, targetLabel, target, videoPlayer, javaVM);
+	}
+	private static void openInVideoPlayer(String taskLabel, String targetLabel, String target, File videoPlayer, File javaVM) {
+		if (videoPlayer==null) return;
 		if (javaVM==null) return;
 		
 		System.out.printf("%s%n", taskLabel);
@@ -1204,16 +1221,31 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		return baseURL;
 	}
 
-	File getJavaVM     () { return getExecutable(AppSettings.ValueKey.JavaVM     , "Select Java VM"); }
+	static boolean hasJavaVM     () { return hasExecutable(AppSettings.ValueKey.JavaVM     ); }
+	static boolean hasVideoPlayer() { return hasExecutable(AppSettings.ValueKey.VideoPlayer); }
+	static boolean hasBrowser    () { return hasExecutable(AppSettings.ValueKey.Browser    ); }
+	static File getJavaVM_     () { return getExecutable(AppSettings.ValueKey.JavaVM     ); }
+	static File getVideoPlayer_() { return getExecutable(AppSettings.ValueKey.VideoPlayer); }
+	static File getBrowser_    () { return getExecutable(AppSettings.ValueKey.Browser    ); }
+	File getJavaVM     () { return getExecutable(AppSettings.ValueKey.JavaVM     , "Select Java VM"    ); }
 	File getVideoPlayer() { return getExecutable(AppSettings.ValueKey.VideoPlayer, "Select VideoPlayer"); }
 	File getBrowser    () { return getExecutable(AppSettings.ValueKey.Browser    , "Select Browser"    ); }
 	private File askUserForJavaVM     () { return askUserForExecutable(AppSettings.ValueKey.JavaVM     , "Select Java VM"    ); }
 	private File askUserForVideoPlayer() { return askUserForExecutable(AppSettings.ValueKey.VideoPlayer, "Select VideoPlayer"); }
 	private File askUserForBrowser    () { return askUserForExecutable(AppSettings.ValueKey.Browser    , "Select Browser"    ); }
 
+	private static boolean hasExecutable(AppSettings.ValueKey valueKey) {
+		if (!settings.contains(valueKey)) return false;
+		File executable = getExecutable(valueKey);
+		return executable.isFile();
+	}
+	
 	private File getExecutable(AppSettings.ValueKey valueKey, String dialogTitle) {
 		if (!settings.contains(valueKey))
 			return askUserForExecutable(valueKey, dialogTitle);
+		return getExecutable(valueKey);
+	}
+	static File getExecutable(AppSettings.ValueKey valueKey) {
 		return settings.getFile(valueKey, null);
 	}
 

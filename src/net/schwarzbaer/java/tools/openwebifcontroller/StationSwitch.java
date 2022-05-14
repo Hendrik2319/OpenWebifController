@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.image.BufferedImage;
 
@@ -64,7 +63,7 @@ class StationSwitch {
 		selectedStation = null;
 		
 		mainWindow = OpenWebifController.createMainWindow("Station Switch",asSubWindow);
-		stationPanel = new JPanel(new GridLayout(0,1));
+		stationPanel = new JPanel(new GridBagLayout());
 		
 		OpenWebifController.AbstractControlPanel.ExternCommands controlPanelCommands = new OpenWebifController.AbstractControlPanel.ExternCommands() {
 			@Override public void showMessageResponse(MessageResponse response, String title) {
@@ -90,13 +89,29 @@ class StationSwitch {
 			Bouquet.SubService station = selectedStation;
 			if (station==null) return;
 			
-			JButton button = OpenWebifController.createButton(station.name, true, e1->{
+			JLabel label = new JLabel(station.name);
+			
+			JButton btnZap = OpenWebifController.createButton("Switch", true, e1->{
 				if (baseURL==null) return;
 				OpenWebifController.zapToStation(station.service.stationID, baseURL);
 			});
-			button.setHorizontalAlignment(JButton.LEFT);
 			
-			stationPanel.add(button);
+			JButton btnStream = OpenWebifController.createButton("Stream", true, e1->{
+				if (baseURL==null) return;
+				OpenWebifController.streamStation(station.service.stationID, baseURL);
+			});
+			btnStream.setEnabled(OpenWebifController.canStreamStation());
+			
+			GridBagConstraints c = new GridBagConstraints();
+			c.fill = GridBagConstraints.BOTH;
+			c.gridwidth = 1;
+			c.weightx = 0;
+			stationPanel.add(label,c);
+			c.weightx = 1;
+			stationPanel.add(btnZap,c);
+			c.gridwidth = GridBagConstraints.REMAINDER;
+			stationPanel.add(btnStream,c);
+			
 			mainWindow.pack();
 			
 			if (baseURL!=null)
@@ -105,7 +120,7 @@ class StationSwitch {
 					Icon icon = picon==null ? null : BouquetsNStations.getScaleIcon(picon, 20, Color.BLACK);
 					if (icon!=null)
 						SwingUtilities.invokeLater(()->{
-							button.setIcon(icon);
+							label.setIcon(icon);
 							mainWindow.pack();
 						});
 				}).start();

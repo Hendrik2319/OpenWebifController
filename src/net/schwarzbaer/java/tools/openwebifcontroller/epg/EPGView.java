@@ -25,6 +25,8 @@ import net.schwarzbaer.gui.Canvas;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
+import net.schwarzbaer.java.lib.openwebif.Timers.Timer.State;
+import net.schwarzbaer.java.lib.openwebif.Timers.Timer.Type;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
 class EPGView extends Canvas {
@@ -462,8 +464,8 @@ class EPGView extends Canvas {
 		Rectangle clip = new Rectangle(xBegin, yBegin, xEnd-xBegin, rowHeight-1-2).intersection(eventViewClip);
 		if (!clip.isEmpty()) {
 			g2.setClip(clip);
-			boolean isDisabled  = timer.timer.isDisabled();
-			boolean isRecording = timer.timer.isRecording();
+			boolean isDisabled  = timer.timer.state2 == State.Deactivated;
+			boolean isRecording = timer.timer.type   == Type.Record || timer.timer.type == Type.RecordNSwitch;
 			g2.setColor(isHovered ? COLOR_ITMER_HOVERED : isDisabled ? COLOR_ITMER_DISABLED : isRecording ? COLOR_ITMER_RECORDING : COLOR_ITMER_JUST_ZAP);
 			if (center==null) {
 				g2.drawLine(xBegin, yBegin, xEnd-1, yBegin);

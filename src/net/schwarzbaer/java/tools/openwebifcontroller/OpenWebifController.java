@@ -976,6 +976,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	public static JButton createButton(String text, Icon icon, boolean enabled, ActionListener al) {
 		return createButton(text, icon, null, enabled, al);
 	}
+	public static JButton createButton(Icon icon, Icon disabledIcon, boolean enabled, ActionListener al) {
+		return createButton(null, icon, disabledIcon, enabled, al);
+	}
 	public static JButton createButton(String text, Icon icon, Icon disabledIcon, boolean enabled, ActionListener al) {
 		JButton comp = new JButton(text);
 		setIcon(comp, icon, disabledIcon);

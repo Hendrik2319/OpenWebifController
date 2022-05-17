@@ -11,6 +11,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
@@ -96,13 +97,15 @@ public class Timers extends JSplitPane {
 
 	private void showValues(Timer timer) {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Description:\r\n").append(timer.description).append("\r\n\r\n");
-		sb.append("Extended Description:\r\n").append(timer.descriptionextended).append("\r\n\r\n");
-		sb.append(String.format("Log Entries: %d%n", timer.logentries.size()));
-		for (int i=0; i<timer.logentries.size(); i++) {
-			LogEntry entry = timer.logentries.get(i);
-			String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
-			sb.append(String.format("    [%d] %s <Type:%d> \"%s\"%n", i+1, timeStr, entry.type, entry.text));
+		if (timer!=null) {
+			sb.append("Description:\r\n").append(timer.description).append("\r\n\r\n");
+			sb.append("Extended Description:\r\n").append(timer.descriptionextended).append("\r\n\r\n");
+			sb.append(String.format("Log Entries: %d%n", timer.logentries.size()));
+			for (int i=0; i<timer.logentries.size(); i++) {
+				LogEntry entry = timer.logentries.get(i);
+				String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
+				sb.append(String.format("    [%d] %s <Type:%d> \"%s\"%n", i+1, timeStr, entry.type, entry.text));
+			}
 		}
 		textArea.setText(sb.toString());
 	}
@@ -123,6 +126,10 @@ public class Timers extends JSplitPane {
 			tableModel.setColumnWidths(table);
 			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 			TimersTableCellRenderer renderer = new TimersTableCellRenderer(tableModel);
+			table.setDefaultRenderer(String.class, renderer);
+			table.setDefaultRenderer(Double.class, renderer);
+			table.setDefaultRenderer(Long.class, renderer);
+			/*
 			tableModel.forEachColum((columnID, column) -> {
 				switch (columnID) {
 				case begin: case end: case duration:
@@ -132,6 +139,7 @@ public class Timers extends JSplitPane {
 				default: break;
 				}
 			});
+			*/
 			tableModel.setAllDefaultRenderers();
 		}
 		for (DataUpdateListener listener:dataUpdateListeners)
@@ -156,18 +164,21 @@ public class Timers extends JSplitPane {
 			TimersTableModel.ColumnID columnID = tableModel.getColumnID(columnM);
 			Timer timer = tableModel.getRow(rowM);
 			
-			if (columnID!=null && timer!=null)
-				switch (columnID) {
-				case duration      : setText(DateTimeFormatter.getDurationStr(timer.duration)); break;
-				case begin         : setText(OpenWebifController.dateTimeFormatter.getTimeStr(           timer.begin       *1000 , Locale.GERMANY,  true,  true, false, true, false)); break;
-				case end           : setText(OpenWebifController.dateTimeFormatter.getTimeStr(           timer.end         *1000 , Locale.GERMANY,  true,  true, false, true, false)); break;
-				case startprepare  : setText(OpenWebifController.dateTimeFormatter.getTimeStr(Math.round(timer.startprepare*1000), Locale.GERMANY,  true,  true, false, true, false)); break;
-				case nextactivation:
-					if (timer.nextactivation!=null)
-						setText(OpenWebifController.dateTimeFormatter.getTimeStr(timer.nextactivation.longValue()*1000, Locale.GERMANY,  true,  true, false, true, false));
-					break;
-				default: break;
-				}
+			if (columnID!=null) {
+				setHorizontalAlignment(columnID.horizontalAlignment);
+				if (timer!=null)
+					switch (columnID) {
+					case duration      : setText(DateTimeFormatter.getDurationStr(timer.duration)); break;
+					case begin         : setText(OpenWebifController.dateTimeFormatter.getTimeStr(           timer.begin       *1000 , Locale.GERMANY,  true,  true, false, true, false)); break;
+					case end           : setText(OpenWebifController.dateTimeFormatter.getTimeStr(           timer.end         *1000 , Locale.GERMANY,  true,  true, false, true, false)); break;
+					case startprepare  : setText(OpenWebifController.dateTimeFormatter.getTimeStr(Math.round(timer.startprepare*1000), Locale.GERMANY,  true,  true, false, true, false)); break;
+					case nextactivation:
+						if (timer.nextactivation!=null)
+							setText(OpenWebifController.dateTimeFormatter.getTimeStr(timer.nextactivation.longValue()*1000, Locale.GERMANY,  true,  true, false, true, false));
+						break;
+					default: break;
+					}
+			}
 			
 			return rendererComp;
 		}
@@ -178,45 +189,58 @@ public class Timers extends JSplitPane {
 		
 		// [70, 190, 180, 110, 220, 120, 350, 100, 100, 170, 170, 60, 170, 170, 50, 50, 70, 50, 60, 65, 90, 45, 70, 50, 60, 90, 50, 60, 45, 85, 100, 110, 110, 90]
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface {
-			isAutoTimer        ("isAutoTimer"        , Boolean.class,  70),
-			tags               ("tags"               , String .class, 190),
-			serviceref         ("serviceref"         , String .class, 180),
-			servicename        ("servicename"        , String .class, 110),
-			name               ("name"               , String .class, 220),
-			dirname            ("dirname"            , String .class, 120),
-			filename           ("filename"           , String .class, 350),
-			realbegin          ("realbegin"          , String .class, 100),
-			realend            ("realend"            , String .class, 100),
-			begin              ("begin"              , Long   .class, 170),
-			end                ("end"                , Long   .class, 170),
-			duration           ("duration"           , Long   .class,  60),
-			startprepare       ("startprepare"       , Double .class, 170),
-			nextactivation     ("nextactivation"     , Long   .class, 170),
-			eit                ("eit"                , Long   .class,  50),
-			justplay           ("justplay"           , Boolean.class,  50),
-			always_zap         ("always_zap"         , Boolean.class,  70),
-			disabled           ("disabled"           , Boolean.class,  50),
-			cancelled          ("cancelled"          , Boolean.class,  60),
+			isAutoTimer        ("isAutoTimer"        , Long       .class,  70, SwingConstants.CENTER),
+			type               ("Type"               , Timer.Type .class,  90),
+			state_             ("State"              , Timer.State.class,  70),
+			tags               ("tags"               , String     .class, 190),
+			serviceref         ("serviceref"         , String     .class, 180),
+			servicename        ("servicename"        , String     .class, 110),
+			name               ("name"               , String     .class, 220),
+			dirname            ("dirname"            , String     .class, 120),
+			filename           ("filename"           , String     .class, 350),
+			realbegin          ("realbegin"          , String     .class, 100),
+			realend            ("realend"            , String     .class, 100),
+			begin              ("begin"              , Long       .class, 170),
+			end                ("end"                , Long       .class, 170),
+			duration           ("duration"           , Long       .class,  60),
+			startprepare       ("startprepare"       , Double     .class, 170),
+			nextactivation     ("nextactivation"     , Long       .class, 170),
+			eit                ("eit"                , Long       .class,  50),
+			state              ("state"              , Long       .class,  45),
+			justplay           ("justplay"           , Long       .class,  50),
+			always_zap         ("always_zap"         , Long       .class,  70),
+			disabled           ("disabled"           , Long       .class,  50),
+			cancelled          ("cancelled"          , Boolean    .class,  60),
+			toggledisabled     ("toggledisabled"     , Long       .class,  85),
+			toggledisabledimg  ("toggledisabledimg"  , String     .class, 100),
 			
-			afterevent         ("afterevent"         , Long   .class,  65),
-			allow_duplicate    ("allow_duplicate"    , Boolean.class,  90),
-			asrefs             ("asrefs"             , String .class,  45),
-			autoadjust         ("autoadjust"         , Long   .class,  70),
-			backoff            ("backoff"            , Long   .class,  50),
-			dontsave           ("dontsave"           , Boolean.class,  60),
-			firsttryprepare    ("firsttryprepare"    , Long   .class,  90),
-			pipzap             ("pipzap"             , Long   .class,  50),
-			repeated           ("repeated"           , Long   .class,  60),
-			state              ("state"              , Long   .class,  45),
-			toggledisabled     ("toggledisabled"     , Boolean.class,  85),
-			toggledisabledimg  ("toggledisabledimg"  , String .class, 100),
-			vpsplugin_enabled  ("vpsplugin_enabled"  , Boolean.class, 110),
-			vpsplugin_overwrite("vpsplugin_overwrite", Boolean.class, 110),
-			vpsplugin_time     ("vpsplugin_time"     , Long   .class,  90),
+			afterevent         ("afterevent"         , Long       .class,  65),
+			allow_duplicate    ("allow_duplicate"    , Long       .class,  90),
+			asrefs             ("asrefs"             , String     .class,  45),
+			autoadjust         ("autoadjust"         , Long       .class,  70),
+			backoff            ("backoff"            , Long       .class,  50),
+			dontsave           ("dontsave"           , Long       .class,  60),
+			firsttryprepare    ("firsttryprepare"    , Long       .class,  90),
+			pipzap             ("pipzap"             , Long       .class,  50),
+			repeated           ("repeated"           , Long       .class,  60),
+			vpsplugin_enabled  ("vpsplugin_enabled"  , Boolean    .class, 110),
+			vpsplugin_overwrite("vpsplugin_overwrite", Boolean    .class, 110),
+			vpsplugin_time     ("vpsplugin_time"     , Long       .class,  90),
 			;
 			private final SimplifiedColumnConfig config;
+			private final int horizontalAlignment;
 			ColumnID(String name, Class<?> columnClass, int prefWidth) {
+				this(name, columnClass, prefWidth, getDefaultHorizontalAlignment(columnClass));
+			}
+			ColumnID(String name, Class<?> columnClass, int prefWidth, int horizontalAlignment) {
+				this.horizontalAlignment = horizontalAlignment;
 				config = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
+			}
+			private static int getDefaultHorizontalAlignment(Class<?> columnClass) {
+				if (columnClass == null) return SwingConstants.LEFT;
+				if (columnClass == String.class) return SwingConstants.LEFT;
+				if (Number.class.isAssignableFrom(columnClass)) return SwingConstants.RIGHT;
+				return SwingConstants.LEFT;
 			}
 			@Override public SimplifiedColumnConfig getColumnConfig() { return this.config; }
 		}
@@ -264,27 +288,29 @@ public class Timers extends JSplitPane {
 			case startprepare       : return timer.startprepare       ;
 			case nextactivation     : return timer.nextactivation     ;
 			case eit                : return timer.eit                ;
-			case isAutoTimer        : return timer.isAutoTimer==1     ;
+			case isAutoTimer        : return timer.isAutoTimer        ;
 			case tags               : return timer.tags               ;
 			case afterevent         : return timer.afterevent         ;
-			case allow_duplicate    : return timer.allow_duplicate==1 ;
-			case always_zap         : return timer.always_zap==1      ;
+			case allow_duplicate    : return timer.allow_duplicate    ;
+			case always_zap         : return timer.always_zap         ;
 			case asrefs             : return timer.asrefs             ;
 			case autoadjust         : return timer.autoadjust         ;
 			case backoff            : return timer.backoff            ;
 			case cancelled          : return timer.cancelled          ;
-			case disabled           : return timer.disabled==1        ;
-			case dontsave           : return timer.dontsave==1        ;
+			case disabled           : return timer.disabled           ;
+			case dontsave           : return timer.dontsave           ;
 			case firsttryprepare    : return timer.firsttryprepare    ;
-			case justplay           : return timer.justplay==1        ;
+			case justplay           : return timer.justplay           ;
 			case pipzap             : return timer.pipzap             ;
 			case repeated           : return timer.repeated           ;
 			case state              : return timer.state              ;
-			case toggledisabled     : return timer.toggledisabled==1  ;
+			case toggledisabled     : return timer.toggledisabled     ;
 			case toggledisabledimg  : return timer.toggledisabledimg  ;
 			case vpsplugin_enabled  : return timer.vpsplugin_enabled  ;
 			case vpsplugin_overwrite: return timer.vpsplugin_overwrite;
 			case vpsplugin_time     : return timer.vpsplugin_time     ;
+			case type               : return timer.type;
+			case state_             : return timer.state2;
 			}
 			return null;
 		}

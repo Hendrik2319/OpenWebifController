@@ -7,35 +7,49 @@ import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.Point;
+import java.awt.Window;
 import java.awt.image.BufferedImage;
+import java.util.Locale;
+import java.util.Vector;
+import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.ListCellRenderer;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.table.TableCellRenderer;
 
+import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.Tables;
+import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.Timers;
+import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.PowerControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.VolumeControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
+import net.schwarzbaer.system.DateTimeFormatter;
 
 class StationSwitch {
 
@@ -172,7 +186,11 @@ class StationSwitch {
 		scrlpActiveTimers.setToolTipText("Active Timers");
 		scrlpActiveTimers.setPreferredSize(new Dimension(300,70));
 		btnShowTimers = OpenWebifController.createButton("Timer", false, e-> {
-			// TODO
+			if (timerData==null) {
+				//System.err.printf("timerData == null%n");
+				return;
+			}
+			TimersDialog.showDialog(mainWindow,timerData.timers);
 		});
 		txtActiveTimers.setEnabled(false);
 		btnShowTimers.setEnabled(false);
@@ -295,7 +313,10 @@ class StationSwitch {
 			isFirst = false;
 		}
 		
-		txtActiveTimers.setText(sb.toString());
+		String str = sb.toString();
+		if (str.isBlank())
+			str = "No Active Timers";
+		txtActiveTimers.setText(str);
 	}
 
 	private void initializeBouquetData(ProgressDialog pd) {
@@ -328,5 +349,199 @@ class StationSwitch {
 		}
 	
 	}
+	
+	private static class TimersDialog extends JDialog {
+		private static final long serialVersionUID = -6615053929219118162L;
+		private static TimersDialog instance = null;
+		
+		private final Window window;
+		private final JTable table;
+		private final JScrollPane tableScrollPane;
+		private TimersTableModel tableModel;
 
+		TimersDialog(Window window) {
+			super(window, "Timers", ModalityType.APPLICATION_MODAL);
+			this.window = window;
+			
+			tableModel = null;
+			table = new JTable();
+			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+			new TimersTableContextMenu().addTo(table);
+			
+			tableScrollPane = new JScrollPane(table);
+			tableScrollPane.setPreferredSize(new Dimension(300, 600));
+			
+			setContentPane(tableScrollPane);
+		}
+		
+		void showDialog(Vector<Timer> data) {
+			tableModel = new TimersTableModel(data);
+			table.setModel(tableModel);
+			tableModel.setTable(table);
+			tableModel.setColumnWidths(table);
+			tableModel.setAllDefaultRenderers();
+			
+			Dimension size = table.getPreferredSize();
+			tableScrollPane.setPreferredSize(new Dimension(size.width+25, 600));
+			
+			pack();
+			setLocationRelativeTo(window);
+			setVisible(true);
+		}
+		
+		static void showDialog(Window window, Vector<Timer> data) {
+			if (instance == null) {
+				instance = new TimersDialog(window);
+				instance.setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE);
+			}
+			instance.showDialog(data);
+		}
+		
+		private class TimersTableContextMenu extends ContextMenu {
+			private static final long serialVersionUID = -8581851712142869327L;
+			private final JMenuItem miToggleTimer;
+			private final JMenuItem miDeleteTimer;
+			private Timer clickedTimer;
+			
+			TimersTableContextMenu() {
+				clickedTimer = null;
+				add(miToggleTimer = OpenWebifController.createMenuItem("Toggle Timer", e->toggleTimer()));
+				add(miDeleteTimer = OpenWebifController.createMenuItem("Delete Timer", e->deleteTimer()));
+				addContextMenuInvokeListener((comp, x, y) -> {
+					int rowV = table.rowAtPoint(new Point(x,y));
+					int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
+					clickedTimer = tableModel==null ? null : tableModel.getRow(rowM);
+					miToggleTimer.setEnabled(clickedTimer!=null);
+					miDeleteTimer.setEnabled(clickedTimer!=null);
+					if (clickedTimer!=null) {
+						miToggleTimer.setText(String.format("Toggle Timer \"%s: %s\"", clickedTimer.servicename, clickedTimer.name));
+						miDeleteTimer.setText(String.format("Delete Timer \"%s: %s\"", clickedTimer.servicename, clickedTimer.name));
+					} else {
+						miToggleTimer.setText("Toggle Timer");
+						miDeleteTimer.setText("Delete Timer");
+					}
+				});
+			}
+
+			private void deleteTimer() {
+				if (clickedTimer==null) return;
+				OpenWebifController.runWithProgressDialog(TimersDialog.this, "Delete Timer", pd->{
+					String baseURL = OpenWebifController.getBaseURL(true, TimersDialog.this);
+					OpenWebifTools.MessageResponse response = Timers.deleteTimer(baseURL, clickedTimer.serviceref, clickedTimer.begin, clickedTimer.end, taskTitle->{
+						OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
+					});
+					OpenWebifController.showMessageResponse(TimersDialog.this, response, "Delete Timer");
+				});
+			}
+
+			private void toggleTimer() {
+				if (clickedTimer==null) return;
+				OpenWebifController.runWithProgressDialog(TimersDialog.this, "Toggle Timer", pd->{
+					String baseURL = OpenWebifController.getBaseURL(true, TimersDialog.this);
+					OpenWebifTools.MessageResponse response = Timers.toggleTimer(baseURL, clickedTimer.serviceref, clickedTimer.begin, clickedTimer.end, taskTitle->{
+						OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
+					});
+					OpenWebifController.showMessageResponse(TimersDialog.this, response, "Toggle Timer");
+				});
+			}
+		}
+	}
+	
+	private static class TimersTableRenderer implements TableCellRenderer {
+		
+		private final Tables.LabelRendererComponent rendererComp;
+		private final TimersTableModel tableModel;
+
+		TimersTableRenderer(TimersTableModel tableModel) {
+			this.tableModel = tableModel;
+			rendererComp = new Tables.LabelRendererComponent();
+		}
+
+		@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV) {
+			
+			Supplier<Color> bgCol = null;
+			Supplier<Color> fgCol = null;
+			String valueStr = value==null ? null : value.toString();
+			
+			int columnM = table.convertColumnIndexToModel(columnV);
+			TimersTableModel.ColumnID columnID = tableModel.getColumnID(columnM);
+			
+			if (value instanceof Timer.Type)
+				bgCol = ()->net.schwarzbaer.java.tools.openwebifcontroller.Timers.TimersTableCellRenderer.getBgColor((Timer.Type) value);
+				
+			if (value instanceof Timer.State)
+				bgCol = ()->net.schwarzbaer.java.tools.openwebifcontroller.Timers.TimersTableCellRenderer.getBgColor((Timer.State) value);
+				
+			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
+			rendererComp.setHorizontalAlignment(columnID.horizontalAlignment);
+			
+			return rendererComp;
+		}
+	}
+	
+	private static class TimersTableModel extends Tables.SimplifiedTableModel<TimersTableModel.ColumnID> {
+
+		enum ColumnID implements Tables.SimplifiedColumnIDInterface {
+			type               ("Type"               , Timer.Type .class,  90, SwingConstants.CENTER),
+			state              ("State"              , Timer.State.class,  70, SwingConstants.CENTER),
+			servicename        ("Station"            , String     .class, 110),
+			name               ("Name"               , String     .class, 220),
+			_date_             ("Date"               , String     .class, 115, SwingConstants.RIGHT),
+			begin              ("Begin"              , String     .class,  55, SwingConstants.RIGHT),
+			end                ("End"                , String     .class,  55, SwingConstants.RIGHT),
+			duration           ("Duration"           , String     .class,  60, SwingConstants.RIGHT),
+			;
+			private final SimplifiedColumnConfig config;
+			private final int horizontalAlignment;
+			ColumnID(String name, Class<?> columnClass, int width) {
+				this(name, columnClass, width, SwingConstants.LEFT);
+			}
+			ColumnID(String name, Class<?> columnClass, int width, int horizontalAlignment) {
+				this.horizontalAlignment = horizontalAlignment;
+				config = new SimplifiedColumnConfig(name, columnClass, 20, -1, width, width);
+			}
+			@Override public SimplifiedColumnConfig getColumnConfig() { return config; }
+		}
+
+		private final Vector<Timer> data;
+
+		private TimersTableModel(Vector<Timer> data) {
+			super(ColumnID.values());
+			if (data==null) throw new IllegalArgumentException();
+			this.data = data;
+		}
+
+		private void setAllDefaultRenderers() {
+			TimersTableRenderer renderer = new TimersTableRenderer(this);
+			table.setDefaultRenderer(Timer.Type .class, renderer);
+			table.setDefaultRenderer(Timer.State.class, renderer);
+			table.setDefaultRenderer(String     .class, renderer);
+		}
+
+		@Override public int getRowCount() {
+			return data.size();
+		}
+
+		private Timer getRow(int rowIndex) {
+			if (rowIndex < 0 || data.size() <= rowIndex) return null;
+			return data.get(rowIndex);
+		}
+
+		@Override public Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID) {
+			Timer timer = getRow(rowIndex);
+			
+			if (timer!=null)
+				switch (columnID) {
+				case state      : return timer.state2;
+				case type       : return timer.type;
+				case servicename: return timer.servicename;
+				case name       : return timer.name;
+				case _date_     : return OpenWebifController.dateTimeFormatter.getTimeStr( timer.begin*1000, Locale.GERMANY,   true,   true, false, false, false);
+				case begin      : return OpenWebifController.dateTimeFormatter.getTimeStr( timer.begin*1000, Locale.GERMANY,  false,  false, false,  true, false);
+				case end        : return OpenWebifController.dateTimeFormatter.getTimeStr( timer.end  *1000, Locale.GERMANY,  false,  false, false,  true, false);
+				case duration   : return DateTimeFormatter.getDurationStr(timer.duration);
+				}
+			return null;
+		}
+	}
 }

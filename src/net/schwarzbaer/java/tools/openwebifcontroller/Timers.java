@@ -1,9 +1,12 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.util.Locale;
 import java.util.Vector;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
 import javax.swing.JMenuItem;
@@ -12,8 +15,8 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
-import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
 
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.ProgressView;
@@ -125,62 +128,109 @@ public class Timers extends JSplitPane {
 			tableModel.setTable(table);
 			tableModel.setColumnWidths(table);
 			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-			TimersTableCellRenderer renderer = new TimersTableCellRenderer(tableModel);
-			table.setDefaultRenderer(String.class, renderer);
-			table.setDefaultRenderer(Double.class, renderer);
-			table.setDefaultRenderer(Long.class, renderer);
-			/*
-			tableModel.forEachColum((columnID, column) -> {
-				switch (columnID) {
-				case begin: case end: case duration:
-				case startprepare: case nextactivation:
-					column.setCellRenderer(renderer);
-					break;
-				default: break;
-				}
-			});
-			*/
 			tableModel.setAllDefaultRenderers();
 		}
 		for (DataUpdateListener listener:dataUpdateListeners)
 			listener.timersHasUpdated(timers);
 	}
 	
-	private static class TimersTableCellRenderer extends DefaultTableCellRenderer {
-		private static final long serialVersionUID = -2154233305983187976L;
+	static class TimersTableCellRenderer implements TableCellRenderer {
+		
+		private static final Color COLOR_Type_Record        = new Color(0xD9D9FF);
+		private static final Color COLOR_Type_RecordNSwitch = new Color(0xD9FFFF);
+		private static final Color COLOR_Type_Switch        = new Color(0xFFEDD9);
+		private static final Color COLOR_State_Running      = new Color(0xFFFFD9);
+		private static final Color COLOR_State_Waiting      = new Color(0xD9FFD9);
+		private static final Color COLOR_State_Finished     = new Color(0xFFD9D9);
+		private static final Color COLOR_State_Deactivated  = new Color(0xD9D9D9);
+		private static final Color COLOR_Unknown            = new Color(0xFF5CFF);
 		
 		private final TimersTableModel tableModel;
+		private final Tables.LabelRendererComponent labRenderer;
+		private final Tables.CheckBoxRendererComponent chkbxRenderer;
 
-		public TimersTableCellRenderer(TimersTableModel tableModel) {
+		private TimersTableCellRenderer(TimersTableModel tableModel) {
+			labRenderer = new Tables.LabelRendererComponent();
+			chkbxRenderer = new Tables.CheckBoxRendererComponent();
 			this.tableModel = tableModel;
+		}
+		
+		static Color getBgColor(Timer.Type type) {
+			switch (type) {
+			case Record       : return COLOR_Type_Record;
+			case RecordNSwitch: return COLOR_Type_RecordNSwitch;
+			case Switch       : return COLOR_Type_Switch;
+			case Unknown      : return COLOR_Unknown;
+			}
+			return null;
+		}
+		
+		static Color getBgColor(Timer.State state) {
+			switch (state) {
+			case Running    : return COLOR_State_Running;
+			case Waiting    : return COLOR_State_Waiting;
+			case Finished   : return COLOR_State_Finished;
+			case Deactivated: return COLOR_State_Deactivated;
+			case Unknown    : return COLOR_Unknown;
+			}
+			return null;
 		}
 
 		@Override
 		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV) {
-			Component rendererComp = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, rowV, columnV);
+			//Component rendererComp = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, rowV, columnV);
 			
 			int    rowM = table.convertRowIndexToModel   (   rowV);
 			int columnM = table.convertColumnIndexToModel(columnV);
 			TimersTableModel.ColumnID columnID = tableModel.getColumnID(columnM);
 			Timer timer = tableModel.getRow(rowM);
 			
+			Component rendererComp = labRenderer;
+			
 			if (columnID!=null) {
-				setHorizontalAlignment(columnID.horizontalAlignment);
-				if (timer!=null)
+				Supplier<Color> bgCol = ()->timer==null ? null : getBgColor(timer.state2);
+				Supplier<Color> fgCol = null;
+				if (columnID.config.columnClass==Boolean.class) {
+					if (value instanceof Boolean) {
+						rendererComp = chkbxRenderer;
+						chkbxRenderer.configureAsTableCellRendererComponent(table, ((Boolean) value).booleanValue(), null, isSelected, hasFocus, fgCol, bgCol);
+						chkbxRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+					} else
+						labRenderer.configureAsTableCellRendererComponent(table, null, "", isSelected, hasFocus, bgCol, fgCol);
+					
+				} else {
+					if (columnID.config.columnClass==Timer.Type.class && value instanceof Timer.Type)
+						bgCol = ()->getBgColor((Timer.Type) value);
+					
+					String valueStr = null;
 					switch (columnID) {
-					case duration      : setText(DateTimeFormatter.getDurationStr(timer.duration)); break;
-					case begin         : setText(OpenWebifController.dateTimeFormatter.getTimeStr(           timer.begin       *1000 , Locale.GERMANY,  true,  true, false, true, false)); break;
-					case end           : setText(OpenWebifController.dateTimeFormatter.getTimeStr(           timer.end         *1000 , Locale.GERMANY,  true,  true, false, true, false)); break;
-					case startprepare  : setText(OpenWebifController.dateTimeFormatter.getTimeStr(Math.round(timer.startprepare*1000), Locale.GERMANY,  true,  true, false, true, false)); break;
-					case nextactivation:
-						if (timer.nextactivation!=null)
-							setText(OpenWebifController.dateTimeFormatter.getTimeStr(timer.nextactivation.longValue()*1000, Locale.GERMANY,  true,  true, false, true, false));
+					
+					case duration    : valueStr = generateText(Long  .class, value, DateTimeFormatter::getDurationStr); break;
+					case startprepare: valueStr = generateText(Double.class, value, d->formatSec(Math.round(d*1000))); break;
+					
+					case begin: case end: case nextactivation:
+						valueStr = generateText(Long.class, value, t->formatSec(t*1000));
 						break;
-					default: break;
+						
+					default:
+						valueStr = value==null ? null : value.toString();
+						break;
 					}
+					labRenderer.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
+					labRenderer.setHorizontalAlignment(columnID.horizontalAlignment);
+				}
 			}
 			
 			return rendererComp;
+		}
+
+		private String formatSec(long millis) {
+			return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  true,  true, false, true, false);
+		}
+		
+		private <V> String generateText(Class<V> class_, Object value, Function<V,String> toString) {
+			if (!class_.isInstance(value)) return null;
+			return toString.apply(class_.cast(value));
 		}
 		
 	}
@@ -212,7 +262,7 @@ public class Timers extends JSplitPane {
 			disabled           ("disabled"           , Long       .class,  50),
 			cancelled          ("cancelled"          , Boolean    .class,  60),
 			toggledisabled     ("toggledisabled"     , Long       .class,  85),
-			toggledisabledimg  ("toggledisabledimg"  , String     .class, 100),
+			toggledisabledimg  ("toggledisabledimg"  , String     .class, 100, SwingConstants.RIGHT),
 			
 			afterevent         ("afterevent"         , Long       .class,  65),
 			allow_duplicate    ("allow_duplicate"    , Long       .class,  90),
@@ -253,12 +303,13 @@ public class Timers extends JSplitPane {
 		}
 
 		public void setAllDefaultRenderers() {
-			//setAllDefaultRenderers(columnClass->{
-			//	if ()
-			//	return new DefaultTableCellRenderer();
-			//});
-			// TODO Auto-generated method stub: setAllDefaultRenderers
-			
+			TimersTableCellRenderer renderer = new TimersTableCellRenderer(this);
+			table.setDefaultRenderer(Timer.Type .class, renderer);
+			table.setDefaultRenderer(Timer.State.class, renderer);
+			table.setDefaultRenderer(Boolean    .class, renderer);
+			table.setDefaultRenderer(String     .class, renderer);
+			table.setDefaultRenderer(Double     .class, renderer);
+			table.setDefaultRenderer(Long       .class, renderer);
 		}
 
 		@Override public int getRowCount() {

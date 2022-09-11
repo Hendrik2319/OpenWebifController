@@ -35,6 +35,7 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.table.TableCellRenderer;
 
 import net.schwarzbaer.gui.ContextMenu;
+import net.schwarzbaer.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.gui.Tables;
@@ -45,7 +46,6 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.PowerControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.VolumeControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
@@ -102,7 +102,7 @@ class StationSwitch {
 		volumeControl = new OpenWebifController.VolumeControl(controlPanelCommands,false,true,true);
 		powerControl.addUpdateTask(baseURL -> volumeControl.initialize(baseURL,null));
 		
-		btnBouquetData = OpenWebifController.createButton(CommandIcons.Download.getIcon(), CommandIcons.Download_Dis.getIcon(), true, e->{
+		btnBouquetData = OpenWebifController.createButton(GrayCommandIcons.Download.getIcon(), GrayCommandIcons.Download_Dis.getIcon(), true, e->{
 			String title = (bouquetData == null ? "Load" : "Reload") +" Bouquet Data";
 			OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeBouquetData);
 			mainWindow.pack();
@@ -172,7 +172,7 @@ class StationSwitch {
 		
 		
 		
-		btnTimerData = OpenWebifController.createButton(CommandIcons.Download.getIcon(), CommandIcons.Download_Dis.getIcon(), true, e-> {
+		btnTimerData = OpenWebifController.createButton(GrayCommandIcons.Download.getIcon(), GrayCommandIcons.Download_Dis.getIcon(), true, e-> {
 			String title = (timerData == null ? "Load" : "Reload") +" Bouquet Data";
 			OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeTimerData);
 		});
@@ -292,7 +292,7 @@ class StationSwitch {
 		
 		SwingUtilities.invokeLater(()->{
 			btnTimerData.setToolTipText("Reload Timer Data");
-			OpenWebifController.setIcon(btnTimerData, CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon());
+			OpenWebifController.setIcon(btnTimerData, GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon());
 			txtActiveTimers.setEnabled(timerData != null);
 			btnShowTimers.setEnabled(timerData != null);
 			updateActiveTimersText();
@@ -327,7 +327,7 @@ class StationSwitch {
 		
 		SwingUtilities.invokeLater(()->{
 			btnBouquetData.setToolTipText("Reload Bouquet Data");
-			OpenWebifController.setIcon(btnBouquetData, CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon());
+			OpenWebifController.setIcon(btnBouquetData, GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon());
 			cmbbxBouquet.setModel  (bouquetData==null ? new DefaultComboBoxModel<Bouquet>() : new DefaultComboBoxModel<Bouquet>(bouquetData.bouquets));
 			cmbbxBouquet.setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
 			labBouquet  .setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());

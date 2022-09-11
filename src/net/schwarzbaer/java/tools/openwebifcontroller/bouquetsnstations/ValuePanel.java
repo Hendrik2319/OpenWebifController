@@ -11,11 +11,11 @@ import javax.swing.JSplitPane;
 import javax.swing.tree.TreePath;
 
 import net.schwarzbaer.gui.ContextMenu;
+import net.schwarzbaer.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.gui.ImageView;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 
 class ValuePanel {
@@ -58,7 +58,7 @@ class ValuePanel {
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateEPGAlways, updateEPGAlways = isChecked);
 		}) );
 		
-		textViewContextMenu.add(miUpdateEPG = OpenWebifController.createMenuItem("Update EPG Now", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
+		textViewContextMenu.add(miUpdateEPG = OpenWebifController.createMenuItem("Update EPG Now", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
 			if (shownStationNode != null)
 				startEpgUpdate(shownStationNode, this.getBaseURL.get());
 		}) );

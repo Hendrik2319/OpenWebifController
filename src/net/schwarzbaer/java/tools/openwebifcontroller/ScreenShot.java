@@ -21,7 +21,7 @@ import javax.swing.SwingUtilities;
 import net.schwarzbaer.gui.ImageView;
 import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.LedIcons;
 
 class ScreenShot extends JPanel {
 	private static final long serialVersionUID = 4685951556648091350L;
@@ -124,14 +124,14 @@ class ScreenShot extends JPanel {
 
 	private void updateScreenShot(String baseURL) {
 		SwingUtilities.invokeLater(()->{
-			updateButton.setIcon(CommandIcons.LED_yellow.getIcon());
+			updateButton.setIcon(LedIcons.LED_yellow.getIcon());
 		});
 		
 		BufferedImage image = OpenWebifTools.getScreenShot(baseURL, content, resolution);
 		
 		SwingUtilities.invokeLater(()->{
 			screenshotView.setImage(image);
-			updateButton.setIcon(CommandIcons.LED_green.getIcon());
+			updateButton.setIcon(LedIcons.LED_green.getIcon());
 		});
 	}
 

@@ -58,6 +58,7 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import net.schwarzbaer.gui.ContextMenu;
+import net.schwarzbaer.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.gui.IconSource;
 import net.schwarzbaer.gui.MultiStepProgressDialog;
 import net.schwarzbaer.gui.ProgressDialog;
@@ -92,19 +93,17 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		}
 	}
 	
-	private static IconSource.CachedIcons<TreeIcons> TreeIconsIS = IconSource.createCachedIcons(16, 16, "/images/TreeIcons.png", TreeIcons.values());
 	public enum TreeIcons {
 		Folder, GreenFolder;
-		public Icon getIcon() { return TreeIconsIS.getCachedIcon(this); }
+		public Icon getIcon() { return IS.getCachedIcon(this); }
+		private static IconSource.CachedIcons<TreeIcons> IS = IconSource.createCachedIcons(16, 16, "/images/TreeIcons.png", TreeIcons.values());
 	}
 	
-	private static IconSource.CachedIcons<CommandIcons> CommandIconsIS = IconSource.createCachedIcons(16, 16, 10, "/images/CommandIcons.png", CommandIcons.values());
-	public enum CommandIcons {
-		Muted, UnMuted, Up, Down, Power_IsOn, Power_IsOff, Reload, Download, Image, Save,
-		Muted_Dis, UnMuted_Dis, Up_Dis, Down_Dis, Power_IsOn_Dis, Power_IsOff_Dis, Reload_Dis, Download_Dis, Image_Dis, Save_Dis,
+	public enum LedIcons {
 		LED_green, LED_yellow,
 		;
-		public Icon getIcon() { return CommandIconsIS.getCachedIcon(this); }
+		public Icon getIcon() { return IS.getCachedIcon(this); }
+		private static IconSource.CachedIcons<LedIcons> IS = IconSource.createCachedIcons(16, 16, "/images/LedIcons.png", LedIcons.values());
 	}
 	
 	public static AppSettings settings = new AppSettings();
@@ -710,7 +709,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			c.fill = GridBagConstraints.BOTH;
 			
 			if (this.isSmall && isStretchable) c.weightx = 1;
-			add(btnPower = createButton(isSmall ? null : "Toggle StandBy", CommandIcons.Power_IsOn.getIcon(), CommandIcons.Power_IsOn_Dis.getIcon(), true, e->{
+			add(btnPower = createButton(isSmall ? null : "Toggle StandBy", GrayCommandIcons.Power_IsOn.getIcon(), GrayCommandIcons.Power_IsOn_Dis.getIcon(), true, e->{
 				callCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->{
 					Power.Values state = Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle);
 					for (UpdateTask ut : updateTasks) ut.update(baseURL);
@@ -732,7 +731,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				}), c);
 				if (isStretchable) c.weightx = 0;
 				
-				add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), true), c);
+				add(btnUpdate = createUpdateButton("Update", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), true), c);
 			} else {
 				cmbbxSetOtherState = null;
 				btnUpdate = null;
@@ -760,9 +759,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				else btnPower.setText("Switch to Standby");
 			}
 			if (values.instandby)
-				setIcon(btnPower, CommandIcons.Power_IsOff.getIcon(), CommandIcons.Power_IsOff_Dis.getIcon());
+				setIcon(btnPower, GrayCommandIcons.Power_IsOff.getIcon(), GrayCommandIcons.Power_IsOff_Dis.getIcon());
 			else
-				setIcon(btnPower, CommandIcons.Power_IsOn.getIcon(), CommandIcons.Power_IsOn_Dis.getIcon());
+				setIcon(btnPower, GrayCommandIcons.Power_IsOn.getIcon(), GrayCommandIcons.Power_IsOn_Dis.getIcon());
 		}
 
 		@Override protected void setPanelEnable(boolean enabled) {
@@ -807,12 +806,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			if (this.isSmall && isStretchable) c.weightx = 1;
 			add(btnVolDown = createButton("-", true, e->setVolDown(null)), c);
 			add(btnVolUp   = createButton("+", true, e->setVolUp  (null)), c);
-			add(btnVolMute = createButton(isSmall ? null : "Mute", CommandIcons.Muted.getIcon(), CommandIcons.Muted_Dis.getIcon(), true, e->setVolMute(null)), c);
+			add(btnVolMute = createButton(isSmall ? null : "Mute", GrayCommandIcons.Muted.getIcon(), GrayCommandIcons.Muted_Dis.getIcon(), true, e->setVolMute(null)), c);
 			if (this.isSmall) add(txtVolume, c);
 			if (this.isSmall && isStretchable) c.weightx = 0;
 			
 			if (!this.isSmall)
-				add(btnUpdate = createUpdateButton("Update", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), false), c);
+				add(btnUpdate = createUpdateButton("Update", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), false), c);
 			else
 				btnUpdate = null;
 			
@@ -860,13 +859,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				String format;
 				if (values.ismute) {
 					format = "mute (%d)";
-					btnVolMute.setIcon(CommandIcons.UnMuted.getIcon());
-					btnVolMute.setDisabledIcon(CommandIcons.UnMuted_Dis.getIcon());
+					btnVolMute.setIcon(GrayCommandIcons.UnMuted.getIcon());
+					btnVolMute.setDisabledIcon(GrayCommandIcons.UnMuted_Dis.getIcon());
 					if (!isSmall) btnVolMute.setText("UnMute");
 				} else {
 					format = "%d";
-					btnVolMute.setIcon(CommandIcons.Muted.getIcon());
-					btnVolMute.setDisabledIcon(CommandIcons.Muted_Dis.getIcon());
+					btnVolMute.setIcon(GrayCommandIcons.Muted.getIcon());
+					btnVolMute.setDisabledIcon(GrayCommandIcons.Muted_Dis.getIcon());
 					if (!isSmall) btnVolMute.setText("Mute");
 				}
 				

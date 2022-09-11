@@ -30,6 +30,7 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
+import net.schwarzbaer.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.gui.StandardMainWindow;
@@ -38,7 +39,6 @@ import net.schwarzbaer.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
 import net.schwarzbaer.system.DateTimeFormatter;
@@ -93,10 +93,10 @@ class Movies extends JSplitPane {
 		
 		JMenuItem miReloadTable1, miOpenVideoPlayer, miOpenBrowser;
 		ContextMenu tableContextMenu = new ContextMenu();
-		tableContextMenu.add(miOpenVideoPlayer = OpenWebifController.createMenuItem("Show in VideoPlayer", CommandIcons.Image.getIcon(), CommandIcons.Image_Dis.getIcon(), e->showMovie(clickedMovie)));
-		tableContextMenu.add(miOpenBrowser     = OpenWebifController.createMenuItem("Show in Browser"    , CommandIcons.Image.getIcon(), CommandIcons.Image_Dis.getIcon(), e->showMovieInBrowser(clickedMovie)));
+		tableContextMenu.add(miOpenVideoPlayer = OpenWebifController.createMenuItem("Show in VideoPlayer", GrayCommandIcons.Image.getIcon(), GrayCommandIcons.Image_Dis.getIcon(), e->showMovie(clickedMovie)));
+		tableContextMenu.add(miOpenBrowser     = OpenWebifController.createMenuItem("Show in Browser"    , GrayCommandIcons.Image.getIcon(), GrayCommandIcons.Image_Dis.getIcon(), e->showMovieInBrowser(clickedMovie)));
 		tableContextMenu.addSeparator();
-		tableContextMenu.add(miReloadTable1 = OpenWebifController.createMenuItem("Reload Table", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->reloadTreeNode(selectedTreeNode)));
+		tableContextMenu.add(miReloadTable1 = OpenWebifController.createMenuItem("Reload Table", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->reloadTreeNode(selectedTreeNode)));
 		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 			TableColumnModel columnModel = movieTable.getColumnModel();
 			if (columnModel==null) return;
@@ -126,7 +126,7 @@ class Movies extends JSplitPane {
 		
 		JMenuItem miReloadTable2;
 		ContextMenu treeContextMenu = new ContextMenu();
-		treeContextMenu.add(miReloadTable2 = OpenWebifController.createMenuItem("Reload Folder", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->reloadTreeNode(clickedTreeNode)));
+		treeContextMenu.add(miReloadTable2 = OpenWebifController.createMenuItem("Reload Folder", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->reloadTreeNode(clickedTreeNode)));
 		
 		treeContextMenu.addTo(locationsTree);
 		treeContextMenu.addContextMenuInvokeListener((comp, x, y) -> {

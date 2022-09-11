@@ -35,6 +35,7 @@ import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.gui.ContextMenu;
 import net.schwarzbaer.gui.FileChooser;
+import net.schwarzbaer.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.gui.StandardMainWindow;
@@ -46,7 +47,6 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.CommandIcons;
 
 public class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
@@ -114,7 +114,7 @@ public class BouquetsNStations extends JPanel {
 		JMenuItem miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet, miUpdateCurrentStationNow;
 		ContextMenu treeContextMenu = new ContextMenu();
 		
-		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
+		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
 			this.main.runWithProgressDialog("Reload Bouquets", pd->{
 				OpenWebifController.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: Get BaseURL");
 				String baseURL = this.main.getBaseURL();
@@ -124,7 +124,7 @@ public class BouquetsNStations extends JPanel {
 			});
 		}));
 		
-		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
+		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", GrayCommandIcons.Save.getIcon(), GrayCommandIcons.Save_Dis.getIcon(), e->{
 			if (bsTreeRoot==null) return;
 			
 			this.main.runWithProgressDialog("Save Stations to TabSeparated-File", pd -> {
@@ -163,7 +163,7 @@ public class BouquetsNStations extends JPanel {
 			startStopPeriodicUpdater10s( ()->updatePlayableStatesPeriodically=isChecked );
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, isChecked);
 		}));
-		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
+		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
 			periodicUpdater10s.runOnce( () -> updatePlayableStates() );
 		}));
 		
@@ -172,7 +172,7 @@ public class BouquetsNStations extends JPanel {
 			startStopPeriodicUpdater10s( ()->updateCurrentStationPeriodically=isChecked );
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, isChecked);
 		}));
-		treeContextMenu.add(miUpdateCurrentStationNow = OpenWebifController.createMenuItem("Update 'Current Station' Now", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
+		treeContextMenu.add(miUpdateCurrentStationNow = OpenWebifController.createMenuItem("Update 'Current Station' Now", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
 			periodicUpdater10s.runOnce( () -> updateCurrentStation() );
 		}));
 		treeContextMenu.add(OpenWebifController.createMenuItem("Show 'Current Station' Data", e->{
@@ -181,7 +181,7 @@ public class BouquetsNStations extends JPanel {
 			//JOptionPane.showMessageDialog(mainWindow, msg, "Current Station", JOptionPane.INFORMATION_MESSAGE);
 		}));
 		
-		treeContextMenu.add(miWriteSelectedStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Selected Stations to M3U-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
+		treeContextMenu.add(miWriteSelectedStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Selected Stations to M3U-File", GrayCommandIcons.Save.getIcon(), GrayCommandIcons.Save_Dis.getIcon(), e->{
 			if (selectedStationNodes.isEmpty()) return;
 			
 			String baseURL = this.main.getBaseURL();
@@ -196,13 +196,13 @@ public class BouquetsNStations extends JPanel {
 		
 		treeContextMenu.addSeparator();
 		
-		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", CommandIcons.Reload.getIcon(), CommandIcons.Reload_Dis.getIcon(), e->{
+		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
 			periodicUpdater10s.runOnce( () -> updatePlayableStates(baseURL, clickedBouquetNode) );
 		}));
 		
-		treeContextMenu.add(miWriteBouquetStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", CommandIcons.Save.getIcon(), CommandIcons.Save_Dis.getIcon(), e->{
+		treeContextMenu.add(miWriteBouquetStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", GrayCommandIcons.Save.getIcon(), GrayCommandIcons.Save_Dis.getIcon(), e->{
 			if (clickedBouquetNode==null) return;
 			
 			String baseURL = this.main.getBaseURL();
@@ -223,7 +223,7 @@ public class BouquetsNStations extends JPanel {
 		
 		treeContextMenu.addSeparator();
 		
-		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", CommandIcons.Image.getIcon(), CommandIcons.Image_Dis.getIcon(), e->{
+		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", GrayCommandIcons.Image.getIcon(), GrayCommandIcons.Image_Dis.getIcon(), e->{
 			if (clickedBouquetNode!=null) {
 				String baseURL = this.main.getBaseURL();
 				if (baseURL==null) return;

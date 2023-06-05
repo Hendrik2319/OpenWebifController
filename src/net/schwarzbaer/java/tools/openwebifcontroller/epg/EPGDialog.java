@@ -23,8 +23,8 @@ import javax.swing.JScrollBar;
 import javax.swing.JSlider;
 import javax.swing.SwingUtilities;
 
-import net.schwarzbaer.gui.ContextMenu;
-import net.schwarzbaer.gui.StandardDialog;
+import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;

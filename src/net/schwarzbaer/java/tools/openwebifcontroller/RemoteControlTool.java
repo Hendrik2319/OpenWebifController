@@ -17,9 +17,9 @@ import javax.swing.JPanel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
-import net.schwarzbaer.gui.FileChooser;
-import net.schwarzbaer.gui.StandardMainWindow;
-import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.gui.FileChooser;
+import net.schwarzbaer.java.lib.gui.StandardMainWindow;
+import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.RemoteControl;
 import net.schwarzbaer.java.tools.imagemapeditor.Area;
 import net.schwarzbaer.java.tools.imagemapeditor.ImageMapEditor;

@@ -10,10 +10,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.tree.TreePath;
 
-import net.schwarzbaer.gui.ContextMenu;
-import net.schwarzbaer.gui.GeneralIcons.GrayCommandIcons;
-import net.schwarzbaer.gui.ImageView;
-import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.ImageView;
+import net.schwarzbaer.java.lib.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;

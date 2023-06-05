@@ -57,14 +57,14 @@ import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
-import net.schwarzbaer.gui.ContextMenu;
-import net.schwarzbaer.gui.GeneralIcons.GrayCommandIcons;
-import net.schwarzbaer.gui.IconSource;
-import net.schwarzbaer.gui.MultiStepProgressDialog;
-import net.schwarzbaer.gui.ProgressDialog;
-import net.schwarzbaer.gui.ProgressView;
-import net.schwarzbaer.gui.StandardMainWindow;
-import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.IconSource;
+import net.schwarzbaer.java.lib.gui.MultiStepProgressDialog;
+import net.schwarzbaer.java.lib.gui.ProgressDialog;
+import net.schwarzbaer.java.lib.gui.ProgressView;
+import net.schwarzbaer.java.lib.gui.StandardMainWindow;
+import net.schwarzbaer.java.lib.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.BoxSettings;
 import net.schwarzbaer.java.lib.openwebif.BoxSettings.BoxSettingsValue;
@@ -77,11 +77,11 @@ import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
+import net.schwarzbaer.java.lib.system.DateTimeFormatter;
+import net.schwarzbaer.java.lib.system.Settings;
 import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
-import net.schwarzbaer.system.DateTimeFormatter;
-import net.schwarzbaer.system.Settings;
 
 public class OpenWebifController implements EPGDialog.ExternCommands {
 	

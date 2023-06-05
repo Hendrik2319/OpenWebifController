@@ -18,8 +18,8 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
-import net.schwarzbaer.gui.ImageView;
-import net.schwarzbaer.gui.ProgressView;
+import net.schwarzbaer.java.lib.gui.ImageView;
+import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.LedIcons;
 

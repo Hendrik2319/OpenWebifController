@@ -21,8 +21,8 @@ import java.util.Vector;
 import javax.swing.BorderFactory;
 import javax.swing.border.Border;
 
-import net.schwarzbaer.gui.Canvas;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
+import net.schwarzbaer.java.lib.gui.Canvas;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer.State;

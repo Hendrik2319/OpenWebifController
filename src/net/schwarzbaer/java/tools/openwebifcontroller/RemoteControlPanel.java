@@ -18,9 +18,9 @@ import java.util.function.Consumer;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
-import net.schwarzbaer.gui.Canvas;
-import net.schwarzbaer.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
+import net.schwarzbaer.java.lib.gui.Canvas;
+import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.RemoteControl;
 import net.schwarzbaer.java.lib.openwebif.RemoteControl.Key;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;

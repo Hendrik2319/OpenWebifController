@@ -11,8 +11,8 @@ import java.util.Vector;
 
 import javax.swing.JScrollBar;
 
-import net.schwarzbaer.gui.TextAreaDialog;
-import net.schwarzbaer.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.gui.TextAreaDialog;
+import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.EventContextMenu;

@@ -3,6 +3,7 @@ package net.schwarzbaer.java.tools.openwebifcontroller;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Point;
 import java.util.Locale;
 import java.util.Vector;
 import java.util.function.Function;
@@ -21,9 +22,9 @@ import javax.swing.table.TableCellRenderer;
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.Tables;
+import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
@@ -44,7 +45,7 @@ public class Timers extends JSplitPane {
 	
 	public net.schwarzbaer.java.lib.openwebif.Timers timers;
 	private TimersTableModel tableModel;
-	private Timer selectedTimer;
+	private Timer clickedTimer;
 
 	public Timers(OpenWebifController main) {
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
@@ -63,24 +64,43 @@ public class Timers extends JSplitPane {
 			if (tableModel == null) return;
 			int rowV = table.getSelectedRow();
 			int rowM = table.convertRowIndexToModel(rowV);
-			selectedTimer = tableModel.getRow(rowM);
-			showValues(selectedTimer);
+			showValues(tableModel.getRow(rowM));
 		});
 		
 		ContextMenu tableContextMenu = new ContextMenu();
 		tableContextMenu.addTo(table);
 		
-		JMenuItem miShowSelectedRow;
-		tableContextMenu.add(miShowSelectedRow = OpenWebifController.createMenuItem("Show Details of Selected Timer", e->{
-			String text = generateOutput(selectedTimer);
-			TextAreaDialog.showText(this.main.mainWindow, "Details of Selected Timer", 800, 800, true, text);
+		JMenuItem miShowTimerDetails = tableContextMenu.add(OpenWebifController.createMenuItem("Show Details of Timer", e->{
+			if (clickedTimer==null) return;
+			String text = generateOutput(clickedTimer);
+			TextAreaDialog.showText(this.main.mainWindow, "Details of Timer", 800, 800, true, text);
 		}));
 		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 			System.out.printf("Column Widths: %s%n", TimersTableModel.getColumnWidthsAsString(table));
 		}));
+		JMenuItem miToggleTimer = tableContextMenu.add(OpenWebifController.createMenuItem("Toggle Timer", e->{
+			if (clickedTimer==null) return;
+			OpenWebifController.toggleTimer(clickedTimer, this.main.mainWindow);
+		}));
+		
+		JMenuItem miDeleteTimer = tableContextMenu.add(OpenWebifController.createMenuItem("Delete Timer", e->{
+			if (clickedTimer==null) return;
+			OpenWebifController.deleteTimer(clickedTimer, this.main.mainWindow);
+		}));
 		
 		tableContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
-			miShowSelectedRow.setEnabled(selectedTimer!=null);
+			int rowV = table.rowAtPoint(new Point(x,y));
+			int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
+			clickedTimer = tableModel==null ? null : tableModel.getRow(rowM);
+			
+			miToggleTimer     .setEnabled(clickedTimer!=null);
+			miDeleteTimer     .setEnabled(clickedTimer!=null);
+			miShowTimerDetails.setEnabled(clickedTimer!=null);
+			
+			String timerLabel = clickedTimer==null ? "" : String.format(" \"%s: %s\"", clickedTimer.servicename, clickedTimer.name);
+			miToggleTimer     .setText("Toggle Timer"+timerLabel);
+			miDeleteTimer     .setText("Delete Timer"+timerLabel);
+			miShowTimerDetails.setText("Show Details of Timer"+timerLabel);
 		});
 		
 		textArea = new ExtendedTextArea(false);

@@ -58,13 +58,13 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.MultiStepProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.BoxSettings;
 import net.schwarzbaer.java.lib.openwebif.BoxSettings.BoxSettingsValue;
@@ -76,10 +76,11 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
+import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
+import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.lib.system.Settings;
-import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
 
@@ -1127,6 +1128,28 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			});
 			showMessageResponse(response, "Toggle Timer");
 			timers.readData(baseURL,pd);
+		});
+	}
+
+	public static void deleteTimer(Timer timer, Window window)
+	{
+		runWithProgressDialog(window, "Delete Timer", pd->{
+			String baseURL = OpenWebifController.getBaseURL(true, window);
+			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.deleteTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
+				setIndeterminateProgressTask(pd, taskTitle);
+			});
+			showMessageResponse(window, response, "Delete Timer");
+		});
+	}
+
+	public static void toggleTimer(Timer timer, Window window)
+	{
+		OpenWebifController.runWithProgressDialog(window, "Toggle Timer", pd->{
+			String baseURL = OpenWebifController.getBaseURL(true, window);
+			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.toggleTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
+				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
+			});
+			OpenWebifController.showMessageResponse(window, response, "Toggle Timer");
 		});
 	}
 	

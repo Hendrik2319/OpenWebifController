@@ -25,9 +25,11 @@ import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.ListCellRenderer;
+import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
@@ -45,8 +47,10 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.Timers;
+import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.PowerControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.VolumeControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
@@ -74,7 +78,7 @@ class StationSwitch {
 	private String baseURL;
 	private BouquetData bouquetData;
 	private Bouquet.SubService selectedStation;
-	private JButton btnTimerData;
+	private JButton btnReLoadTimerData;
 	private JButton btnShowTimers;
 	private Timers timerData;
 	//private JLabel labActiveTimers;
@@ -172,11 +176,8 @@ class StationSwitch {
 		
 		
 		
-		btnTimerData = OpenWebifController.createButton(GrayCommandIcons.Download.getIcon(), GrayCommandIcons.Download_Dis.getIcon(), true, e-> {
-			String title = (timerData == null ? "Load" : "Reload") +" Bouquet Data";
-			OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeTimerData);
-		});
-		btnTimerData.setToolTipText("Load Timer Data");
+		btnReLoadTimerData = OpenWebifController.createButton(GrayCommandIcons.Download.getIcon(), GrayCommandIcons.Download_Dis.getIcon(), true, e -> reloadTimerData());
+		btnReLoadTimerData.setToolTipText("Load Timer Data");
 		
 		txtActiveTimers = new JTextArea();
 		JScrollPane scrlpActiveTimers = new JScrollPane(txtActiveTimers);
@@ -211,7 +212,7 @@ class StationSwitch {
 		
 		c.gridwidth = 1;
 		c.weightx = 0;
-		timerPanel.add(btnTimerData,c);
+		timerPanel.add(btnReLoadTimerData,c);
 		
 		c.insets = new Insets(1, 1, 1, 1);
 		c.weightx = 1;
@@ -267,6 +268,12 @@ class StationSwitch {
 		
 		mainWindow.startGUI(contentPane);
 	}
+
+	private void reloadTimerData()
+	{
+		String title = (timerData == null ? "Load" : "Reload") +" Bouquet Data";
+		OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeTimerData);
+	}
 	
 	private void initialize(String baseURL) {
 		if (baseURL==null) baseURL = OpenWebifController.getBaseURL(true, mainWindow);
@@ -291,8 +298,8 @@ class StationSwitch {
 			timerData = OpenWebifTools.readTimers(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timer Data: "+taskTitle));
 		
 		SwingUtilities.invokeLater(()->{
-			btnTimerData.setToolTipText("Reload Timer Data");
-			OpenWebifController.setIcon(btnTimerData, GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon());
+			btnReLoadTimerData.setToolTipText("Reload Timer Data");
+			OpenWebifController.setIcon(btnReLoadTimerData, GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon());
 			txtActiveTimers.setEnabled(timerData != null);
 			btnShowTimers.setEnabled(timerData != null);
 			updateActiveTimersText();
@@ -358,6 +365,7 @@ class StationSwitch {
 		private final JTable table;
 		private final JScrollPane tableScrollPane;
 		private TimersTableModel tableModel;
+		private ExtendedTextArea textArea;
 
 		TimersDialog(Window window) {
 			super(window, "Timers", ModalityType.APPLICATION_MODAL);
@@ -366,12 +374,28 @@ class StationSwitch {
 			tableModel = null;
 			table = new JTable();
 			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+			table.setColumnSelectionAllowed(false);
+			table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			table.getSelectionModel().addListSelectionListener(e->{
+				if (tableModel == null) return;
+				int rowV = table.getSelectedRow();
+				int rowM = table.convertRowIndexToModel(rowV);
+				showValues(tableModel.getRow(rowM));
+			});
 			new TimersTableContextMenu().addTo(table);
 			
 			tableScrollPane = new JScrollPane(table);
 			tableScrollPane.setPreferredSize(new Dimension(300, 600));
 			
-			setContentPane(tableScrollPane);
+			textArea = new ExtendedTextArea(false);
+			textArea.setLineWrap(true);
+			textArea.setWrapStyleWord(true);
+			
+			JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true);
+			splitPane.setLeftComponent(tableScrollPane);
+			splitPane.setRightComponent(textArea.createScrollPane(500, 500));
+			
+			setContentPane(splitPane);
 		}
 		
 		void showDialog(Vector<Timer> data) {
@@ -397,20 +421,48 @@ class StationSwitch {
 			instance.showDialog(data);
 		}
 		
+		private void showValues(Timer timer) {
+			StringBuilder sb = new StringBuilder();
+			if (timer!=null) {
+				sb.append("Description:\r\n").append(timer.description).append("\r\n\r\n");
+				sb.append("Extended Description:\r\n").append(timer.descriptionextended).append("\r\n\r\n");
+				sb.append(String.format("Log Entries: %d%n", timer.logentries.size()));
+				for (int i=0; i<timer.logentries.size(); i++) {
+					LogEntry entry = timer.logentries.get(i);
+					String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
+					sb.append(String.format("    [%d] %s <Type:%d> \"%s\"%n", i+1, timeStr, entry.type, entry.text));
+				}
+			}
+			textArea.setText(sb.toString());
+		}
+		
 		private class TimersTableContextMenu extends ContextMenu {
 			private static final long serialVersionUID = -8581851712142869327L;
-			private final JMenuItem miToggleTimer;
-			private final JMenuItem miDeleteTimer;
 			private Timer clickedTimer;
+			//private final JMenuItem miReloadTimers;
 			
 			TimersTableContextMenu() {
 				clickedTimer = null;
-				add(miToggleTimer = OpenWebifController.createMenuItem("Toggle Timer", e->toggleTimer()));
-				add(miDeleteTimer = OpenWebifController.createMenuItem("Delete Timer", e->deleteTimer()));
+				
+				JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
+					if (clickedTimer==null) return;
+					OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this);
+				}));
+				
+				JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", e->{
+					if (clickedTimer==null) return;
+					OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this);
+				}));
+				
+				//JMenuItem miReloadTimers = add(OpenWebifController.createMenuItem("Reload Timer Data", e->{
+				//	// TODO
+				//}));
+				
 				addContextMenuInvokeListener((comp, x, y) -> {
 					int rowV = table.rowAtPoint(new Point(x,y));
 					int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
 					clickedTimer = tableModel==null ? null : tableModel.getRow(rowM);
+					
 					miToggleTimer.setEnabled(clickedTimer!=null);
 					miDeleteTimer.setEnabled(clickedTimer!=null);
 					if (clickedTimer!=null) {
@@ -420,28 +472,6 @@ class StationSwitch {
 						miToggleTimer.setText("Toggle Timer");
 						miDeleteTimer.setText("Delete Timer");
 					}
-				});
-			}
-
-			private void deleteTimer() {
-				if (clickedTimer==null) return;
-				OpenWebifController.runWithProgressDialog(TimersDialog.this, "Delete Timer", pd->{
-					String baseURL = OpenWebifController.getBaseURL(true, TimersDialog.this);
-					OpenWebifTools.MessageResponse response = Timers.deleteTimer(baseURL, clickedTimer.serviceref, clickedTimer.begin, clickedTimer.end, taskTitle->{
-						OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
-					});
-					OpenWebifController.showMessageResponse(TimersDialog.this, response, "Delete Timer");
-				});
-			}
-
-			private void toggleTimer() {
-				if (clickedTimer==null) return;
-				OpenWebifController.runWithProgressDialog(TimersDialog.this, "Toggle Timer", pd->{
-					String baseURL = OpenWebifController.getBaseURL(true, TimersDialog.this);
-					OpenWebifTools.MessageResponse response = Timers.toggleTimer(baseURL, clickedTimer.serviceref, clickedTimer.begin, clickedTimer.end, taskTitle->{
-						OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
-					});
-					OpenWebifController.showMessageResponse(TimersDialog.this, response, "Toggle Timer");
 				});
 			}
 		}

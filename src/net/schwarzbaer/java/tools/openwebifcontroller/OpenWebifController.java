@@ -58,6 +58,7 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.MultiStepProgressDialog;
@@ -467,41 +468,41 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 				return true;
 			});
 			
-			addTask("Movies"               , true, false, pd->{ if (baseURL==null) return false; movies.readInitialMovieList(baseURL,pd);          return true; });
-			addTask("Bouquets 'n' Stations", true, false, pd->{ if (baseURL==null) return false; bouquetsNStations.readData(baseURL,pd);           return true; });
-			addTask("Timers"               , true, false, pd->{ if (baseURL==null) return false; timers           .readData(baseURL,pd);           return true; });
-			addTask("Remote Control"       , true,  true, pd->{ if (baseURL==null) return false; remoteControl .initialize(baseURL,pd,systemInfo); return true; });
-			addTask("ScreenShot"           , true, false, pd->{ if (baseURL==null) return false; screenShot    .initialize(baseURL,pd);            return true; });
-			addTask("Power Control"        ,              pd->{ if (baseURL==null) return false; powerControl  .initialize(baseURL,pd);            return true; });
-			addTask("Volume Control"       ,              pd->{ if (baseURL==null) return false; volumeControl .initialize(baseURL,pd);            return true; });
-			addTask("Message Control"      ,              pd->{ if (baseURL==null) return false; messageControl.initialize(baseURL,pd);            return true; });
+			addTask("Movies"               , true, false, pd->{ if (baseURL==null) return false; movies.readInitialMovieList(baseURL,pd);            return true; });
+			addTask("Bouquets 'n' Stations", true, false, pd->{ if (baseURL==null) return false; bouquetsNStations .readData(baseURL,pd);            return true; });
+			addTask("Timers"               , true, false, pd->{ if (baseURL==null) return false; timers            .readData(baseURL,pd);            return true; });
+			addTask("Remote Control"       , true,  true, pd->{ if (baseURL==null) return false; remoteControl   .initialize(baseURL,pd,systemInfo); return true; });
+			addTask("ScreenShot"           , true, false, pd->{ if (baseURL==null) return false; screenShot      .initialize(baseURL,pd);            return true; });
+			addTask("Power Control"        ,              pd->{ if (baseURL==null) return false; powerControl    .initialize(baseURL,pd);            return true; });
+			addTask("Volume Control"       ,              pd->{ if (baseURL==null) return false; volumeControl   .initialize(baseURL,pd);            return true; });
+			addTask("Message Control"      ,              pd->{ if (baseURL==null) return false; messageControl  .initialize(baseURL,pd);            return true; });
 			
 			finishGUI();
 		}
 	}
 	
 	private void fillUpdatesMenu(JMenu updatesMenu) {
-		updatesMenu.add(createMenuItem("BoxSettings", e->getBaseURLAndRunWithProgressDialog("Init/Update BoxSettings", (pd, baseURL)->{
+		updatesMenu.add(createMenuItem("BoxSettings", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update BoxSettings", (baseURL, pd)->{
 			boxSettings = BoxSettings.getSettings (baseURL, createProgressTaskFcn(pd, "BoxSettings"));
 		})));
-		updatesMenu.add(createMenuItem("SystemInfo", e->getBaseURLAndRunWithProgressDialog("Init/Update SystemInfo", (pd, baseURL)->{
+		updatesMenu.add(createMenuItem("SystemInfo", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update SystemInfo", (baseURL, pd)->{
 			systemInfo  = SystemInfo.getSystemInfo(baseURL, createProgressTaskFcn(pd, "SystemInfo"));
 			SwingUtilities.invokeLater(systemInfoPanel::update);
 		})));
-		updatesMenu.add(createMenuItem("Movies"               , e->getBaseURLAndRunWithProgressDialog("Init/Update Movies"               , (pd, baseURL)->{ movies.readInitialMovieList(baseURL,pd);          })));
-		updatesMenu.add(createMenuItem("Bouquets 'n' Stations", e->getBaseURLAndRunWithProgressDialog("Init/Update Bouquets 'n' Stations", (pd, baseURL)->{ bouquetsNStations.readData(baseURL,pd);           })));
-		updatesMenu.add(createMenuItem("Timers"               , e->getBaseURLAndRunWithProgressDialog("Init/Update Timers"               , (pd, baseURL)->{ timers           .readData(baseURL,pd);           })));
-		updatesMenu.add(createMenuItem("Remote Control"       , e->getBaseURLAndRunWithProgressDialog("Init/Update Remote Control"       , (pd, baseURL)->{ remoteControl .initialize(baseURL,pd,systemInfo); })));
-		updatesMenu.add(createMenuItem("ScreenShot"           , e->getBaseURLAndRunWithProgressDialog("Init/Update ScreenShot"           , (pd, baseURL)->{ screenShot    .initialize(baseURL,pd);            })));
-		//updatesMenu.add(createMenuItem("Power Control"        , e->getBaseURLAndRunWithProgressDialog("Init/Update Power Control"        , (pd, baseURL)->{ powerControl  .initialize(baseURL,pd);            })));
-		//updatesMenu.add(createMenuItem("Volume Control"       , e->getBaseURLAndRunWithProgressDialog("Init/Update Volume Control"       , (pd, baseURL)->{ volumeControl .initialize(baseURL,pd);            })));
-		//updatesMenu.add(createMenuItem("Message Control"      , e->getBaseURLAndRunWithProgressDialog("Init/Update Message Control"      , (pd, baseURL)->{ messageControl.initialize(baseURL,pd);            })));
+		updatesMenu.add(createMenuItem("Movies"               , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Movies"               , movies::readInitialMovieList)));
+		updatesMenu.add(createMenuItem("Bouquets 'n' Stations", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Bouquets 'n' Stations", bouquetsNStations ::readData)));
+		updatesMenu.add(createMenuItem("Timers"               , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Timers"               , timers            ::readData)));
+		updatesMenu.add(createMenuItem("Remote Control"       , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Remote Control"       , (baseURL, pd)->{ remoteControl.initialize(baseURL,pd,systemInfo); })));
+		updatesMenu.add(createMenuItem("ScreenShot"           , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update ScreenShot"           , screenShot      ::initialize)));
+	//	updatesMenu.add(createMenuItem("Power Control"        , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Power Control"        , powerControl    ::initialize)));
+	//	updatesMenu.add(createMenuItem("Volume Control"       , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Volume Control"       , volumeControl   ::initialize)));
+	//	updatesMenu.add(createMenuItem("Message Control"      , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Message Control"      , messageControl  ::initialize)));
 	}
 	
-	private void getBaseURLAndRunWithProgressDialog(String dlgTitle, BiConsumer<ProgressDialog,String> action) {
+	public void getBaseURLAndRunWithProgressDialog(String dlgTitle, BiConsumer<String,ProgressDialog> action) {
 		String baseURL = getBaseURL();
 		if (baseURL != null)
-			runWithProgressDialog(dlgTitle, pd->action.accept(pd, baseURL));
+			runWithProgressDialog(dlgTitle, pd->action.accept(baseURL, pd));
 	}
 	
 	public void runWithProgressDialog(String title, Consumer<ProgressDialog> action) {
@@ -1001,6 +1002,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	}
 	public static JMenuItem createMenuItem(String title, Icon icon, ActionListener al) {
 		return createMenuItem(title, icon, null, al);
+	}
+	public static JMenuItem createMenuItem(String title, GeneralIcons.IconGroup iconGroup, ActionListener al) {
+		return createMenuItem(title, iconGroup.getEnabledIcon(), iconGroup.getDisabledIcon(), al);
 	}
 	public static JMenuItem createMenuItem(String title, Icon icon, Icon disabledIcon, ActionListener al) {
 		JMenuItem comp = new JMenuItem(title,icon);

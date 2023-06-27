@@ -25,6 +25,7 @@ import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
@@ -41,12 +42,12 @@ public class TimersPanel extends JSplitPane {
 
 	private final OpenWebifController main;
 	private final JTable table;
+	private final JScrollPane tableScrollPane;
 	private final ExtendedTextArea textArea;
 	private final Vector<DataUpdateListener> dataUpdateListeners;
 	
-	public Timers timers;
+	private Timers timers;
 	private TimersTableModel tableModel;
-	private Timer clickedTimer;
 
 	public TimersPanel(OpenWebifController main) {
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
@@ -58,6 +59,10 @@ public class TimersPanel extends JSplitPane {
 		timers = null;
 		tableModel = null;
 		
+		textArea = new ExtendedTextArea(false);
+		textArea.setLineWrap(true);
+		textArea.setWrapStyleWord(true);
+		
 		table = new JTable();
 		table.setColumnSelectionAllowed(false);
 		table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -65,75 +70,80 @@ public class TimersPanel extends JSplitPane {
 			if (tableModel == null) return;
 			int rowV = table.getSelectedRow();
 			int rowM = table.convertRowIndexToModel(rowV);
-			showValues(tableModel.getRow(rowM));
+			textArea.setText(generateShortInfo(tableModel.getRow(rowM)));
 		});
-		
-		ContextMenu tableContextMenu = new ContextMenu();
-		tableContextMenu.addTo(table);
-		
-		JMenuItem miShowTimerDetails = tableContextMenu.add(OpenWebifController.createMenuItem("Show Details of Timer", e->{
-			if (clickedTimer==null) return;
-			String text = generateOutput(clickedTimer);
-			TextAreaDialog.showText(this.main.mainWindow, "Details of Timer", 800, 800, true, text);
-		}));
-		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
-			System.out.printf("Column Widths: %s%n", TimersTableModel.getColumnWidthsAsString(table));
-		}));
-		JMenuItem miToggleTimer = tableContextMenu.add(OpenWebifController.createMenuItem("Toggle Timer", e->{
-			if (clickedTimer==null) return;
-			OpenWebifController.toggleTimer(clickedTimer, this.main.mainWindow);
-		}));
-		
-		JMenuItem miDeleteTimer = tableContextMenu.add(OpenWebifController.createMenuItem("Delete Timer", e->{
-			if (clickedTimer==null) return;
-			OpenWebifController.deleteTimer(clickedTimer, this.main.mainWindow);
-		}));
-		
-		tableContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
-			int rowV = table.rowAtPoint(new Point(x,y));
-			int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
-			clickedTimer = tableModel==null ? null : tableModel.getRow(rowM);
-			
-			miToggleTimer     .setEnabled(clickedTimer!=null);
-			miDeleteTimer     .setEnabled(clickedTimer!=null);
-			miShowTimerDetails.setEnabled(clickedTimer!=null);
-			
-			String timerLabel = clickedTimer==null ? "" : String.format(" \"%s: %s\"", clickedTimer.servicename, clickedTimer.name);
-			miToggleTimer     .setText("Toggle Timer"+timerLabel);
-			miDeleteTimer     .setText("Delete Timer"+timerLabel);
-			miShowTimerDetails.setText("Show Details of Timer"+timerLabel);
-		});
-		
-		textArea = new ExtendedTextArea(false);
-		textArea.setLineWrap(true);
-		textArea.setWrapStyleWord(true);
-		
-		JScrollPane tableScrollPane = new JScrollPane(table);
+		tableScrollPane = new JScrollPane(table);
 		tableScrollPane.setPreferredSize(new Dimension(1000,500));
+		
+		new TableContextMenu();
+		
 		JScrollPane textScrollPane = textArea.createScrollPane(500,500);
 		
 		setLeftComponent(tableScrollPane);
 		setRightComponent(textScrollPane);
 	}
 	
+	private class TableContextMenu extends ContextMenu {
+		private static final long serialVersionUID = -1274113566143850520L;
+		
+		private Timer clickedTimer;
+
+		TableContextMenu() {
+			clickedTimer = null;
+			
+			addTo(table);
+			addTo(tableScrollPane);
+			
+			add(OpenWebifController.createMenuItem("Reload Timer Data", GrayCommandIcons.IconGroup.Reload, e->{
+				main.getBaseURLAndRunWithProgressDialog("Reload Timer Data", TimersPanel.this::readData);
+			}));
+			
+			addSeparator();
+			
+			JMenuItem miShowTimerDetails = add(OpenWebifController.createMenuItem("Show Details of Timer", e->{
+				if (clickedTimer==null) return;
+				String text = generateDetailsOutput(clickedTimer);
+				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
+			}));
+			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
+				System.out.printf("Column Widths: %s%n", TimersTableModel.getColumnWidthsAsString(table));
+			}));
+			
+			addSeparator();
+			
+			JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
+				if (clickedTimer==null) return;
+				OpenWebifController.toggleTimer(clickedTimer, main.mainWindow);
+			}));
+			
+			JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->{
+				if (clickedTimer==null) return;
+				OpenWebifController.deleteTimer(clickedTimer, main.mainWindow);
+			}));
+			
+			addContextMenuInvokeListener((comp, x, y) -> {
+				int rowV = comp!=table ? -1 : table.rowAtPoint(new Point(x,y));
+				int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
+				clickedTimer = tableModel==null ? null : tableModel.getRow(rowM);
+				
+				miToggleTimer     .setEnabled(clickedTimer!=null);
+				miDeleteTimer     .setEnabled(clickedTimer!=null);
+				miShowTimerDetails.setEnabled(clickedTimer!=null);
+				
+				String timerLabel = clickedTimer==null ? "" : String.format(" \"%s: %s\"", clickedTimer.servicename, clickedTimer.name);
+				miToggleTimer     .setText("Toggle Timer"+timerLabel);
+				miDeleteTimer     .setText("Delete Timer"+timerLabel);
+				miShowTimerDetails.setText("Show Details of Timer"+timerLabel);
+			});
+		}
+	}
+	
 	public void    addListener(DataUpdateListener listener) { dataUpdateListeners.   add(listener); }
 	public void removeListener(DataUpdateListener listener) { dataUpdateListeners.remove(listener); }
 
-	private void showValues(Timer timer) {
-		StringBuilder sb = new StringBuilder();
-		if (timer!=null) {
-			sb.append("Description:\r\n").append(timer.description).append("\r\n\r\n");
-			sb.append("Extended Description:\r\n").append(timer.descriptionextended).append("\r\n\r\n");
-			sb.append(String.format("Log Entries: %d%n", timer.logentries.size()));
-			for (int i=0; i<timer.logentries.size(); i++) {
-				LogEntry entry = timer.logentries.get(i);
-				String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
-				sb.append(String.format("    [%d] %s <Type:%d> \"%s\"%n", i+1, timeStr, entry.type, entry.text));
-			}
-		}
-		textArea.setText(sb.toString());
+	public Timers getData() {
+		return timers;
 	}
-
 	public boolean hasData() {
 		return timers!=null;
 	}
@@ -151,6 +161,7 @@ public class TimersPanel extends JSplitPane {
 			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 			tableModel.setAllDefaultRenderers();
 		}
+		table.repaint();
 		for (DataUpdateListener listener:dataUpdateListeners)
 			listener.timersHasUpdated(timers);
 	}
@@ -389,7 +400,7 @@ public class TimersPanel extends JSplitPane {
 	
 	}
 
-	private static String generateOutput(Timer timer) {
+	private static String generateDetailsOutput(Timer timer) {
 		ValueListOutput output = new ValueListOutput();
 		output.add(0, "isAutoTimer"        , "%s (%d)", timer.isAutoTimer==1, timer.isAutoTimer);
 		output.add(0, "tags"               , timer.tags               );
@@ -432,6 +443,23 @@ public class TimersPanel extends JSplitPane {
 		output.add(0, "vpsplugin_overwrite", timer.vpsplugin_overwrite);
 		output.add(0, "vpsplugin_time"     , timer.vpsplugin_time     );
 		return output.generateOutput();
+	}
+
+	public static String generateShortInfo(Timer timer)
+	{
+		StringBuilder sb = new StringBuilder();
+		if (timer!=null) {
+			sb.append("Description:\r\n").append(timer.description).append("\r\n\r\n");
+			sb.append("Extended Description:\r\n").append(timer.descriptionextended).append("\r\n\r\n");
+			sb.append(String.format("Log Entries: %d%n", timer.logentries.size()));
+			for (int i=0; i<timer.logentries.size(); i++) {
+				LogEntry entry = timer.logentries.get(i);
+				String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
+				sb.append(String.format("    [%d] %s <Type:%d> \"%s\"%n", i+1, timeStr, entry.type, entry.text));
+			}
+		}
+		String string = sb.toString();
+		return string;
 	}
 
 }

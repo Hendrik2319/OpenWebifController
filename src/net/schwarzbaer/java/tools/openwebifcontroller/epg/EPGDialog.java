@@ -24,6 +24,7 @@ import javax.swing.JSlider;
 import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
@@ -154,7 +155,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		};
 		epgView = new EPGView(this.stations);
 		epgViewRepainter = new OpenWebifController.Updater(20, epgView::repaint);
-		timersHasUpdated(this.timers.timers, false);
+		timersHasUpdated(this.timers.getData(), false);
 		
 		int rowHeight = OpenWebifController.settings.getInt(ValueKey.EPGDialog_RowHeight, -1);
 		if (rowHeight<0) rowHeight = epgView.getRowHeight();
@@ -426,8 +427,8 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 			add(miAddRecordTimer        = OpenWebifController.createMenuItem("Add Record Timer"         , e->addTimer(Timers.Timer.Type.Record)));
 			add(miAddSwitchTimer        = OpenWebifController.createMenuItem("Add Switch Timer"         , e->addTimer(Timers.Timer.Type.Switch)));
 			add(miAddRecordNSwitchTimer = OpenWebifController.createMenuItem("Add Record'N'Switch Timer", e->addTimer(Timers.Timer.Type.RecordNSwitch)));
-			add(miToggleTimer        = OpenWebifController.createMenuItem("Toggle Timer"          , e->toggleTimer()));
-			add(miDeleteTimer        = OpenWebifController.createMenuItem("Delete Timer"          , e->deleteTimer()));
+			add(miToggleTimer        = OpenWebifController.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
+			add(miDeleteTimer        = OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
 		}
 		
 		private void addTimer(Timers.Timer.Type type) { externCommands.addTimer   (baseURL, event.event.sref, event.event.id.intValue(), type); }
@@ -466,8 +467,8 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		private final JMenuItem miStreamStation;
 		
 		StationContextMenu(ExternCommands externCommands, String baseURL) {
-			add(miSwitchToStation = OpenWebifController.createMenuItem("Switch to Station", e->externCommands. zapToStation(baseURL,stationID)));
-			add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , e->externCommands.streamStation(baseURL,stationID)));
+			add(miSwitchToStation = OpenWebifController.createMenuItem("Switch to Station",                                   e->externCommands. zapToStation(baseURL,stationID)));
+			add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->externCommands.streamStation(baseURL,stationID)));
 		}
 
 		void setStationID(String stationName, StationID stationID) {

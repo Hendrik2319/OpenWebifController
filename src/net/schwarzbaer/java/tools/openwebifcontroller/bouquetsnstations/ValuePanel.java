@@ -58,7 +58,7 @@ class ValuePanel {
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateEPGAlways, updateEPGAlways = isChecked);
 		}) );
 		
-		textViewContextMenu.add(miUpdateEPG = OpenWebifController.createMenuItem("Update EPG Now", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
+		textViewContextMenu.add(miUpdateEPG = OpenWebifController.createMenuItem("Update EPG Now", GrayCommandIcons.IconGroup.Reload, e->{
 			if (shownStationNode != null)
 				startEpgUpdate(shownStationNode, this.getBaseURL.get());
 		}) );

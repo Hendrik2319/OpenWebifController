@@ -37,17 +37,16 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.table.TableCellRenderer;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.gui.Tables;
-import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.Timers;
-import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
@@ -107,8 +106,7 @@ class StationSwitch {
 		powerControl.addUpdateTask(baseURL -> volumeControl.initialize(baseURL,null));
 		
 		btnBouquetData = OpenWebifController.createButton(GrayCommandIcons.Download.getIcon(), GrayCommandIcons.Download_Dis.getIcon(), true, e->{
-			String title = (bouquetData == null ? "Load" : "Reload") +" Bouquet Data";
-			OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeBouquetData);
+			reloadBouquetData();
 			mainWindow.pack();
 		});
 		btnBouquetData.setToolTipText("Load Bouquet Data");
@@ -191,7 +189,10 @@ class StationSwitch {
 				//System.err.printf("timerData == null%n");
 				return;
 			}
-			TimersDialog.showDialog(mainWindow,timerData.timers);
+			TimersDialog.showDialog(mainWindow, timerData.timers, ()->{
+				reloadTimerData();
+				return timerData.timers;
+			});
 		});
 		txtActiveTimers.setEnabled(false);
 		btnShowTimers.setEnabled(false);
@@ -269,9 +270,15 @@ class StationSwitch {
 		mainWindow.startGUI(contentPane);
 	}
 
+	private void reloadBouquetData()
+	{
+		String title = (bouquetData == null ? "Load" : "Reload") +" Bouquet Data";
+		OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeBouquetData);
+	}
+
 	private void reloadTimerData()
 	{
-		String title = (timerData == null ? "Load" : "Reload") +" Bouquet Data";
+		String title = (timerData == null ? "Load" : "Reload") +" Timer Data";
 		OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeTimerData);
 	}
 	
@@ -366,10 +373,16 @@ class StationSwitch {
 		private final JScrollPane tableScrollPane;
 		private TimersTableModel tableModel;
 		private ExtendedTextArea textArea;
+		private Supplier<Vector<Timer>> updateData;
 
 		TimersDialog(Window window) {
 			super(window, "Timers", ModalityType.APPLICATION_MODAL);
 			this.window = window;
+			updateData = null;
+			
+			textArea = new ExtendedTextArea(false);
+			textArea.setLineWrap(true);
+			textArea.setWrapStyleWord(true);
 			
 			tableModel = null;
 			table = new JTable();
@@ -380,16 +393,12 @@ class StationSwitch {
 				if (tableModel == null) return;
 				int rowV = table.getSelectedRow();
 				int rowM = table.convertRowIndexToModel(rowV);
-				showValues(tableModel.getRow(rowM));
+				textArea.setText(TimersPanel.generateShortInfo(tableModel.getRow(rowM)));
 			});
 			new TimersTableContextMenu().addTo(table);
 			
 			tableScrollPane = new JScrollPane(table);
 			tableScrollPane.setPreferredSize(new Dimension(300, 600));
-			
-			textArea = new ExtendedTextArea(false);
-			textArea.setLineWrap(true);
-			textArea.setWrapStyleWord(true);
 			
 			JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true);
 			splitPane.setLeftComponent(tableScrollPane);
@@ -398,12 +407,9 @@ class StationSwitch {
 			setContentPane(splitPane);
 		}
 		
-		void showDialog(Vector<Timer> data) {
-			tableModel = new TimersTableModel(data);
-			table.setModel(tableModel);
-			tableModel.setTable(table);
-			tableModel.setColumnWidths(table);
-			tableModel.setAllDefaultRenderers();
+		void showDialog(Vector<Timer> data, Supplier<Vector<Timer>> updateData) {
+			this.updateData = updateData;
+			setData(data);
 			
 			Dimension size = table.getPreferredSize();
 			tableScrollPane.setPreferredSize(new Dimension(size.width+25, 600));
@@ -412,34 +418,27 @@ class StationSwitch {
 			setLocationRelativeTo(window);
 			setVisible(true);
 		}
+
+		private void setData(Vector<Timer> data)
+		{
+			tableModel = new TimersTableModel(data);
+			table.setModel(tableModel);
+			tableModel.setTable(table);
+			tableModel.setColumnWidths(table);
+			tableModel.setAllDefaultRenderers();
+		}
 		
-		static void showDialog(Window window, Vector<Timer> data) {
+		static void showDialog(Window window, Vector<Timer> data, Supplier<Vector<Timer>> updateData) {
 			if (instance == null) {
 				instance = new TimersDialog(window);
 				instance.setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE);
 			}
-			instance.showDialog(data);
-		}
-		
-		private void showValues(Timer timer) {
-			StringBuilder sb = new StringBuilder();
-			if (timer!=null) {
-				sb.append("Description:\r\n").append(timer.description).append("\r\n\r\n");
-				sb.append("Extended Description:\r\n").append(timer.descriptionextended).append("\r\n\r\n");
-				sb.append(String.format("Log Entries: %d%n", timer.logentries.size()));
-				for (int i=0; i<timer.logentries.size(); i++) {
-					LogEntry entry = timer.logentries.get(i);
-					String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
-					sb.append(String.format("    [%d] %s <Type:%d> \"%s\"%n", i+1, timeStr, entry.type, entry.text));
-				}
-			}
-			textArea.setText(sb.toString());
+			instance.showDialog(data,updateData);
 		}
 		
 		private class TimersTableContextMenu extends ContextMenu {
 			private static final long serialVersionUID = -8581851712142869327L;
 			private Timer clickedTimer;
-			//private final JMenuItem miReloadTimers;
 			
 			TimersTableContextMenu() {
 				clickedTimer = null;
@@ -449,22 +448,26 @@ class StationSwitch {
 					OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this);
 				}));
 				
-				JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", e->{
+				JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->{
 					if (clickedTimer==null) return;
 					OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this);
 				}));
 				
-				//JMenuItem miReloadTimers = add(OpenWebifController.createMenuItem("Reload Timer Data", e->{
-				//	// TODO
-				//}));
+				addSeparator();
+				
+				JMenuItem miReloadTimers = add(OpenWebifController.createMenuItem("Reload Timer Data", GrayCommandIcons.IconGroup.Reload, e->{
+					if (updateData==null) return;
+					setData(updateData.get());
+				}));
 				
 				addContextMenuInvokeListener((comp, x, y) -> {
 					int rowV = table.rowAtPoint(new Point(x,y));
 					int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
 					clickedTimer = tableModel==null ? null : tableModel.getRow(rowM);
 					
-					miToggleTimer.setEnabled(clickedTimer!=null);
-					miDeleteTimer.setEnabled(clickedTimer!=null);
+					miReloadTimers.setEnabled(updateData  !=null);
+					miToggleTimer .setEnabled(clickedTimer!=null);
+					miDeleteTimer .setEnabled(clickedTimer!=null);
 					if (clickedTimer!=null) {
 						miToggleTimer.setText(String.format("Toggle Timer \"%s: %s\"", clickedTimer.servicename, clickedTimer.name));
 						miDeleteTimer.setText(String.format("Delete Timer \"%s: %s\"", clickedTimer.servicename, clickedTimer.name));

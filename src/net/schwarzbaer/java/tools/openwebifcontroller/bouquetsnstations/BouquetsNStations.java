@@ -114,17 +114,11 @@ public class BouquetsNStations extends JPanel {
 		JMenuItem miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet, miUpdateCurrentStationNow;
 		ContextMenu treeContextMenu = new ContextMenu();
 		
-		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
-			this.main.runWithProgressDialog("Reload Bouquets", pd->{
-				OpenWebifController.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: Get BaseURL");
-				String baseURL = this.main.getBaseURL();
-				if (baseURL==null) return;
-				
-				readData(baseURL,pd);
-			});
+		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", GrayCommandIcons.IconGroup.Reload, e->{
+			this.main.getBaseURLAndRunWithProgressDialog("Reload Bouquets", this::readData);
 		}));
 		
-		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", GrayCommandIcons.Save.getIcon(), GrayCommandIcons.Save_Dis.getIcon(), e->{
+		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", GrayCommandIcons.IconGroup.Save, e->{
 			if (bsTreeRoot==null) return;
 			
 			this.main.runWithProgressDialog("Save Stations to TabSeparated-File", pd -> {
@@ -163,7 +157,7 @@ public class BouquetsNStations extends JPanel {
 			startStopPeriodicUpdater10s( ()->updatePlayableStatesPeriodically=isChecked );
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, isChecked);
 		}));
-		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
+		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", GrayCommandIcons.IconGroup.Reload, e->{
 			periodicUpdater10s.runOnce( () -> updatePlayableStates() );
 		}));
 		
@@ -172,7 +166,7 @@ public class BouquetsNStations extends JPanel {
 			startStopPeriodicUpdater10s( ()->updateCurrentStationPeriodically=isChecked );
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, isChecked);
 		}));
-		treeContextMenu.add(miUpdateCurrentStationNow = OpenWebifController.createMenuItem("Update 'Current Station' Now", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
+		treeContextMenu.add(miUpdateCurrentStationNow = OpenWebifController.createMenuItem("Update 'Current Station' Now", GrayCommandIcons.IconGroup.Reload, e->{
 			periodicUpdater10s.runOnce( () -> updateCurrentStation() );
 		}));
 		treeContextMenu.add(OpenWebifController.createMenuItem("Show 'Current Station' Data", e->{
@@ -181,7 +175,7 @@ public class BouquetsNStations extends JPanel {
 			//JOptionPane.showMessageDialog(mainWindow, msg, "Current Station", JOptionPane.INFORMATION_MESSAGE);
 		}));
 		
-		treeContextMenu.add(miWriteSelectedStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Selected Stations to M3U-File", GrayCommandIcons.Save.getIcon(), GrayCommandIcons.Save_Dis.getIcon(), e->{
+		treeContextMenu.add(miWriteSelectedStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Selected Stations to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
 			if (selectedStationNodes.isEmpty()) return;
 			
 			String baseURL = this.main.getBaseURL();
@@ -196,13 +190,13 @@ public class BouquetsNStations extends JPanel {
 		
 		treeContextMenu.addSeparator();
 		
-		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), e->{
+		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", GrayCommandIcons.IconGroup.Reload, e->{
 			String baseURL = this.main.getBaseURL();
 			if (baseURL==null) return;
 			periodicUpdater10s.runOnce( () -> updatePlayableStates(baseURL, clickedBouquetNode) );
 		}));
 		
-		treeContextMenu.add(miWriteBouquetStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", GrayCommandIcons.Save.getIcon(), GrayCommandIcons.Save_Dis.getIcon(), e->{
+		treeContextMenu.add(miWriteBouquetStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
 			if (clickedBouquetNode==null) return;
 			
 			String baseURL = this.main.getBaseURL();
@@ -223,7 +217,7 @@ public class BouquetsNStations extends JPanel {
 		
 		treeContextMenu.addSeparator();
 		
-		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", GrayCommandIcons.Image.getIcon(), GrayCommandIcons.Image_Dis.getIcon(), e->{
+		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", GrayCommandIcons.IconGroup.Image, e->{
 			if (clickedBouquetNode!=null) {
 				String baseURL = this.main.getBaseURL();
 				if (baseURL==null) return;
@@ -237,8 +231,8 @@ public class BouquetsNStations extends JPanel {
 				PICON_LOADER.addTask(clickedStationNode.getStationID());
 			}
 		}));
-		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station", e->this.main. zapToStation(clickedStationNode.getStationID())));
-		treeContextMenu.add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , e->this.main.streamStation(clickedStationNode.getStationID())));
+		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station",                                   e->this.main. zapToStation(clickedStationNode.getStationID())));
+		treeContextMenu.add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->this.main.streamStation(clickedStationNode.getStationID())));
 		
 		treeContextMenu.addTo(bsTree);
 		treeContextMenu.addContextMenuInvokeListener((comp, x, y) -> {

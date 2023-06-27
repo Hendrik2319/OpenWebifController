@@ -77,8 +77,6 @@ import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers;
-import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
-import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
 import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.lib.system.Settings;
@@ -1102,7 +1100,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	}
 
 	@Override
-	public void addTimer(String baseURL, String sRef, int eventID, TimerType type) {
+	public void addTimer(String baseURL, String sRef, int eventID, Timers.Timer.Type type) {
 		runWithProgressDialog("Add Timer", pd->{
 			OpenWebifTools.MessageResponse response = Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
@@ -1132,7 +1130,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		});
 	}
 
-	public static void deleteTimer(Timer timer, Window window)
+	public static void deleteTimer(Timers.Timer timer, Window window)
 	{
 		runWithProgressDialog(window, "Delete Timer", pd->{
 			String baseURL = OpenWebifController.getBaseURL(true, window);
@@ -1143,7 +1141,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		});
 	}
 
-	public static void toggleTimer(Timer timer, Window window)
+	public static void toggleTimer(Timers.Timer timer, Window window)
 	{
 		OpenWebifController.runWithProgressDialog(window, "Toggle Timer", pd->{
 			String baseURL = OpenWebifController.getBaseURL(true, window);

@@ -31,14 +31,12 @@ import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
-import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BouquetsNStationsListener;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.EPGViewEvent;
-import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.Timer;
 
 public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateListener, BouquetsNStationsListener {
 	private static final long serialVersionUID = 8634962178940555542L;
@@ -131,7 +129,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 	public interface ExternCommands {
 		void zapToStation (String baseURL, StationID stationID);
 		void streamStation(String baseURL, StationID stationID);
-		void addTimer     (String baseURL, String sRef, int eventID, TimerType type);
+		void addTimer     (String baseURL, String sRef, int eventID, Timers.Timer.Type type);
 		void deleteTimer  (String baseURL, String sRef, long begin, long end);
 		void toggleTimer  (String baseURL, String sRef, long begin, long end);
 	}
@@ -385,7 +383,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 			if (station.isMarker()) continue;
 			StationID stationID = station.service.stationID;
 			Vector<EPGevent> events = epg.getEvents(stationID, beginTime_UnixTS, endTime_UnixTS, true);
-			Vector<EPGView.EPGViewEvent> viewEvents = epgView.convertEvents(events);
+			Vector<EPGViewEvent> viewEvents = epgView.convertEvents(events);
 			epgView.updateEvents(stationID,viewEvents/*,dataStatus*/);
 		}
 		epgView.updateMinMaxTime();
@@ -411,13 +409,13 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		private final EPGView epgView;
 		
 		private final JMenuItem miAddRecordTimer;
-		private final JMenuItem miAddZapTimer;
-		private final JMenuItem miAddRecordNZapTimer;
+		private final JMenuItem miAddSwitchTimer;
+		private final JMenuItem miAddRecordNSwitchTimer;
 		private final JMenuItem miToggleTimer;
 		private final JMenuItem miDeleteTimer;
 		
 		private EPGViewEvent event;
-		private Timer timer;
+		private EPGView.Timer timer;
 
 		EventContextMenu(ExternCommands externCommands, String baseURL, EPGView epgView) {
 			this.externCommands = externCommands;
@@ -425,18 +423,18 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 			this.epgView = epgView;
 			event = null;
 			timer = null;
-			add(miAddRecordTimer     = OpenWebifController.createMenuItem("Add Record Timer"      , e->addTimer(TimerType.Record)));
-			add(miAddZapTimer        = OpenWebifController.createMenuItem("Add Zap Timer"         , e->addTimer(TimerType.ZapOnly)));
-			add(miAddRecordNZapTimer = OpenWebifController.createMenuItem("Add Record'N'Zap Timer", e->addTimer(TimerType.RecordAndZap)));
+			add(miAddRecordTimer        = OpenWebifController.createMenuItem("Add Record Timer"         , e->addTimer(Timers.Timer.Type.Record)));
+			add(miAddSwitchTimer        = OpenWebifController.createMenuItem("Add Switch Timer"         , e->addTimer(Timers.Timer.Type.Switch)));
+			add(miAddRecordNSwitchTimer = OpenWebifController.createMenuItem("Add Record'N'Switch Timer", e->addTimer(Timers.Timer.Type.RecordNSwitch)));
 			add(miToggleTimer        = OpenWebifController.createMenuItem("Toggle Timer"          , e->toggleTimer()));
 			add(miDeleteTimer        = OpenWebifController.createMenuItem("Delete Timer"          , e->deleteTimer()));
 		}
 		
-		private void addTimer(TimerType type) { externCommands.addTimer   (baseURL, event.event.sref, event.event.id.intValue(), type); }
-		private void deleteTimer()            { externCommands.deleteTimer(baseURL, event.event.sref, timer.timer.begin, timer.timer.end); }
-		private void toggleTimer()            { externCommands.toggleTimer(baseURL, event.event.sref, timer.timer.begin, timer.timer.end); }
+		private void addTimer(Timers.Timer.Type type) { externCommands.addTimer   (baseURL, event.event.sref, event.event.id.intValue(), type); }
+		private void deleteTimer()                    { externCommands.deleteTimer(baseURL, event.event.sref, timer.timer.begin, timer.timer.end); }
+		private void toggleTimer()                    { externCommands.toggleTimer(baseURL, event.event.sref, timer.timer.begin, timer.timer.end); }
 
-		public void setEvent(EPGView.EPGViewEvent event) {
+		public void setEvent(EPGViewEvent event) {
 			this.event = event;
 			boolean isEventOK = this.event!=null &&
 				this.event.event!=null &&
@@ -447,16 +445,16 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 			else
 				timer = null;
 			
-			miAddRecordTimer    .setEnabled(isEventOK && timer==null);
-			miAddZapTimer       .setEnabled(isEventOK && timer==null);
-			miAddRecordNZapTimer.setEnabled(isEventOK && timer==null);
-			miToggleTimer       .setEnabled(isEventOK && timer!=null);
-			miDeleteTimer       .setEnabled(isEventOK && timer!=null);
-			miAddRecordTimer    .setText(!isEventOK  ? "Add Record Timer"       : String.format("Add "+"Record"      +" Timer for Event \"%s\"", this.event.title));
-			miAddZapTimer       .setText(!isEventOK  ? "Add Zap Timer"          : String.format("Add "+"Zap"         +" Timer for Event \"%s\"", this.event.title));
-			miAddRecordNZapTimer.setText(!isEventOK  ? "Add Record'N'Zap Timer" : String.format("Add "+"Record'N'Zap"+" Timer for Event \"%s\"", this.event.title));
-			miToggleTimer       .setText(timer==null ? "Toggle Timer"           : String.format("Toggle Timer \"%s\"", timer.name));
-			miDeleteTimer       .setText(timer==null ? "Delete Timer"           : String.format("Delete Timer \"%s\"", timer.name));
+			miAddRecordTimer       .setEnabled(isEventOK && timer==null);
+			miAddSwitchTimer       .setEnabled(isEventOK && timer==null);
+			miAddRecordNSwitchTimer.setEnabled(isEventOK && timer==null);
+			miToggleTimer          .setEnabled(isEventOK && timer!=null);
+			miDeleteTimer          .setEnabled(isEventOK && timer!=null);
+			miAddRecordTimer       .setText(!isEventOK  ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", this.event.title));
+			miAddSwitchTimer       .setText(!isEventOK  ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", this.event.title));
+			miAddRecordNSwitchTimer.setText(!isEventOK  ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", this.event.title));
+			miToggleTimer          .setText(timer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", timer.name));
+			miDeleteTimer          .setText(timer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", timer.name));
 		}
 	}
 

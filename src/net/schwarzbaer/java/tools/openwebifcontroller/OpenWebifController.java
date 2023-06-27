@@ -76,6 +76,7 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
+import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
 import net.schwarzbaer.java.lib.openwebif.Volume;
@@ -278,7 +279,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	private final JFileChooser exeFileChooser;
 	private final Movies movies;
 	private final BouquetsNStations bouquetsNStations;
-	private final Timers timers;
+	private final TimersPanel timers;
 	private final ScreenShot screenShot;
 	private final VolumeControl volumeControl;
 	private final PowerControl powerControl;
@@ -301,7 +302,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		mainWindow = createMainWindow("OpenWebif Controller",false);
 		movies = new Movies(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
-		timers = new Timers(this);
+		timers = new TimersPanel(this);
 		screenShot = new ScreenShot(this, remoteControl = new RemoteControlPanel(this));
 		systemInfoPanel = new SystemInfoPanel();
 		
@@ -1103,7 +1104,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	@Override
 	public void addTimer(String baseURL, String sRef, int eventID, TimerType type) {
 		runWithProgressDialog("Add Timer", pd->{
-			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
+			OpenWebifTools.MessageResponse response = Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			showMessageResponse(response, "Add Timer");
@@ -1113,7 +1114,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	@Override
 	public void deleteTimer(String baseURL, String sRef, long begin, long end) {
 		runWithProgressDialog("Delete Timer", pd->{
-			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.deleteTimer(baseURL, sRef, begin, end, taskTitle->{
+			OpenWebifTools.MessageResponse response = Timers.deleteTimer(baseURL, sRef, begin, end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			showMessageResponse(response, "Delete Timer");
@@ -1123,7 +1124,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	@Override
 	public void toggleTimer(String baseURL, String sRef, long begin, long end) {
 		runWithProgressDialog("Toggle Timer", pd->{
-			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.toggleTimer(baseURL, sRef, begin, end, taskTitle->{
+			OpenWebifTools.MessageResponse response = Timers.toggleTimer(baseURL, sRef, begin, end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			showMessageResponse(response, "Toggle Timer");
@@ -1135,7 +1136,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	{
 		runWithProgressDialog(window, "Delete Timer", pd->{
 			String baseURL = OpenWebifController.getBaseURL(true, window);
-			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.deleteTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
+			OpenWebifTools.MessageResponse response = Timers.deleteTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			showMessageResponse(window, response, "Delete Timer");
@@ -1146,7 +1147,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	{
 		OpenWebifController.runWithProgressDialog(window, "Toggle Timer", pd->{
 			String baseURL = OpenWebifController.getBaseURL(true, window);
-			OpenWebifTools.MessageResponse response = net.schwarzbaer.java.lib.openwebif.Timers.toggleTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
+			OpenWebifTools.MessageResponse response = Timers.toggleTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
 				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
 			});
 			OpenWebifController.showMessageResponse(window, response, "Toggle Timer");

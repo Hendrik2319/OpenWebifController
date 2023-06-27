@@ -30,16 +30,17 @@ import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
+import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.TimerType;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
-import net.schwarzbaer.java.tools.openwebifcontroller.Timers;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BouquetsNStationsListener;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.EPGViewEvent;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.Timer;
 
-public class EPGDialog extends StandardDialog implements Timers.DataUpdateListener, BouquetsNStationsListener {
+public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateListener, BouquetsNStationsListener {
 	private static final long serialVersionUID = 8634962178940555542L;
 	
 	private enum LeadTime {
@@ -102,7 +103,7 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	}
 	
 	private final EPG epg;
-	private final Timers timers;
+	private final TimersPanel timers;
 	private final BouquetsNStations bouquetsNStations;
 	private final Vector<SubService> stations;
 	private final LoadEPGThread loadEPGThread;
@@ -113,7 +114,7 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	private int leadTime_s;
 	private int rangeTime_s;
 
-	public static void showDialog(Window parent, String baseURL, EPG epg, Timers timers, BouquetsNStations bouquetsNStations, Bouquet bouquet, ExternCommands externCommands) {
+	public static void showDialog(Window parent, String baseURL, EPG epg, TimersPanel timers, BouquetsNStations bouquetsNStations, Bouquet bouquet, ExternCommands externCommands) {
 		if (parent           ==null) throw new IllegalArgumentException();
 		if (baseURL          ==null) throw new IllegalArgumentException();
 		if (epg              ==null) throw new IllegalArgumentException();
@@ -137,7 +138,7 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 
 	public EPGDialog(
 			Window parent, ModalityType modality, boolean repeatedUseOfDialogObject,
-			String baseURL, EPG epg, Timers timers, BouquetsNStations bouquetsNStations, Bouquet bouquet,
+			String baseURL, EPG epg, TimersPanel timers, BouquetsNStations bouquetsNStations, Bouquet bouquet,
 			ExternCommands externCommands) {
 		super(parent, getTitle(bouquet), modality, repeatedUseOfDialogObject);
 		this.epg = epg;
@@ -392,11 +393,11 @@ public class EPGDialog extends StandardDialog implements Timers.DataUpdateListen
 	}
 
 	@Override
-	public void timersHasUpdated(net.schwarzbaer.java.lib.openwebif.Timers timers) {
+	public void timersHasUpdated(Timers timers) {
 		timersHasUpdated(timers, true);
 	}
 	
-	private void timersHasUpdated(net.schwarzbaer.java.lib.openwebif.Timers timers, boolean repaintEPGView) {
+	private void timersHasUpdated(Timers timers, boolean repaintEPGView) {
 		Vector<EPGView.Timer> convertedTimers = epgView.convertTimers(timers.timers);
 		epgView.setTimers(convertedTimers);
 		if (repaintEPGView) epgView.repaint();

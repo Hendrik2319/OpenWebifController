@@ -21,12 +21,11 @@ import java.util.Vector;
 import javax.swing.BorderFactory;
 import javax.swing.border.Border;
 
-import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.gui.Canvas;
+import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
-import net.schwarzbaer.java.lib.openwebif.Timers.Timer.State;
-import net.schwarzbaer.java.lib.openwebif.Timers.Timer.Type;
+import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
 class EPGView extends Canvas {
@@ -182,9 +181,9 @@ class EPGView extends Canvas {
 		final long eventID;
 		final int begin_s_based;
 		final int end_s_based;
-		final net.schwarzbaer.java.lib.openwebif.Timers.Timer timer;
+		final Timers.Timer timer;
 
-		public Timer(String name, String serviceref, long eventID, int begin_s_based, int end_s_based, net.schwarzbaer.java.lib.openwebif.Timers.Timer timer) {
+		public Timer(String name, String serviceref, long eventID, int begin_s_based, int end_s_based, Timers.Timer timer) {
 			this.name = name;
 			this.serviceref = serviceref;
 			this.eventID = eventID;
@@ -194,10 +193,10 @@ class EPGView extends Canvas {
 		}
 	}
 
-	Vector<Timer> convertTimers(Vector<net.schwarzbaer.java.lib.openwebif.Timers.Timer> timers) {
+	Vector<Timer> convertTimers(Vector<Timers.Timer> timers) {
 		if (timers==null || timers.isEmpty()) return null;
 		Vector<Timer> result = new Vector<>(timers.size());
-		for (net.schwarzbaer.java.lib.openwebif.Timers.Timer timer:timers) {
+		for (Timers.Timer timer:timers) {
 			int begin_s_based = (int) (timer.begin - baseTimeOffset_s);
 			int   end_s_based = (int) (timer.end   - baseTimeOffset_s);
 			if (timer.serviceref!=null)
@@ -464,8 +463,8 @@ class EPGView extends Canvas {
 		Rectangle clip = new Rectangle(xBegin, yBegin, xEnd-xBegin, rowHeight-1-2).intersection(eventViewClip);
 		if (!clip.isEmpty()) {
 			g2.setClip(clip);
-			boolean isDisabled  = timer.timer.state2 == State.Deactivated;
-			boolean isRecording = timer.timer.type   == Type.Record || timer.timer.type == Type.RecordNSwitch;
+			boolean isDisabled  = timer.timer.state2 == Timers.Timer.State.Deactivated;
+			boolean isRecording = timer.timer.type   == Timers.Timer.Type.Record || timer.timer.type == Timers.Timer.Type.RecordNSwitch;
 			g2.setColor(isHovered ? COLOR_ITMER_HOVERED : isDisabled ? COLOR_ITMER_DISABLED : isRecording ? COLOR_ITMER_RECORDING : COLOR_ITMER_JUST_ZAP);
 			if (center==null) {
 				g2.drawLine(xBegin, yBegin, xEnd-1, yBegin);

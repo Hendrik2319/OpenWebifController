@@ -313,8 +313,8 @@ class StationSwitch {
 		}
 		StringBuilder sb = new StringBuilder();
 		boolean isFirst = true;
-		for (Timers.Timer timer : timerData.timers) {
-			if (timer.state2!=Timers.Timer.State.Running) continue;
+		for (Timer timer : timerData.timers) {
+			if (timer.state2!=Timer.State.Running) continue;
 			if (!isFirst) sb.append("\r\n");
 			sb.append(String.format("[%s] %s: %s", timer.type, timer.servicename, timer.name));
 			isFirst = false;
@@ -497,10 +497,10 @@ class StationSwitch {
 			TimersTableModel.ColumnID columnID = tableModel.getColumnID(columnM);
 			
 			if (value instanceof Timer.Type)
-				bgCol = ()->net.schwarzbaer.java.tools.openwebifcontroller.Timers.TimersTableCellRenderer.getBgColor((Timer.Type) value);
+				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((Timer.Type) value);
 				
 			if (value instanceof Timer.State)
-				bgCol = ()->net.schwarzbaer.java.tools.openwebifcontroller.Timers.TimersTableCellRenderer.getBgColor((Timer.State) value);
+				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((Timer.State) value);
 				
 			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
 			rendererComp.setHorizontalAlignment(columnID.horizontalAlignment);

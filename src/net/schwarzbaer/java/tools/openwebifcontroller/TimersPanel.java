@@ -26,16 +26,17 @@ import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 
-public class Timers extends JSplitPane {
+public class TimersPanel extends JSplitPane {
 	private static final long serialVersionUID = -2563250955373710618L;
 	
 	public interface DataUpdateListener {
-		void timersHasUpdated(net.schwarzbaer.java.lib.openwebif.Timers timers);
+		void timersHasUpdated(Timers timers);
 	}
 
 	private final OpenWebifController main;
@@ -43,11 +44,11 @@ public class Timers extends JSplitPane {
 	private final ExtendedTextArea textArea;
 	private final Vector<DataUpdateListener> dataUpdateListeners;
 	
-	public net.schwarzbaer.java.lib.openwebif.Timers timers;
+	public Timers timers;
 	private TimersTableModel tableModel;
 	private Timer clickedTimer;
 
-	public Timers(OpenWebifController main) {
+	public TimersPanel(OpenWebifController main) {
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
 		this.main = main;
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));

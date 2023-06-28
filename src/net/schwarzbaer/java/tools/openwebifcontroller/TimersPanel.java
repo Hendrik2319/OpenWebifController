@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.util.Comparator;
 import java.util.Locale;
 import java.util.Vector;
 import java.util.function.Function;
@@ -15,17 +16,18 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
+import javax.swing.SortOrder;
 import javax.swing.SwingConstants;
-import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
+import net.schwarzbaer.java.lib.gui.Tables.SimplifiedTableModel;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
@@ -42,6 +44,7 @@ public class TimersPanel extends JSplitPane {
 
 	private final OpenWebifController main;
 	private final JTable table;
+	private final TimersTableRowSorter tableRowSorter;
 	private final JScrollPane tableScrollPane;
 	private final ExtendedTextArea textArea;
 	private final Vector<DataUpdateListener> dataUpdateListeners;
@@ -57,17 +60,21 @@ public class TimersPanel extends JSplitPane {
 		dataUpdateListeners = new Vector<>();
 		
 		timers = null;
-		tableModel = null;
+		tableModel = new TimersTableModel();
 		
 		textArea = new ExtendedTextArea(false);
 		textArea.setLineWrap(true);
 		textArea.setWrapStyleWord(true);
 		
-		table = new JTable();
+		table = new JTable(tableModel);
+		table.setRowSorter(tableRowSorter = new TimersTableRowSorter(tableModel));
+		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+		tableModel.setTable(table);
+		tableModel.setColumnWidths(table);
+		tableModel.setAllDefaultRenderers();
 		table.setColumnSelectionAllowed(false);
 		table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		table.getSelectionModel().addListSelectionListener(e->{
-			if (tableModel == null) return;
 			int rowV = table.getSelectedRow();
 			int rowM = table.convertRowIndexToModel(rowV);
 			textArea.setText(generateShortInfo(tableModel.getRow(rowM)));
@@ -100,17 +107,6 @@ public class TimersPanel extends JSplitPane {
 			
 			addSeparator();
 			
-			JMenuItem miShowTimerDetails = add(OpenWebifController.createMenuItem("Show Details of Timer", e->{
-				if (clickedTimer==null) return;
-				String text = generateDetailsOutput(clickedTimer);
-				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
-			}));
-			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
-				System.out.printf("Column Widths: %s%n", TimersTableModel.getColumnWidthsAsString(table));
-			}));
-			
-			addSeparator();
-			
 			JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
 				if (clickedTimer==null) return;
 				OpenWebifController.toggleTimer(clickedTimer, main.mainWindow);
@@ -121,10 +117,27 @@ public class TimersPanel extends JSplitPane {
 				OpenWebifController.deleteTimer(clickedTimer, main.mainWindow);
 			}));
 			
+			JMenuItem miShowTimerDetails = add(OpenWebifController.createMenuItem("Show Details of Timer", e->{
+				if (clickedTimer==null) return;
+				String text = generateDetailsOutput(clickedTimer);
+				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
+			}));
+			
+			addSeparator();
+			
+			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
+				System.out.printf("Column Widths: %s%n", TimersTableModel.getColumnWidthsAsString(table));
+			}));
+			
+			add(OpenWebifController.createMenuItem("Reset Row Order", e->{
+				tableRowSorter.resetSortOrder();
+				table.repaint();
+			}));
+			
 			addContextMenuInvokeListener((comp, x, y) -> {
 				int rowV = comp!=table ? -1 : table.rowAtPoint(new Point(x,y));
 				int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
-				clickedTimer = tableModel==null ? null : tableModel.getRow(rowM);
+				clickedTimer = tableModel.getRow(rowM);
 				
 				miToggleTimer     .setEnabled(clickedTimer!=null);
 				miDeleteTimer     .setEnabled(clickedTimer!=null);
@@ -151,19 +164,42 @@ public class TimersPanel extends JSplitPane {
 	public void readData(String baseURL, ProgressView pd) {
 		if (baseURL==null) return;
 		timers = OpenWebifTools.readTimers(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));
-		if (timers==null) {
-			tableModel = null;
-			table.setModel(new DefaultTableModel());
-		} else {
-			table.setModel(tableModel = new TimersTableModel(timers.timers));
-			tableModel.setTable(table);
-			tableModel.setColumnWidths(table);
-			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-			tableModel.setAllDefaultRenderers();
-		}
+		tableModel = timers==null ? new TimersTableModel() : new TimersTableModel(timers.timers);
+		table.setModel(tableModel);
+		tableRowSorter.setModel(tableModel);
+		tableModel.setTable(table);
+		tableModel.setColumnWidths(table);
+		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+		tableModel.setAllDefaultRenderers();
 		table.repaint();
 		for (DataUpdateListener listener:dataUpdateListeners)
 			listener.timersHasUpdated(timers);
+	}
+	
+	public static class TimersTableRowSorter extends Tables.SimplifiedRowSorter
+	{
+
+		public TimersTableRowSorter(SimplifiedTableModel<?> tableModel)
+		{
+			super(tableModel);
+		}
+
+		@Override
+		protected boolean isNewClass(Class<?> columnClass)
+		{
+			return
+				(columnClass == Timer.Type .class) ||
+				(columnClass == Timer.State.class);
+		}
+		
+		@Override
+		protected Comparator<Integer> addComparatorForNewClass(Comparator<Integer> comparator, SortOrder sortOrder, Class<?> columnClass, Function<Integer,Object> getValueAtRow)
+		{
+			if      (columnClass == Timer.Type .class) comparator = addComparator(comparator, sortOrder, row->(Timer.Type )getValueAtRow.apply(row));
+			else if (columnClass == Timer.State.class) comparator = addComparator(comparator, sortOrder, row->(Timer.State)getValueAtRow.apply(row));
+			return comparator;
+		}
+		
 	}
 	
 	static class TimersTableCellRenderer implements TableCellRenderer {
@@ -329,6 +365,9 @@ public class TimersPanel extends JSplitPane {
 
 		private final Vector<Timer> timers;
 
+		public TimersTableModel() {
+			this(new Vector<>());
+		}
 		public TimersTableModel(Vector<Timer> timers) {
 			super(ColumnID.values());
 			this.timers = timers;

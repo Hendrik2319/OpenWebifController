@@ -4,6 +4,7 @@
 	* [x] add view of detail for selected timer
 * in OpenWebifController
 	* [x] add commands to context menu: delete, toggle, [ ] update all
-	* [ ] rename Timers to TimerData
+	* [x] rename Timers to TimerData
 * both
-	* [ ] merge TimerTables of both into one class
+	* [ ] merge TimerTables of both into one class -> nope
+		* separate classes can be more specific and smaller

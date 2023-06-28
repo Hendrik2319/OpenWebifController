@@ -52,6 +52,7 @@ import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.PowerControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.VolumeControl;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimersTableRowSorter;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 
 class StationSwitch {
@@ -371,6 +372,7 @@ class StationSwitch {
 		private final Window window;
 		private final JTable table;
 		private final JScrollPane tableScrollPane;
+		private final TimersTableRowSorter tableRowSorter;
 		private TimersTableModel tableModel;
 		private ExtendedTextArea textArea;
 		private Supplier<Vector<Timer>> updateData;
@@ -384,17 +386,21 @@ class StationSwitch {
 			textArea.setLineWrap(true);
 			textArea.setWrapStyleWord(true);
 			
-			tableModel = null;
-			table = new JTable();
+			tableModel = new TimersTableModel();
+			table = new JTable(tableModel);
+			table.setRowSorter(tableRowSorter = new TimersTableRowSorter(tableModel));
 			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 			table.setColumnSelectionAllowed(false);
 			table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 			table.getSelectionModel().addListSelectionListener(e->{
-				if (tableModel == null) return;
 				int rowV = table.getSelectedRow();
 				int rowM = table.convertRowIndexToModel(rowV);
 				textArea.setText(TimersPanel.generateShortInfo(tableModel.getRow(rowM)));
 			});
+			tableModel.setTable(table);
+			tableModel.setColumnWidths(table);
+			tableModel.setAllDefaultRenderers();
+			
 			new TimersTableContextMenu().addTo(table);
 			
 			tableScrollPane = new JScrollPane(table);
@@ -423,6 +429,7 @@ class StationSwitch {
 		{
 			tableModel = new TimersTableModel(data);
 			table.setModel(tableModel);
+			tableRowSorter.setModel(tableModel);
 			tableModel.setTable(table);
 			tableModel.setColumnWidths(table);
 			tableModel.setAllDefaultRenderers();
@@ -443,6 +450,13 @@ class StationSwitch {
 			TimersTableContextMenu() {
 				clickedTimer = null;
 				
+				JMenuItem miReloadTimers = add(OpenWebifController.createMenuItem("Reload Timer Data", GrayCommandIcons.IconGroup.Reload, e->{
+					if (updateData==null) return;
+					setData(updateData.get());
+				}));
+				
+				addSeparator();
+				
 				JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
 					if (clickedTimer==null) return;
 					OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this);
@@ -455,15 +469,15 @@ class StationSwitch {
 				
 				addSeparator();
 				
-				JMenuItem miReloadTimers = add(OpenWebifController.createMenuItem("Reload Timer Data", GrayCommandIcons.IconGroup.Reload, e->{
-					if (updateData==null) return;
-					setData(updateData.get());
+				add(OpenWebifController.createMenuItem("Reset Row Order", e->{
+					tableRowSorter.resetSortOrder();
+					table.repaint();
 				}));
 				
 				addContextMenuInvokeListener((comp, x, y) -> {
 					int rowV = table.rowAtPoint(new Point(x,y));
 					int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
-					clickedTimer = tableModel==null ? null : tableModel.getRow(rowM);
+					clickedTimer = tableModel.getRow(rowM);
 					
 					miReloadTimers.setEnabled(updateData  !=null);
 					miToggleTimer .setEnabled(clickedTimer!=null);
@@ -538,6 +552,9 @@ class StationSwitch {
 
 		private final Vector<Timer> data;
 
+		private TimersTableModel() {
+			this(new Vector<>());
+		}
 		private TimersTableModel(Vector<Timer> data) {
 			super(ColumnID.values());
 			if (data==null) throw new IllegalArgumentException();

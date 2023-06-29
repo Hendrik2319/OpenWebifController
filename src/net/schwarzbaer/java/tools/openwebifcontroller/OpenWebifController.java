@@ -276,7 +276,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 
 	public  final StandardMainWindow mainWindow;
 	private final JFileChooser exeFileChooser;
-	private final Movies movies;
+	private final MoviesPanel movies;
 	private final BouquetsNStations bouquetsNStations;
 	private final TimersPanel timers;
 	private final ScreenShot screenShot;
@@ -299,7 +299,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
 		
 		mainWindow = createMainWindow("OpenWebif Controller",false);
-		movies = new Movies(this,mainWindow);
+		movies = new MoviesPanel(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new TimersPanel(this);
 		screenShot = new ScreenShot(this, remoteControl = new RemoteControlPanel(this));

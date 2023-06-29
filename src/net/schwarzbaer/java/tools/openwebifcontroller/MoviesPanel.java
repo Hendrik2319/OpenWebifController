@@ -43,7 +43,7 @@ import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
 
-class Movies extends JSplitPane {
+class MoviesPanel extends JSplitPane {
 	private static final long serialVersionUID = 3435419463730240276L;
 	
 	private static final DateTimeFormatter dtFormatter = new DateTimeFormatter();
@@ -66,7 +66,7 @@ class Movies extends JSplitPane {
 	private LocationTreeNode clickedTreeNode;
 	private MovieList.Movie clickedMovie;
 
-	Movies(OpenWebifController main, StandardMainWindow mainWindow) {
+	MoviesPanel(OpenWebifController main, StandardMainWindow mainWindow) {
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		this.main = main;

@@ -30,13 +30,13 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.gui.Tables;
-import net.schwarzbaer.java.lib.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
+import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
@@ -91,10 +91,11 @@ class MoviesPanel extends JSplitPane {
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
 		
-		JMenuItem miReloadTable1, miOpenVideoPlayer, miOpenBrowser;
+		JMenuItem miReloadTable1, miOpenVideoPlayer, miOpenBrowser, miZapToMovie;
 		ContextMenu tableContextMenu = new ContextMenu();
-		tableContextMenu.add(miOpenVideoPlayer = OpenWebifController.createMenuItem("Show in VideoPlayer", GrayCommandIcons.IconGroup.Image, e->showMovie(clickedMovie)));
-		tableContextMenu.add(miOpenBrowser     = OpenWebifController.createMenuItem("Show in Browser"    , GrayCommandIcons.IconGroup.Image, e->showMovieInBrowser(clickedMovie)));
+		tableContextMenu.add(miOpenVideoPlayer = OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image, e->showMovie(clickedMovie)));
+		tableContextMenu.add(miOpenBrowser     = OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image, e->showMovieInBrowser(clickedMovie)));
+		tableContextMenu.add(miZapToMovie      = OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Image, e->zapToMovie(clickedMovie)));
 		tableContextMenu.addSeparator();
 		tableContextMenu.add(miReloadTable1 = OpenWebifController.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
 		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
@@ -119,9 +120,11 @@ class MoviesPanel extends JSplitPane {
 			
 			miReloadTable1.setEnabled(selectedTreeNode!=null);
 			miOpenVideoPlayer.setEnabled(clickedMovie!=null);
-			miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer" : String.format("Show \"%s\" in VideoPlayer", clickedMovie.eventname));
-			miOpenBrowser.setEnabled(clickedMovie!=null);
-			miOpenBrowser.setText(clickedMovie==null ? "Show in Browser" : String.format("Show \"%s\" in Browser", clickedMovie.eventname));
+			miOpenBrowser    .setEnabled(clickedMovie!=null);
+			miZapToMovie     .setEnabled(clickedMovie!=null);
+			miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer"  : String.format("Show \"%s\" in VideoPlayer" , clickedMovie.eventname));
+			miOpenBrowser    .setText(clickedMovie==null ? "Show in Browser"      : String.format("Show \"%s\" in Browser"     , clickedMovie.eventname));
+			miZapToMovie     .setText(clickedMovie==null ? "Start Playing in STB" : String.format("Start Playing \"%s\" in STB", clickedMovie.eventname));
 		});
 		
 		JMenuItem miReloadTable2;
@@ -218,6 +221,20 @@ class MoviesPanel extends JSplitPane {
 		locationsTreeModel.nodeChanged(treeNode);
 		if (treeNode==selectedTreeNode)
 			updateMovieTableModel(movieList.movies);
+	}
+	
+	private void zapToMovie(MovieList.Movie movie) {
+		if (movie==null) return;
+		
+		String baseURL = main.getBaseURL();
+		if (baseURL==null) return;
+		
+		main.runWithProgressDialog("Zap to Movie", pd->{
+			OpenWebifTools.MessageResponse response = OpenWebifTools.zapToMovie(baseURL, movie, taskTitle->{
+				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
+			});
+			main.showMessageResponse(response, "Zap to Movie");
+		});
 	}
 
 	private void showMovie(MovieList.Movie movie) {

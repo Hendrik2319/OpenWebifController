@@ -95,7 +95,7 @@ class MoviesPanel extends JSplitPane {
 		ContextMenu tableContextMenu = new ContextMenu();
 		tableContextMenu.add(miOpenVideoPlayer = OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image, e->showMovie(clickedMovie)));
 		tableContextMenu.add(miOpenBrowser     = OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image, e->showMovieInBrowser(clickedMovie)));
-		tableContextMenu.add(miZapToMovie      = OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Image, e->zapToMovie(clickedMovie)));
+		tableContextMenu.add(miZapToMovie      = OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play , e->zapToMovie(clickedMovie)));
 		tableContextMenu.addSeparator();
 		tableContextMenu.add(miReloadTable1 = OpenWebifController.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
 		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{

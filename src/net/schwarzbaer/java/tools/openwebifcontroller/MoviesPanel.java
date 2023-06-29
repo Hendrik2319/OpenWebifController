@@ -61,10 +61,7 @@ class MoviesPanel extends JSplitPane {
 	private MovieTableModel movieTableModel;
 
 	private TreePath selectedTreePath;
-	private TreePath clickedTreePath;
 	private LocationTreeNode selectedTreeNode;
-	private LocationTreeNode clickedTreeNode;
-	private MovieList.Movie clickedMovie;
 
 	MoviesPanel(OpenWebifController main, StandardMainWindow mainWindow) {
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
@@ -76,7 +73,6 @@ class MoviesPanel extends JSplitPane {
 		selectedTreePath = null;
 		selectedTreeNode = null;
 		movieTableModel = null;
-		clickedMovie = null;
 		
 		locationsTree = new JTree(locationsTreeModel);
 		locationsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
@@ -90,60 +86,8 @@ class MoviesPanel extends JSplitPane {
 		JScrollPane tableScrollPane = new JScrollPane(movieTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
-		
-		JMenuItem miReloadTable1, miOpenVideoPlayer, miOpenBrowser, miZapToMovie;
-		ContextMenu tableContextMenu = new ContextMenu();
-		tableContextMenu.add(miOpenVideoPlayer = OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image, e->showMovie(clickedMovie)));
-		tableContextMenu.add(miOpenBrowser     = OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image, e->showMovieInBrowser(clickedMovie)));
-		tableContextMenu.add(miZapToMovie      = OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play , e->zapToMovie(clickedMovie)));
-		tableContextMenu.addSeparator();
-		tableContextMenu.add(miReloadTable1 = OpenWebifController.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
-		tableContextMenu.add(OpenWebifController.createMenuItem("Show Column Widths", e->{
-			TableColumnModel columnModel = movieTable.getColumnModel();
-			if (columnModel==null) return;
-			int[] widths = new int[columnModel.getColumnCount()];
-			for (int i=0; i<widths.length; i++) {
-				TableColumn column = columnModel.getColumn(i);
-				if (column==null) widths[i] = -1;
-				else widths[i] = column.getWidth();
-			}
-			System.out.printf("Column Widths: %s%n", Arrays.toString(widths));
-		}));
-		
-		tableContextMenu.addTo(movieTable);
-		tableContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
-			clickedMovie = null;
-			int rowV = movieTable.rowAtPoint(new Point(x,y));
-			int rowM = movieTable.convertRowIndexToModel(rowV);
-			if (movieTableModel!=null)
-				clickedMovie = movieTableModel.getValue(rowM);
-			
-			miReloadTable1.setEnabled(selectedTreeNode!=null);
-			miOpenVideoPlayer.setEnabled(clickedMovie!=null);
-			miOpenBrowser    .setEnabled(clickedMovie!=null);
-			miZapToMovie     .setEnabled(clickedMovie!=null);
-			miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer"  : String.format("Show \"%s\" in VideoPlayer" , clickedMovie.eventname));
-			miOpenBrowser    .setText(clickedMovie==null ? "Show in Browser"      : String.format("Show \"%s\" in Browser"     , clickedMovie.eventname));
-			miZapToMovie     .setText(clickedMovie==null ? "Start Playing in STB" : String.format("Start Playing \"%s\" in STB", clickedMovie.eventname));
-		});
-		
-		JMenuItem miReloadTable2;
-		ContextMenu treeContextMenu = new ContextMenu();
-		treeContextMenu.add(miReloadTable2 = OpenWebifController.createMenuItem("Reload Folder", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(clickedTreeNode)));
-		
-		treeContextMenu.addTo(locationsTree);
-		treeContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
-			clickedTreePath = locationsTree.getPathForLocation(x,y);
-			clickedTreeNode = null;
-			if (clickedTreePath!=null) {
-				Object obj = clickedTreePath.getLastPathComponent();
-				if (obj instanceof LocationTreeNode)
-					clickedTreeNode = (LocationTreeNode) obj;
-			}
-			miReloadTable2.setEnabled(clickedTreeNode!=null);
-			miReloadTable2.setText(String.format("%s Folder", clickedTreeNode!=null && clickedTreeNode.movies!=null ? "Reload" : "Load"));
-		});
-		
+		new TableContextMenu().addTo(movieTable);
+		new TreeContextMenu().addTo(locationsTree);
 		
 		movieInfo1 = new ExtendedTextArea(false);
 		//movieInfo1.setLineWrap(true);
@@ -207,6 +151,80 @@ class MoviesPanel extends JSplitPane {
 			}
 		});
 		
+	}
+
+	private class TreeContextMenu extends ContextMenu
+	{
+		private static final long serialVersionUID = -7833563667506242088L;
+		
+		private TreePath clickedTreePath;
+		private LocationTreeNode clickedTreeNode;
+
+		TreeContextMenu()
+		{
+			clickedTreePath = null;
+			clickedTreeNode = null;
+			
+			add(OpenWebifController.createMenuItem("Reload Movies", GrayCommandIcons.IconGroup.Reload, e->main.getBaseURLAndRunWithProgressDialog("Reload Movies", MoviesPanel.this::readInitialMovieList)));
+			JMenuItem miReloadTreeNode = add(OpenWebifController.createMenuItem("Reload Folder", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(clickedTreeNode)));
+			
+			addContextMenuInvokeListener((comp, x, y) -> {
+				clickedTreePath = locationsTree.getPathForLocation(x,y);
+				clickedTreeNode = null;
+				if (clickedTreePath!=null) {
+					Object obj = clickedTreePath.getLastPathComponent();
+					if (obj instanceof LocationTreeNode)
+						clickedTreeNode = (LocationTreeNode) obj;
+				}
+				miReloadTreeNode.setEnabled(clickedTreeNode!=null);
+				miReloadTreeNode.setText(String.format("%s Folder", clickedTreeNode!=null && clickedTreeNode.movies!=null ? "Reload" : "Load"));
+			});
+		}
+	}
+
+	private class TableContextMenu extends ContextMenu
+	{
+		private static final long serialVersionUID = -1424675027095694095L;
+		
+		private MovieList.Movie clickedMovie;
+
+		TableContextMenu()
+		{
+			clickedMovie = null;
+			
+			JMenuItem miOpenVideoPlayer = add(OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image, e->showMovie(clickedMovie)));
+			JMenuItem miOpenBrowser     = add(OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image, e->showMovieInBrowser(clickedMovie)));
+			JMenuItem miZapToMovie      = add(OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play , e->zapToMovie(clickedMovie)));
+			addSeparator();
+			JMenuItem miReloadTable = add(OpenWebifController.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
+			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
+				TableColumnModel columnModel = movieTable.getColumnModel();
+				if (columnModel==null) return;
+				int[] widths = new int[columnModel.getColumnCount()];
+				for (int i=0; i<widths.length; i++) {
+					TableColumn column = columnModel.getColumn(i);
+					if (column==null) widths[i] = -1;
+					else widths[i] = column.getWidth();
+				}
+				System.out.printf("Column Widths: %s%n", Arrays.toString(widths));
+			}));
+			
+			addContextMenuInvokeListener((comp, x, y) -> {
+				clickedMovie = null;
+				int rowV = movieTable.rowAtPoint(new Point(x,y));
+				int rowM = movieTable.convertRowIndexToModel(rowV);
+				if (movieTableModel!=null)
+					clickedMovie = movieTableModel.getValue(rowM);
+				
+				miReloadTable.setEnabled(selectedTreeNode!=null);
+				miOpenVideoPlayer.setEnabled(clickedMovie!=null);
+				miOpenBrowser    .setEnabled(clickedMovie!=null);
+				miZapToMovie     .setEnabled(clickedMovie!=null);
+				miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer"  : String.format("Show \"%s\" in VideoPlayer" , clickedMovie.eventname));
+				miOpenBrowser    .setText(clickedMovie==null ? "Show in Browser"      : String.format("Show \"%s\" in Browser"     , clickedMovie.eventname));
+				miZapToMovie     .setText(clickedMovie==null ? "Start Playing in STB" : String.format("Start Playing \"%s\" in STB", clickedMovie.eventname));
+			});
+		}
 	}
 
 	private void updateMovieTableModel(Vector<MovieList.Movie> movies) {

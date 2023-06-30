@@ -109,12 +109,12 @@ public class TimersPanel extends JSplitPane {
 			
 			JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
 				if (clickedTimer==null) return;
-				OpenWebifController.toggleTimer(clickedTimer, main.mainWindow);
+				main.toggleTimer(clickedTimer);
 			}));
 			
 			JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
-				OpenWebifController.deleteTimer(clickedTimer, main.mainWindow);
+				main.deleteTimer(clickedTimer);
 			}));
 			
 			JMenuItem miShowTimerDetails = add(OpenWebifController.createMenuItem("Show Details of Timer", e->{

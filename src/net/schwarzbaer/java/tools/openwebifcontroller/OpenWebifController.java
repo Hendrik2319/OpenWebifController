@@ -6,11 +6,8 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.ActionListener;
-import java.awt.event.ComponentEvent;
-import java.awt.event.ComponentListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.io.File;
@@ -188,16 +185,15 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			.initialize();
 	}
 	
-	public static class AppSettings extends Settings<AppSettings.ValueGroup,AppSettings.ValueKey> {
+	public static class AppSettings extends Settings.DefaultAppSettings<AppSettings.ValueGroup,AppSettings.ValueKey> {
 		public enum ValueKey {
-			WindowX, WindowY, WindowWidth, WindowHeight, VideoPlayer, BaseURL, Browser, JavaVM,
+			VideoPlayer, BaseURL, Browser, JavaVM,
 			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates, BouquetsNStations_UpdateCurrentStation,
 			EPGDialogWidth, EPGDialogHeight, EPGDialog_TimeScale, EPGDialog_RowHeight, EPGDialog_LeadTime, EPGDialog_RangeTime,
+			LogWindow_WindowX, LogWindow_WindowY, LogWindow_WindowWidth, LogWindow_WindowHeight, 
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {
-			WindowPos (ValueKey.WindowX, ValueKey.WindowY),
-			WindowSize(ValueKey.WindowWidth, ValueKey.WindowHeight),
 			;
 			ValueKey[] keys;
 			ValueGroup(ValueKey...keys) { this.keys = keys;}
@@ -205,13 +201,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		}
 
 		AppSettings() {
-			super(OpenWebifController.class);
+			super(OpenWebifController.class, ValueKey.values());
 		}
-		public Point     getWindowPos (              ) { return getPoint(ValueKey.WindowX,ValueKey.WindowY); }
-		public void      setWindowPos (Point location) {        putPoint(ValueKey.WindowX,ValueKey.WindowY,location); }
-		public Dimension getWindowSize(              ) { return getDimension(ValueKey.WindowWidth,ValueKey.WindowHeight); }
-		public void      setWindowSize(Dimension size) {        putDimension(ValueKey.WindowWidth,ValueKey.WindowHeight,size); }
-		
 	}
 
 	public static class Updater {
@@ -285,7 +276,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	public SystemInfo systemInfo;
 	public HashMap<String, BoxSettings.BoxSettingsValue> boxSettings;
 	private final SystemInfoPanel systemInfoPanel;
-	private RemoteControlPanel remoteControl;
+	private final RemoteControlPanel remoteControl;
+	private final LogWindow logWindow;
 
 	OpenWebifController() {
 		systemInfo = null;
@@ -297,6 +289,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
 		
 		mainWindow = createMainWindow("OpenWebif Controller",false);
+		
+		logWindow = new LogWindow(mainWindow, "Response Log");
+		
 		movies = new MoviesPanel(this,mainWindow);
 		bouquetsNStations = new BouquetsNStations(this,mainWindow);
 		timers = new TimersPanel(this);
@@ -342,7 +337,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		JMenu updatesMenu = menuBar.add(createMenu("Init / Updates"));
 		fillUpdatesMenu(updatesMenu);
 		
-		JMenu extrasMenu = menuBar.add(createMenu("Extras"));
+		JMenu extrasMenu = menuBar.add(createMenu("Tools"));
 		extrasMenu.add(createMenuItem("Station Switch", e->{
 			String baseURL = getBaseURL();
 			if (baseURL==null) return;
@@ -350,6 +345,11 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		}));
 		extrasMenu.add(createMenuItem("Remote Control Tool", e->{
 			new RemoteControlTool(true);
+		}));
+		
+		JMenu logsMenu = menuBar.add(createMenu("Logs"));
+		logsMenu.add(createMenuItem("Show Response Log", e->{
+			logWindow.showDialog();
 		}));
 		
 		//JPanel stationSwitchPanel = new JPanel(new BorderLayout());
@@ -386,16 +386,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		contentPane.add(toolBar,BorderLayout.NORTH);
 		
 		mainWindow.startGUI(contentPane, menuBar);
-		
-		if (settings.isSet(AppSettings.ValueGroup.WindowPos )) mainWindow.setLocation(settings.getWindowPos ());
-		if (settings.isSet(AppSettings.ValueGroup.WindowSize)) mainWindow.setSize    (settings.getWindowSize());
-		
-		mainWindow.addComponentListener(new ComponentListener() {
-			@Override public void componentShown  (ComponentEvent e) {}
-			@Override public void componentHidden (ComponentEvent e) {}
-			@Override public void componentResized(ComponentEvent e) { settings.setWindowSize( mainWindow.getSize() ); }
-			@Override public void componentMoved  (ComponentEvent e) { settings.setWindowPos ( mainWindow.getLocation() ); }
-		});
+		settings.registerAppWindow(mainWindow);
+		settings.registerExtraWindow(logWindow,
+			AppSettings.ValueKey.LogWindow_WindowX,
+			AppSettings.ValueKey.LogWindow_WindowY,
+			AppSettings.ValueKey.LogWindow_WindowWidth,
+			AppSettings.ValueKey.LogWindow_WindowHeight
+		);
 	}
 	
 	static StandardMainWindow createMainWindow(String title, boolean asSubWindow) {
@@ -512,19 +509,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	}
 
 	@Override
-	public void showMessageResponse(OpenWebifTools.MessageResponse response, String title) {
-		showMessageResponse(mainWindow, response, title);
-	}
-	public static void showMessageResponse(Component parentComponent, OpenWebifTools.MessageResponse response, String title) {
-		String message = response==null ? "<No Response>" : toString(response);
-		if (parentComponent!=null)
-			JOptionPane.showMessageDialog(parentComponent, message, title, JOptionPane.INFORMATION_MESSAGE);
-		
-		System.out.println(title+":");
-		if (response!=null)
-			response.printTo(System.out);
-		else
-			System.out.println("<No Response>");
+	public void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight) {
+		logWindow.showMessageResponse(response, title, stringsToHighlight);
 	}
 
 	static String getCurrentTimeStr() {
@@ -664,13 +650,6 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		return out.generateOutput();
 	}
 
-	public static String toString(OpenWebifTools.MessageResponse values) {
-		StringBuilder sb = new StringBuilder();
-		sb.append(String.format("Message: \"%s\"%n", values.message));
-		sb.append(String.format("Result: %s%n", values.result));
-		return sb.toString();
-	}
-
 	public static void generateOutput(ValueListOutput out, int level, OpenWebifTools.CurrentStation currentStation) {
 		out.add(level, "Station"          ); generateOutput(out, level+1, currentStation.stationInfo    );
 		out.add(level, "Current EPG Event"); generateOutput(out, level+1, currentStation.currentEPGevent);
@@ -742,7 +721,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	@Override
 	public void addTimer(String baseURL, String sRef, int eventID, Timers.Timer.Type type) {
 		runWithProgressDialog("Add Timer", pd->{
-			OpenWebifTools.MessageResponse response = Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
+			MessageResponse response = Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			showMessageResponse(response, "Add Timer");
@@ -752,43 +731,56 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	@Override
 	public void deleteTimer(String baseURL, String sRef, long begin, long end) {
 		runWithProgressDialog("Delete Timer", pd->{
-			OpenWebifTools.MessageResponse response = Timers.deleteTimer(baseURL, sRef, begin, end, taskTitle->{
+			MessageResponse response = Timers.deleteTimer(baseURL, sRef, begin, end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			showMessageResponse(response, "Delete Timer");
 			timers.readData(baseURL,pd);
 		});
 	}
+	public void deleteTimer(Timers.Timer timer)
+	{
+		deleteTimer(timer, mainWindow, logWindow);
+	}
+	
 	@Override
 	public void toggleTimer(String baseURL, String sRef, long begin, long end) {
 		runWithProgressDialog("Toggle Timer", pd->{
-			OpenWebifTools.MessageResponse response = Timers.toggleTimer(baseURL, sRef, begin, end, taskTitle->{
+			MessageResponse response = Timers.toggleTimer(baseURL, sRef, begin, end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
-			showMessageResponse(response, "Toggle Timer");
+			showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
 			timers.readData(baseURL,pd);
 		});
 	}
+	public void toggleTimer(Timers.Timer timer)
+	{
+		toggleTimer(timer, mainWindow, logWindow);
+	}
 
-	public static void deleteTimer(Timers.Timer timer, Window window)
+	public interface LogWindowInterface {
+		void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight);
+	}
+
+	public static void deleteTimer(Timers.Timer timer, Window window, LogWindowInterface lwi)
 	{
 		runWithProgressDialog(window, "Delete Timer", pd->{
 			String baseURL = getBaseURL(true, window);
-			OpenWebifTools.MessageResponse response = Timers.deleteTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
+			MessageResponse response = Timers.deleteTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
-			showMessageResponse(window, response, "Delete Timer");
+			lwi.showMessageResponse(response, "Delete Timer");
 		});
 	}
 
-	public static void toggleTimer(Timers.Timer timer, Window window)
+	public static void toggleTimer(Timers.Timer timer, Window window, LogWindowInterface lwi)
 	{
 		runWithProgressDialog(window, "Toggle Timer", pd->{
 			String baseURL = getBaseURL(true, window);
-			OpenWebifTools.MessageResponse response = Timers.toggleTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
+			MessageResponse response = Timers.toggleTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
-			showMessageResponse(window, response, "Toggle Timer");
+			lwi.showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
 		});
 	}
 	
@@ -797,13 +789,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		zapToStation(getBaseURL(), stationID);
 	}
 	@Override public void zapToStation(String baseURL, StationID stationID) {
-		zapToStation(stationID, baseURL);
+		zapToStation(stationID, baseURL, logWindow);
 	}
-	public static void zapToStation(StationID stationID, String baseURL) {
+	public static void zapToStation(StationID stationID, String baseURL, LogWindowInterface lwi) {
 		if (stationID==null) return;
 		if (baseURL==null) return;
 		MessageResponse response = OpenWebifTools.zapToStation(baseURL, stationID);
-		if (response!=null) response.printTo(System.out);
+		lwi.showMessageResponse(response, "Zap to Station");
 	}
 
 	public void streamStation(StationID stationID) {

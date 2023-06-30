@@ -19,7 +19,7 @@ public abstract class AbstractControlPanel<ValueStructType> extends JPanel {
 	
 	public interface ExternCommands {
 		String getBaseURL();
-		void showMessageResponse(MessageResponse response, String title);
+		void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight);
 	}
 	
 	protected final ExternCommands externCommands;

@@ -79,11 +79,12 @@ class StationSwitch {
 	private String baseURL;
 	private BouquetData bouquetData;
 	private Bouquet.SubService selectedStation;
-	private JButton btnReLoadTimerData;
-	private JButton btnShowTimers;
+	private final JButton btnReLoadTimerData;
+	private final JButton btnShowTimers;
 	private Timers timerData;
 	//private JLabel labActiveTimers;
-	private JTextArea txtActiveTimers;
+	private final JTextArea txtActiveTimers;
+	private final LogWindow logWindow;
 	
 	StationSwitch(boolean asSubWindow) {
 		baseURL = null;
@@ -92,11 +93,13 @@ class StationSwitch {
 		timerData = null;
 		
 		mainWindow = OpenWebifController.createMainWindow("Station Switch",asSubWindow);
+		logWindow = new LogWindow(mainWindow, "Response Log");
+		
 		stationsPanel = new JPanel(new GridBagLayout());
 		
 		AbstractControlPanel.ExternCommands controlPanelCommands = new AbstractControlPanel.ExternCommands() {
-			@Override public void showMessageResponse(MessageResponse response, String title) {
-				OpenWebifController.showMessageResponse(mainWindow, response, title);
+			@Override public void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight) {
+				logWindow.showMessageResponse(response, title, stringsToHighlight);
 			}
 			@Override public String getBaseURL() {
 				return baseURL!=null ? baseURL : (baseURL = OpenWebifController.getBaseURL(true, mainWindow));
@@ -121,7 +124,7 @@ class StationSwitch {
 			
 			JButton btnZap = OpenWebifController.createButton("Switch", true, e1->{
 				if (baseURL==null) return;
-				OpenWebifController.zapToStation(station.service.stationID, baseURL);
+				OpenWebifController.zapToStation(station.service.stationID, baseURL, logWindow);
 			});
 			
 			JButton btnStream = OpenWebifController.createButton("Stream", true, e1->{
@@ -191,7 +194,7 @@ class StationSwitch {
 				//System.err.printf("timerData == null%n");
 				return;
 			}
-			TimersDialog.showDialog(mainWindow, timerData.timers, ()->{
+			TimersDialog.showDialog(mainWindow, logWindow, timerData.timers, ()->{
 				reloadTimerData();
 				return timerData.timers;
 			});
@@ -207,6 +210,8 @@ class StationSwitch {
 		c.weightx = 1;
 		controllerPanel.add(powerControl ,c);
 		controllerPanel.add(volumeControl,c);
+		c.weightx = 0;
+		controllerPanel.add(OpenWebifController.createButton("Log", true, e->logWindow.showDialog(LogWindow.Position.RIGHT_OF_PARENT)),c);
 		
 		
 		JPanel timerPanel = new JPanel(new GridBagLayout());
@@ -371,6 +376,7 @@ class StationSwitch {
 		private static TimersDialog instance = null;
 		
 		private final Window window;
+		private final LogWindow logWindow;
 		private final JTable table;
 		private final JScrollPane tableScrollPane;
 		private final TimersTableRowSorter tableRowSorter;
@@ -378,9 +384,10 @@ class StationSwitch {
 		private ExtendedTextArea textArea;
 		private Supplier<Vector<Timer>> updateData;
 
-		TimersDialog(Window window) {
+		TimersDialog(Window window, LogWindow logWindow) {
 			super(window, "Timers", ModalityType.APPLICATION_MODAL);
 			this.window = window;
+			this.logWindow = logWindow;
 			updateData = null;
 			
 			textArea = new ExtendedTextArea(false);
@@ -436,9 +443,9 @@ class StationSwitch {
 			tableModel.setAllDefaultRenderers();
 		}
 		
-		static void showDialog(Window window, Vector<Timer> data, Supplier<Vector<Timer>> updateData) {
+		static void showDialog(Window window, LogWindow logWindow, Vector<Timer> data, Supplier<Vector<Timer>> updateData) {
 			if (instance == null) {
-				instance = new TimersDialog(window);
+				instance = new TimersDialog(window, logWindow);
 				instance.setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE);
 			}
 			instance.showDialog(data,updateData);
@@ -460,12 +467,12 @@ class StationSwitch {
 				
 				JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
 					if (clickedTimer==null) return;
-					OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this);
+					OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this, logWindow);
 				}));
 				
 				JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->{
 					if (clickedTimer==null) return;
-					OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this);
+					OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this, logWindow);
 				}));
 				
 				addSeparator();

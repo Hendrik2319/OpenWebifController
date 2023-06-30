@@ -87,7 +87,7 @@ public class RemoteControlPanel extends Canvas implements MouseListener, MouseMo
 		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
 		MessageResponse response = remoteControl.sendKeyPress(baseURL,hoveredKey,null);
-		OpenWebifController.showMessageResponse(null, response, "RemoteControl.sendKeyPress");
+		main.showMessageResponse(response, "RemoteControl.sendKeyPress");
 		for (KeyPressListener kpl:keyPressListeners)
 			kpl.keyWasPressed();
 	}

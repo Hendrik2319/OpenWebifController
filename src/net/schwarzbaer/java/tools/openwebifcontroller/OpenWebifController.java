@@ -6,7 +6,6 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.LayoutManager;
 import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.ActionListener;
@@ -16,7 +15,6 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Vector;
@@ -25,7 +23,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -47,7 +44,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
-import javax.swing.JSlider;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
@@ -73,18 +69,20 @@ import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers;
-import net.schwarzbaer.java.lib.openwebif.Volume;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.lib.system.Settings;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
+import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
+import net.schwarzbaer.java.tools.openwebifcontroller.controls.MessageControl;
+import net.schwarzbaer.java.tools.openwebifcontroller.controls.PowerControl;
+import net.schwarzbaer.java.tools.openwebifcontroller.controls.VolumeControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
 
-public class OpenWebifController implements EPGDialog.ExternCommands {
+public class OpenWebifController implements EPGDialog.ExternCommands, AbstractControlPanel.ExternCommands {
 	
 	public static void ASSERT( boolean predicate) { ASSERT( predicate, null ); }
 	public static void ASSERT( boolean predicate, String message ) {
@@ -307,7 +305,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		
 		epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
-				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+				return dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
 			}
 		});
 		
@@ -371,22 +369,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			openEPGDialog(bouquet);
 		}));
 		
-		AbstractControlPanel.ExternCommands controlPanelCommands = new AbstractControlPanel.ExternCommands() {
-			@Override public void showMessageResponse(MessageResponse response, String title) {
-				OpenWebifController.this.showMessageResponse(response, title);
-			}
-			@Override public String getBaseURL() {
-				return OpenWebifController.this.getBaseURL();
-			}
-		};
-		
 		JPanel toolBar = new JPanel(new GridBagLayout());
 		GridBagConstraints c = new GridBagConstraints();
 		c.fill = GridBagConstraints.BOTH;
 		c.weightx = 0;
-		toolBar.add(powerControl   = new PowerControl  (controlPanelCommands, true, false, false), c);
-		toolBar.add(volumeControl  = new VolumeControl (controlPanelCommands, true, false, false), c);
-		toolBar.add(messageControl = new MessageControl(controlPanelCommands), c);
+		toolBar.add(powerControl   = new PowerControl  (this, true, false, false), c);
+		toolBar.add(volumeControl  = new VolumeControl (this, true, false, false), c);
+		toolBar.add(messageControl = new MessageControl(this), c);
 		toolBar.add(epgControlPanel, c);
 		//toolBar.add(stationSwitchPanel, c);
 		c.weightx = 1;
@@ -522,6 +511,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		});
 	}
 
+	@Override
 	public void showMessageResponse(OpenWebifTools.MessageResponse response, String title) {
 		showMessageResponse(mainWindow, response, title);
 	}
@@ -535,360 +525,6 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			response.printTo(System.out);
 		else
 			System.out.println("<No Response>");
-	}
-
-	static abstract class AbstractControlPanel<ValueStructType> extends JPanel {
-		private static final long serialVersionUID = 1376060978837360833L;
-		
-		interface ExternCommands {
-			String getBaseURL();
-			void showMessageResponse(MessageResponse response, String title);
-		}
-		
-		protected final ExternCommands externCommands;
-		private final String controlLabel;
-		private final BiFunction<String, Consumer<String>, ValueStructType> updateCommand;
-	
-		AbstractControlPanel(LayoutManager layout, ExternCommands externCommands, String controlLabel, String borderTitle, BiFunction<String, Consumer<String>, ValueStructType> updateCommand) {
-			super(layout);
-			if (borderTitle!=null)
-				setBorder(BorderFactory.createTitledBorder(borderTitle));
-			this.externCommands = externCommands;
-			this.controlLabel = controlLabel;
-			this.updateCommand = updateCommand;
-		}
-		
-		void initialize(String baseURL, ProgressView pd) {
-			if (updateCommand!=null)
-				callCommand(baseURL, pd, "Init"+controlLabel, updateCommand);
-		}
-		
-		protected JButton createUpdateButton(String title, boolean withDelayedUpdate) {
-			return createUpdateButton(title, null, null, withDelayedUpdate);
-		}
-		protected JButton createUpdateButton(String title, Icon icon, boolean withDelayedUpdate) {
-			return createUpdateButton(title, icon, null, withDelayedUpdate);
-		}
-		protected JButton createUpdateButton(String title, Icon icon, Icon disIcon, boolean withDelayedUpdate) {
-			if (updateCommand==null)
-				throw new UnsupportedOperationException("Can't create an UpdateButton for a ContolPanel without an UpdateCommand");
-			return createButton(title, icon, disIcon, true, e->{
-				callCommand(null, "Update"+controlLabel, withDelayedUpdate, updateCommand);
-			});
-		}
-		
-		protected void callCommand(ProgressView pd, String commandLabel, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
-			callCommand(pd, commandLabel, false, commandFcn);
-		}
-		protected void callCommand(ProgressView pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
-			String baseURL = externCommands.getBaseURL();
-			if (baseURL==null) return;
-			callCommand(baseURL, pd, commandLabel, withDelayedUpdate, commandFcn);
-		}
-		
-		protected void callCommand(String baseURL, ProgressView pd, String commandLabel, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
-			callCommand(baseURL, pd, commandLabel, false, commandFcn);
-		}
-		protected void callCommand(String baseURL, ProgressView pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
-			if (pd != null)
-				callCommand(baseURL, withDelayedUpdate, commandFcn, taskTitle->setIndeterminateProgressTask(pd, String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle)));
-			else
-				new Thread(()->callCommand(baseURL, withDelayedUpdate, commandFcn, null)).start();
-		}
-
-		private void callCommand(String baseURL, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn, Consumer<String> setTaskTitle) {
-			SwingUtilities.invokeLater(()->{
-				setPanelEnable(false);
-			});
-			
-			ValueStructType values, valuesPre = commandFcn.apply(baseURL, setTaskTitle);
-			
-			if (withDelayedUpdate && updateCommand!=null) {
-				synchronized (this) {
-					long time_ms = System.currentTimeMillis();
-					for (long dur=time_ms+500-System.currentTimeMillis(); dur>5; dur=time_ms+500-System.currentTimeMillis()) {
-						try { wait(dur); }
-						catch (InterruptedException e) { System.err.printf("InterruptedException while waiting for AbstractContolPanel.Update: %s%n", e.getMessage()); }
-					}
-				}
-				values = updateCommand.apply(baseURL, setTaskTitle);
-			} else
-				values = valuesPre;
-			
-			SwingUtilities.invokeLater(()->{
-				updatePanel(values);
-				setPanelEnable(true);
-			});
-		}
-		
-		protected abstract void updatePanel(ValueStructType values);
-		protected abstract void setPanelEnable(boolean enabled);
-	}
-
-	static class MessageControl extends AbstractControlPanel<OpenWebifTools.MessageResponse> {
-		private static final long serialVersionUID = 139846886828802469L;
-		private final JButton btnSend;
-		private final JButton btnGetAnswer;
-		private final JTextField txtfldMessage;
-		private final JTextField txtfldTimeOut;
-		private final JCheckBox chkbxTimeOut;
-		private final JComboBox<MessageType> cmbbxMessageType;
-		private Integer timeOut;
-		private OpenWebifTools.MessageType messageType;
-
-		MessageControl(ExternCommands externCommands) {
-			super(new GridBagLayout(),externCommands,"MessageControl","Messages",null);
-			
-			timeOut = null;
-			messageType = OpenWebifTools.MessageType.INFO;
-			
-			txtfldMessage = createTextField("", 10, null);
-			txtfldTimeOut = createTextField("", 4, OpenWebifController::parseInt, n->n>0, n->timeOut=n);
-			
-			chkbxTimeOut = createCheckBox("Time Out", false, b->{
-				txtfldTimeOut.setEditable(b);
-				txtfldTimeOut.setEnabled(b);
-			});
-			txtfldTimeOut.setEditable(false);
-			txtfldTimeOut.setEnabled(false);
-			
-			cmbbxMessageType = createComboBox(OpenWebifTools.MessageType.values(), messageType, type->messageType = type);
-			
-			btnSend = createButton("Send Message", true, e->{
-				String message = txtfldMessage.getText();
-				Integer timeOut_sec = chkbxTimeOut.isSelected() ? timeOut : null;
-				callCommand(null, "SendMessage", (baseURL, setTaskTitle)->OpenWebifTools.sendMessage(baseURL, message, messageType, timeOut_sec, setTaskTitle));
-			});
-			btnGetAnswer = createButton("Get Answer", true, e->{
-				callCommand(null, "GetAnswer", OpenWebifTools::getMessageAnswer);
-			});
-			
-			GridBagConstraints c = new GridBagConstraints();
-			c.weightx = 0;
-			c.weighty = 1;
-			c.fill = GridBagConstraints.BOTH;
-			
-			add(btnSend, c);
-			add(txtfldMessage, c);
-			add(cmbbxMessageType, c);
-			add(chkbxTimeOut, c);
-			add(txtfldTimeOut, c);
-			add(btnGetAnswer, c);
-		}
-
-		@Override protected void updatePanel(OpenWebifTools.MessageResponse values) {
-			externCommands.showMessageResponse(values, "Message Response");
-		}
-
-		@Override
-		protected void setPanelEnable(boolean enabled) {
-			btnSend      .setEnabled(enabled);
-			btnGetAnswer .setEnabled(enabled);
-			txtfldMessage.setEnabled(enabled);
-			txtfldTimeOut.setEnabled(enabled);
-			chkbxTimeOut .setEnabled(enabled);
-		}
-	}
-
-	static class PowerControl extends AbstractControlPanel<Power.Values> {
-		private static final long serialVersionUID = 3842993673551313089L;
-		
-		private final boolean isSmall;
-		private final JButton btnPower;
-		private final JComboBox<Power.Commands> cmbbxSetOtherState;
-		private final JButton btnUpdate;
-		private final Vector<UpdateTask> updateTasks;
-		
-		PowerControl(ExternCommands externCommands, boolean withBorder, boolean isStretchable, boolean isSmall) {
-			super(new GridBagLayout(),externCommands,"PowerControl",withBorder?"Power":null,Power::getState);
-			this.isSmall = isSmall;
-			updateTasks = new Vector<>();
-			
-			GridBagConstraints c = new GridBagConstraints();
-			c.weightx = 0;
-			c.weighty = 1;
-			c.fill = GridBagConstraints.BOTH;
-			
-			if (this.isSmall && isStretchable) c.weightx = 1;
-			add(btnPower = createButton(isSmall ? null : "Toggle StandBy", GrayCommandIcons.Power_IsOn.getIcon(), GrayCommandIcons.Power_IsOn_Dis.getIcon(), true, e->{
-				callCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->{
-					Power.Values state = Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle);
-					for (UpdateTask ut : updateTasks) ut.update(baseURL);
-					return state;
-				});
-			}), c);
-			if (this.isSmall && isStretchable) c.weightx = 0;
-			
-			if (!this.isSmall) {
-				if (isStretchable) c.weightx = 1;
-				Vector<Power.Commands> items = new Vector<>(Arrays.asList(Power.Commands.values()));
-				items.remove(Power.Commands.ToggleStandBy);
-				add(cmbbxSetOtherState = createComboBox(items, Power.Commands.Wakeup, cmd->{
-					callCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->{
-						Power.Values state = Power.setState(baseURL, cmd, setTaskTitle);
-						for (UpdateTask ut : updateTasks) ut.update(baseURL);
-						return state;
-					});
-				}), c);
-				if (isStretchable) c.weightx = 0;
-				
-				add(btnUpdate = createUpdateButton("Update", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), true), c);
-			} else {
-				cmbbxSetOtherState = null;
-				btnUpdate = null;
-			}
-		}
-		
-		interface UpdateTask {
-			void update(String baseURL);
-		}
-		
-		void addUpdateTask(UpdateTask updateTask) {
-			updateTasks.add(updateTask);
-		}
-
-		static void setState(String baseURL, Power.Commands cmd, PrintStream out) {
-			Power.Values values = Power.setState(baseURL, cmd, str->out.printf("PowerControl: %s%n", str));
-			if (values==null) out.printf("PowerControl: No Answer%n");
-			else              out.printf("PowerControl: In Standby = %s%n", values.instandby);
-		}
-
-		@Override protected void updatePanel(Power.Values values) {
-			if (values==null) return;
-			if (!isSmall) {
-				if (values.instandby) btnPower.setText("Switch On");
-				else btnPower.setText("Switch to Standby");
-			}
-			if (values.instandby)
-				setIcon(btnPower, GrayCommandIcons.Power_IsOff.getIcon(), GrayCommandIcons.Power_IsOff_Dis.getIcon());
-			else
-				setIcon(btnPower, GrayCommandIcons.Power_IsOn.getIcon(), GrayCommandIcons.Power_IsOn_Dis.getIcon());
-		}
-
-		@Override protected void setPanelEnable(boolean enabled) {
-			if (btnPower          !=null) btnPower          .setEnabled(enabled);
-			if (cmbbxSetOtherState!=null) cmbbxSetOtherState.setEnabled(enabled);
-			if (btnUpdate         !=null) btnUpdate         .setEnabled(enabled);
-		}
-	}
-
-	static class VolumeControl extends AbstractControlPanel<Volume.Values> {
-		private static final long serialVersionUID = 6164405483744214580L;
-		
-		private final boolean isSmall;
-		private final JTextField txtVolume;
-		private final JSlider sldrVolume;
-		private final Color defaultTextColor;
-		private final JButton btnVolUp;
-		private final JButton btnVolDown;
-		private final JButton btnVolMute;
-		private final JButton btnUpdate;
-		private boolean ignoreSldrVolumeEvents;
-		
-		VolumeControl(ExternCommands externCommands, boolean withBorder, boolean isStretchable, boolean isSmall) {
-			super(new GridBagLayout(),externCommands,"VolumeControl",withBorder?"Volume":null,Volume::getState);
-			this.isSmall = isSmall;
-			
-			GridBagConstraints c = new GridBagConstraints();
-			c.weightx = 0;
-			c.weighty = 1;
-			c.fill = GridBagConstraints.BOTH;
-			
-			txtVolume = new JTextField("mute",8);
-			if (!this.isSmall) {
-				add(txtVolume, c);
-				if (isStretchable) c.weightx = 1;
-				add(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c);
-				if (isStretchable) c.weightx = 0;
-			} else {
-				sldrVolume = null;
-			}
-			
-			if (this.isSmall && isStretchable) c.weightx = 1;
-			add(btnVolDown = createButton("-", true, e->setVolDown(null)), c);
-			add(btnVolUp   = createButton("+", true, e->setVolUp  (null)), c);
-			add(btnVolMute = createButton(isSmall ? null : "Mute", GrayCommandIcons.Muted.getIcon(), GrayCommandIcons.Muted_Dis.getIcon(), true, e->setVolMute(null)), c);
-			if (this.isSmall) add(txtVolume, c);
-			if (this.isSmall && isStretchable) c.weightx = 0;
-			
-			if (!this.isSmall)
-				add(btnUpdate = createUpdateButton("Update", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), false), c);
-			else
-				btnUpdate = null;
-			
-			if (txtVolume!=null) {
-				txtVolume.setEditable(false);
-				txtVolume.setMinimumSize(new Dimension(65,10));
-				txtVolume.setHorizontalAlignment(JTextField.CENTER);
-				defaultTextColor = txtVolume.getForeground();
-			} else
-				defaultTextColor = null;
-			
-			ignoreSldrVolumeEvents = false;
-			if (sldrVolume!=null) {
-				sldrVolume.setMinimumSize(new Dimension(65,10));
-				sldrVolume.addChangeListener(e -> {
-					if (ignoreSldrVolumeEvents) return;
-					
-					int value = sldrVolume.getValue();
-					if (txtVolume!=null) txtVolume.setText(Integer.toString(value));
-					
-					if (sldrVolume.getValueIsAdjusting()) {
-						if (txtVolume!=null) txtVolume.setForeground(Color.GRAY);
-						
-					} else {
-						if (txtVolume!=null) txtVolume.setForeground(defaultTextColor);
-						setVol(value,null);
-					}
-				});
-			}
-		}
-	
-		static void setVolMute(String baseURL, PrintStream out) {
-			Volume.setVolMute(baseURL,str->out.printf("VolumeControl: %s%n", str));
-		}
-		
-		private void setVolUp  (     ProgressView pd) { callCommand(pd, "VolUp"  , Volume::setVolUp  ); }
-		private void setVolDown(     ProgressView pd) { callCommand(pd, "VolDown", Volume::setVolDown); }
-		private void setVolMute(     ProgressView pd) { callCommand(pd, "VolMute", Volume::setVolMute); }
-		private void setVol(int vol, ProgressView pd) { callCommand(pd, "SetVol", (baseURL,setTaskTitle)->Volume.setVol(baseURL, vol, setTaskTitle)); }
-
-		@Override protected void updatePanel(Volume.Values values) {
-			if (values==null) {
-				if (txtVolume!=null) txtVolume.setText("???");
-			} else {
-				String format;
-				if (values.ismute) {
-					format = "mute (%d)";
-					btnVolMute.setIcon(GrayCommandIcons.UnMuted.getIcon());
-					btnVolMute.setDisabledIcon(GrayCommandIcons.UnMuted_Dis.getIcon());
-					if (!isSmall) btnVolMute.setText("UnMute");
-				} else {
-					format = "%d";
-					btnVolMute.setIcon(GrayCommandIcons.Muted.getIcon());
-					btnVolMute.setDisabledIcon(GrayCommandIcons.Muted_Dis.getIcon());
-					if (!isSmall) btnVolMute.setText("Mute");
-				}
-				
-				if (txtVolume!=null)
-					txtVolume.setText(String.format(format, values.current));
-				
-				if (sldrVolume!=null) {
-					ignoreSldrVolumeEvents = true;
-					sldrVolume.setValue((int) values.current);
-					ignoreSldrVolumeEvents = false;
-				}
-			}
-		}
-
-		@Override protected void setPanelEnable(boolean enabled) {
-			if (txtVolume !=null) txtVolume .setEnabled(enabled);
-			if (sldrVolume!=null) sldrVolume.setEnabled(enabled);
-			if (btnVolUp  !=null) btnVolUp  .setEnabled(enabled);
-			if (btnVolDown!=null) btnVolDown.setEnabled(enabled);
-			if (btnVolMute!=null) btnVolMute.setEnabled(enabled);
-			if (btnUpdate !=null) btnUpdate .setEnabled(enabled);
-		}
 	}
 
 	static String getCurrentTimeStr() {
@@ -1137,7 +773,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 	public static void deleteTimer(Timers.Timer timer, Window window)
 	{
 		runWithProgressDialog(window, "Delete Timer", pd->{
-			String baseURL = OpenWebifController.getBaseURL(true, window);
+			String baseURL = getBaseURL(true, window);
 			OpenWebifTools.MessageResponse response = Timers.deleteTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
@@ -1147,12 +783,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 
 	public static void toggleTimer(Timers.Timer timer, Window window)
 	{
-		OpenWebifController.runWithProgressDialog(window, "Toggle Timer", pd->{
-			String baseURL = OpenWebifController.getBaseURL(true, window);
+		runWithProgressDialog(window, "Toggle Timer", pd->{
+			String baseURL = getBaseURL(true, window);
 			OpenWebifTools.MessageResponse response = Timers.toggleTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
-				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
+				setIndeterminateProgressTask(pd, taskTitle);
 			});
-			OpenWebifController.showMessageResponse(window, response, "Toggle Timer");
+			showMessageResponse(window, response, "Toggle Timer");
 		});
 	}
 	
@@ -1224,6 +860,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 		catch (IOException ex) { System.err.printf("IOException while starting video player: %s%n", ex.getMessage()); }
 	}
 
+	@Override
 	public String getBaseURL() {
 		return getBaseURL(true);
 	}
@@ -1461,9 +1098,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			return textViewScrollPane;
 		}
 
-		public ContextMenu createContextMenu(OpenWebifController.AppSettings.ValueKey linewrapValueKey) {
-			boolean textViewLineWrap = OpenWebifController.settings.getBool(linewrapValueKey, false);
-			return createContextMenu(textViewLineWrap, isChecked -> OpenWebifController.settings.putBool(linewrapValueKey, isChecked));
+		public ContextMenu createContextMenu(AppSettings.ValueKey linewrapValueKey) {
+			boolean textViewLineWrap = settings.getBool(linewrapValueKey, false);
+			return createContextMenu(textViewLineWrap, isChecked -> settings.putBool(linewrapValueKey, isChecked));
 		}
 
 		public ContextMenu createContextMenu(boolean activateLineWrap, Consumer<Boolean> setLineWrap) {
@@ -1472,7 +1109,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands {
 			
 			setLineWrap(activateLineWrap);
 			setWrapStyleWord(activateLineWrap);
-			contextMenu.add(OpenWebifController.createCheckBoxMenuItem("Line Wrap", activateLineWrap, isChecked->{
+			contextMenu.add(createCheckBoxMenuItem("Line Wrap", activateLineWrap, isChecked->{
 				setLineWrap(isChecked);
 				setWrapStyleWord(isChecked);
 				if (setLineWrap!=null) setLineWrap.accept(isChecked);

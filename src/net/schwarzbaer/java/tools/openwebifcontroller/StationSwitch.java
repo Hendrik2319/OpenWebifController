@@ -50,10 +50,11 @@ import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.PowerControl;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.VolumeControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimersTableRowSorter;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
+import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
+import net.schwarzbaer.java.tools.openwebifcontroller.controls.PowerControl;
+import net.schwarzbaer.java.tools.openwebifcontroller.controls.VolumeControl;
 
 class StationSwitch {
 
@@ -93,7 +94,7 @@ class StationSwitch {
 		mainWindow = OpenWebifController.createMainWindow("Station Switch",asSubWindow);
 		stationsPanel = new JPanel(new GridBagLayout());
 		
-		OpenWebifController.AbstractControlPanel.ExternCommands controlPanelCommands = new OpenWebifController.AbstractControlPanel.ExternCommands() {
+		AbstractControlPanel.ExternCommands controlPanelCommands = new AbstractControlPanel.ExternCommands() {
 			@Override public void showMessageResponse(MessageResponse response, String title) {
 				OpenWebifController.showMessageResponse(mainWindow, response, title);
 			}
@@ -102,8 +103,8 @@ class StationSwitch {
 			}
 		};
 		
-		powerControl  = new OpenWebifController.PowerControl (controlPanelCommands,false,true,true);
-		volumeControl = new OpenWebifController.VolumeControl(controlPanelCommands,false,true,true);
+		powerControl  = new PowerControl (controlPanelCommands,false,true,true);
+		volumeControl = new VolumeControl(controlPanelCommands,false,true,true);
 		powerControl.addUpdateTask(baseURL -> volumeControl.initialize(baseURL,null));
 		
 		btnBouquetData = OpenWebifController.createButton(GrayCommandIcons.Download.getIcon(), GrayCommandIcons.Download_Dis.getIcon(), true, e->{
@@ -158,7 +159,7 @@ class StationSwitch {
 			selectedStation = subService;
 			btnAddStation.setEnabled(selectedStation!=null && !selectedStation.isMarker());
 		});
-		cmbbxStation.setRenderer(new StationSwitch.StationListRenderer());
+		cmbbxStation.setRenderer(new StationListRenderer());
 		labStation.setEnabled(false);
 		cmbbxStation.setEnabled(false);
 		

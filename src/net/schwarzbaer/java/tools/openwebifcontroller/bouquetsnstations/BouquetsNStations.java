@@ -305,7 +305,12 @@ public class BouquetsNStations extends JPanel {
 
 	public Bouquet showBouquetSelector(Component parent) {
 		if (bsTreeRoot==null) return null;
-		Vector<Bouquet> bouquets = bsTreeRoot.bouquetData.bouquets;
+		return showBouquetSelector(parent, bsTreeRoot.bouquetData);
+	}
+
+	public static Bouquet showBouquetSelector(Component parent, BouquetData bouquetData)
+	{
+		Vector<Bouquet> bouquets = bouquetData.bouquets;
 		Object result = JOptionPane.showInputDialog(
 				parent,
 				"Select a Bouquet:",

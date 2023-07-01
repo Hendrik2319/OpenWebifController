@@ -10,6 +10,7 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
+import net.schwarzbaer.java.lib.gui.GeneralIcons;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
@@ -46,7 +47,10 @@ public abstract class AbstractControlPanel<ValueStructType> extends JPanel {
 	protected JButton createUpdateButton(String title, Icon icon, boolean withDelayedUpdate) {
 		return createUpdateButton(title, icon, null, withDelayedUpdate);
 	}
-	protected JButton createUpdateButton(String title, Icon icon, Icon disIcon, boolean withDelayedUpdate) {
+	protected JButton createUpdateButton(String title, GeneralIcons.IconGroup icons, boolean withDelayedUpdate) {
+		return createUpdateButton(title, icons.getEnabledIcon(), icons.getDisabledIcon(), withDelayedUpdate);
+	}
+	private JButton createUpdateButton(String title, Icon icon, Icon disIcon, boolean withDelayedUpdate) {
 		if (updateCommand==null)
 			throw new UnsupportedOperationException("Can't create an UpdateButton for a ContolPanel without an UpdateCommand");
 		return OpenWebifController.createButton(title, icon, disIcon, true, e->{

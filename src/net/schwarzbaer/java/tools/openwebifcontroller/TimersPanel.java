@@ -439,66 +439,75 @@ public class TimersPanel extends JSplitPane {
 	
 	}
 
-	private static String generateDetailsOutput(Timer timer) {
+	public static String generateDetailsOutput(Timer timer) {
 		ValueListOutput output = new ValueListOutput();
-		output.add(0, "isAutoTimer"        , "%s (%d)", timer.isAutoTimer==1, timer.isAutoTimer);
-		output.add(0, "tags"               , timer.tags               );
-		output.add(0, "serviceref"         , timer.serviceref         );
-		output.add(0, "servicename"        , timer.servicename        );
-		output.add(0, "name"               , timer.name               );
-		output.add(0, "dirname"            , timer.dirname            );
-		output.add(0, "filename"           , timer.filename           );
-		output.add(0, "realbegin"          , timer.realbegin          );
-		output.add(0, "realend"            , timer.realend            );
-		output.add(0, "begin"              , timer.begin              );
-		output.add(0, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(           timer.begin       *1000 , Locale.GERMANY,  true,  true, false, true, false) );
-		output.add(0, "end"                , timer.end                );
-		output.add(0, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(           timer.end         *1000 , Locale.GERMANY,  true,  true, false, true, false) );
-		output.add(0, "duration"           , timer.duration);
-		output.add(0, ""                   , "%s", DateTimeFormatter.getDurationStr(timer.duration));
-		output.add(0, "startprepare"       , timer.startprepare       );
-		output.add(0, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(Math.round(timer.startprepare*1000), Locale.GERMANY,  true,  true, false, true, false) );
-		output.add(0, "nextactivation"     , timer.nextactivation     );
-		if (timer.nextactivation!=null)
-			output.add(0, ""               , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(timer.nextactivation.longValue()*1000, Locale.GERMANY,  true,  true, false, true, false) );
-		output.add(0, "eit"                , timer.eit                );
-		output.add(0, "justplay"           , "%s (%d)", timer.justplay  ==1, timer.justplay  );
-		output.add(0, "always_zap"         , "%s (%d)", timer.always_zap==1, timer.always_zap);
-		output.add(0, "disabled"           , "%s (%d)", timer.disabled  ==1, timer.disabled  );
-		output.add(0, "cancelled"          , timer.cancelled          );
-		output.add(0, "afterevent"         , timer.afterevent         );
-		output.add(0, "allow_duplicate"    , "%s (%d)", timer.allow_duplicate==1, timer.allow_duplicate);
-		output.add(0, "asrefs"             , timer.asrefs             );
-		output.add(0, "autoadjust"         , timer.autoadjust         );
-		output.add(0, "backoff"            , timer.backoff            );
-		output.add(0, "dontsave"           , "%s (%d)", timer.dontsave==1, timer.dontsave);
-		output.add(0, "firsttryprepare"    , timer.firsttryprepare    );
-		output.add(0, "pipzap"             , timer.pipzap             );
-		output.add(0, "repeated"           , timer.repeated           );
-		output.add(0, "state"              , timer.state              );
-		output.add(0, "toggledisabled"     , "%s (%d)", timer.toggledisabled==1, timer.toggledisabled);
-		output.add(0, "toggledisabledimg"  , timer.toggledisabledimg  );
-		output.add(0, "vpsplugin_enabled"  , timer.vpsplugin_enabled  );
-		output.add(0, "vpsplugin_overwrite", timer.vpsplugin_overwrite);
-		output.add(0, "vpsplugin_time"     , timer.vpsplugin_time     );
+		generateDetailsOutput(output, 0, timer);
 		return output.generateOutput();
+	}
+	
+	public static void generateDetailsOutput(ValueListOutput out, int indentLevel, Timer timer)
+	{
+		out.add(indentLevel, "isAutoTimer"        , "%s (%d)", timer.isAutoTimer==1, timer.isAutoTimer);
+		out.add(indentLevel, "tags"               , timer.tags               );
+		out.add(indentLevel, "serviceref"         , timer.serviceref         );
+		out.add(indentLevel, "servicename"        , timer.servicename        );
+		out.add(indentLevel, "name"               , timer.name               );
+		out.add(indentLevel, "dirname"            , timer.dirname            );
+		out.add(indentLevel, "filename"           , timer.filename           );
+		out.add(indentLevel, "realbegin"          , timer.realbegin          );
+		out.add(indentLevel, "realend"            , timer.realend            );
+		out.add(indentLevel, "begin"              , timer.begin              );
+		out.add(indentLevel, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(           timer.begin       *1000 , Locale.GERMANY,  true,  true, false, true, false) );
+		out.add(indentLevel, "end"                , timer.end                );
+		out.add(indentLevel, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(           timer.end         *1000 , Locale.GERMANY,  true,  true, false, true, false) );
+		out.add(indentLevel, "duration"           , timer.duration);
+		out.add(indentLevel, ""                   , "%s", DateTimeFormatter.getDurationStr(timer.duration));
+		out.add(indentLevel, "startprepare"       , timer.startprepare       );
+		out.add(indentLevel, ""                   , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(Math.round(timer.startprepare*1000), Locale.GERMANY,  true,  true, false, true, false) );
+		out.add(indentLevel, "nextactivation"     , timer.nextactivation     );
+		if (timer.nextactivation!=null)
+			out.add(indentLevel, ""               , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(timer.nextactivation.longValue()*1000, Locale.GERMANY,  true,  true, false, true, false) );
+		out.add(indentLevel, "eit"                , timer.eit                );
+		out.add(indentLevel, "justplay"           , "%s (%d)", timer.justplay  ==1, timer.justplay  );
+		out.add(indentLevel, "always_zap"         , "%s (%d)", timer.always_zap==1, timer.always_zap);
+		out.add(indentLevel, "disabled"           , "%s (%d)", timer.disabled  ==1, timer.disabled  );
+		out.add(indentLevel, "cancelled"          , timer.cancelled          );
+		out.add(indentLevel, "afterevent"         , timer.afterevent         );
+		out.add(indentLevel, "allow_duplicate"    , "%s (%d)", timer.allow_duplicate==1, timer.allow_duplicate);
+		out.add(indentLevel, "asrefs"             , timer.asrefs             );
+		out.add(indentLevel, "autoadjust"         , timer.autoadjust         );
+		out.add(indentLevel, "backoff"            , timer.backoff            );
+		out.add(indentLevel, "dontsave"           , "%s (%d)", timer.dontsave==1, timer.dontsave);
+		out.add(indentLevel, "firsttryprepare"    , timer.firsttryprepare    );
+		out.add(indentLevel, "pipzap"             , timer.pipzap             );
+		out.add(indentLevel, "repeated"           , timer.repeated           );
+		out.add(indentLevel, "state"              , timer.state              );
+		out.add(indentLevel, "toggledisabled"     , "%s (%d)", timer.toggledisabled==1, timer.toggledisabled);
+		out.add(indentLevel, "toggledisabledimg"  , timer.toggledisabledimg  );
+		out.add(indentLevel, "vpsplugin_enabled"  , timer.vpsplugin_enabled  );
+		out.add(indentLevel, "vpsplugin_overwrite", timer.vpsplugin_overwrite);
+		out.add(indentLevel, "vpsplugin_time"     , timer.vpsplugin_time     );
 	}
 
 	public static String generateShortInfo(Timer timer)
 	{
+		return generateShortInfo("", timer);
+	}
+
+	public static String generateShortInfo(String indent, Timer timer)
+	{
 		StringBuilder sb = new StringBuilder();
 		if (timer!=null) {
-			sb.append("Description:\r\n").append(timer.description).append("\r\n\r\n");
-			sb.append("Extended Description:\r\n").append(timer.descriptionextended).append("\r\n\r\n");
-			sb.append(String.format("Log Entries: %d%n", timer.logentries.size()));
+			sb.append(String.format("%sDescription:%n%s%n%n", indent, timer.description));
+			sb.append(String.format("%sExtended Description:%n%s%n%n", indent, timer.descriptionextended));
+			sb.append(String.format("%sLog Entries: %d%n", indent, timer.logentries.size()));
 			for (int i=0; i<timer.logentries.size(); i++) {
 				LogEntry entry = timer.logentries.get(i);
 				String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
-				sb.append(String.format("    [%d] %s <Type:%d> \"%s\"%n", i+1, timeStr, entry.type, entry.text));
+				sb.append(String.format("%s    [%d] %s <Type:%d> \"%s\"%n", indent, i+1, timeStr, entry.type, entry.text));
 			}
 		}
-		String string = sb.toString();
-		return string;
+		return sb.toString();
 	}
 
 }

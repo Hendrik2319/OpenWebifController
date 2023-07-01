@@ -50,12 +50,12 @@ public class VolumeControl extends AbstractControlPanel<Volume.Values> {
 		if (this.isSmall && isStretchable) c.weightx = 1;
 		add(btnVolDown = OpenWebifController.createButton("-", true, e->setVolDown(null)), c);
 		add(btnVolUp   = OpenWebifController.createButton("+", true, e->setVolUp  (null)), c);
-		add(btnVolMute = OpenWebifController.createButton(isSmall ? null : "Mute", GrayCommandIcons.Muted.getIcon(), GrayCommandIcons.Muted_Dis.getIcon(), true, e->setVolMute(null)), c);
+		add(btnVolMute = OpenWebifController.createButton(isSmall ? null : "Mute", GrayCommandIcons.IconGroup.Muted, true, e->setVolMute(null)), c);
 		if (this.isSmall) add(txtVolume, c);
 		if (this.isSmall && isStretchable) c.weightx = 0;
 		
 		if (!this.isSmall)
-			add(btnUpdate = createUpdateButton("Update", GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon(), false), c);
+			add(btnUpdate = createUpdateButton("Update", GrayCommandIcons.IconGroup.Reload, false), c);
 		else
 			btnUpdate = null;
 		

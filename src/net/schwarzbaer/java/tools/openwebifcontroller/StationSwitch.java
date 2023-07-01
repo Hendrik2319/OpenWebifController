@@ -43,11 +43,14 @@ import net.schwarzbaer.java.lib.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
+import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
+import net.schwarzbaer.java.lib.openwebif.Timers.Timer.Type;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimersTableRowSorter;
@@ -55,6 +58,7 @@ import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.Bouquets
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.PowerControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.VolumeControl;
+import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
 
 class StationSwitch {
 
@@ -85,6 +89,7 @@ class StationSwitch {
 	//private JLabel labActiveTimers;
 	private final JTextArea txtActiveTimers;
 	private final LogWindow logWindow;
+	private final EPG epg;
 	
 	StationSwitch(boolean asSubWindow) {
 		baseURL = null;
@@ -95,7 +100,19 @@ class StationSwitch {
 		mainWindow = OpenWebifController.createMainWindow("Station Switch",asSubWindow);
 		logWindow = new LogWindow(mainWindow, "Response Log");
 		
-		stationsPanel = new JPanel(new GridBagLayout());
+		epg = new EPG(new EPG.Tools() {
+			@Override public String getTimeStr(long millis) {
+				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+			}
+		});
+		
+		EPGDialog.ExternCommands epgDialogCommands = new EPGDialog.ExternCommands() {
+			@Override public void  zapToStation(String baseURL, StationID stationID) { OpenWebifController. zapToStation(stationID, baseURL, logWindow); }
+			@Override public void streamStation(String baseURL, StationID stationID) { OpenWebifController.streamStation(stationID, baseURL); }
+			@Override public void    addTimer(String baseURL, String sRef, int eventID, Type type) { OpenWebifController.addTimer(baseURL, sRef, eventID, type, mainWindow, logWindow, null); }
+			@Override public void deleteTimer(String baseURL, Timer timer) { OpenWebifController.deleteTimer(baseURL, timer, mainWindow, logWindow, null); }
+			@Override public void toggleTimer(String baseURL, Timer timer) { OpenWebifController.toggleTimer(baseURL, timer, mainWindow, logWindow, null); }
+		};
 		
 		AbstractControlPanel.ExternCommands controlPanelCommands = new AbstractControlPanel.ExternCommands() {
 			@Override public void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight) {
@@ -110,7 +127,59 @@ class StationSwitch {
 		volumeControl = new VolumeControl(controlPanelCommands,false,true,true);
 		powerControl.addUpdateTask(baseURL -> volumeControl.initialize(baseURL,null));
 		
-		btnBouquetData = OpenWebifController.createButton(GrayCommandIcons.Download.getIcon(), GrayCommandIcons.Download_Dis.getIcon(), true, e->{
+		JButton btnShowLogWindow = OpenWebifController.createButton("Log", true, e->logWindow.showDialog(LogWindow.Position.RIGHT_OF_PARENT));
+		JButton btnShowEPG = OpenWebifController.createButton("EPG", true, e->{
+			String baseURL = OpenWebifController.getBaseURL(true, mainWindow);
+			if (baseURL==null) return;
+			
+			if (timerData==null)
+			{
+				if (!OpenWebifController.askUserIfDataShouldBeInitialized(mainWindow, "Timer")) return;
+				reloadTimerData();
+			}
+			
+			if (bouquetData==null)
+			{
+				if (!OpenWebifController.askUserIfDataShouldBeInitialized(mainWindow, "Bouquet")) return;
+				reloadBouquetData();
+				mainWindow.pack();
+			}
+			Bouquet bouquet = BouquetsNStations.showBouquetSelector(mainWindow, bouquetData);
+			if (bouquet==null) return;
+			
+			EPGDialog.showDialog(mainWindow, baseURL, epg, timerData, bouquet, epgDialogCommands);
+		});
+		
+		
+		
+		btnReLoadTimerData = OpenWebifController.createButton(GrayCommandIcons.IconGroup.Download, true, e -> reloadTimerData());
+		btnReLoadTimerData.setToolTipText("Load Timer Data");
+		
+		txtActiveTimers = new JTextArea();
+		JScrollPane scrlpActiveTimers = new JScrollPane(txtActiveTimers);
+		//labActiveTimers = new JLabel("Currently no Active Timers");
+		txtActiveTimers.setEditable(false);
+		txtActiveTimers  .setToolTipText("Active Timers");
+		scrlpActiveTimers.setToolTipText("Active Timers");
+		scrlpActiveTimers.setPreferredSize(new Dimension(300,70));
+		btnShowTimers = OpenWebifController.createButton("Timer", false, e-> {
+			if (timerData==null) {
+				//System.err.printf("timerData == null%n");
+				return;
+			}
+			TimersDialog.showDialog(mainWindow, logWindow, timerData.timers, ()->{
+				reloadTimerData();
+				return timerData.timers;
+			});
+		});
+		txtActiveTimers.setEnabled(false);
+		btnShowTimers.setEnabled(false);
+		
+		
+		
+		stationsPanel = new JPanel(new GridBagLayout());
+		
+		btnBouquetData = OpenWebifController.createButton(GrayCommandIcons.IconGroup.Download, true, e->{
 			reloadBouquetData();
 			mainWindow.pack();
 		});
@@ -179,30 +248,6 @@ class StationSwitch {
 		
 		
 		
-		btnReLoadTimerData = OpenWebifController.createButton(GrayCommandIcons.Download.getIcon(), GrayCommandIcons.Download_Dis.getIcon(), true, e -> reloadTimerData());
-		btnReLoadTimerData.setToolTipText("Load Timer Data");
-		
-		txtActiveTimers = new JTextArea();
-		JScrollPane scrlpActiveTimers = new JScrollPane(txtActiveTimers);
-		//labActiveTimers = new JLabel("Currently no Active Timers");
-		txtActiveTimers.setEditable(false);
-		txtActiveTimers  .setToolTipText("Active Timers");
-		scrlpActiveTimers.setToolTipText("Active Timers");
-		scrlpActiveTimers.setPreferredSize(new Dimension(300,70));
-		btnShowTimers = OpenWebifController.createButton("Timer", false, e-> {
-			if (timerData==null) {
-				//System.err.printf("timerData == null%n");
-				return;
-			}
-			TimersDialog.showDialog(mainWindow, logWindow, timerData.timers, ()->{
-				reloadTimerData();
-				return timerData.timers;
-			});
-		});
-		txtActiveTimers.setEnabled(false);
-		btnShowTimers.setEnabled(false);
-		
-		
 		GridBagConstraints c;
 		JPanel controllerPanel = new JPanel(new GridBagLayout());
 		c = new GridBagConstraints();
@@ -211,7 +256,8 @@ class StationSwitch {
 		controllerPanel.add(powerControl ,c);
 		controllerPanel.add(volumeControl,c);
 		c.weightx = 0;
-		controllerPanel.add(OpenWebifController.createButton("Log", true, e->logWindow.showDialog(LogWindow.Position.RIGHT_OF_PARENT)),c);
+		controllerPanel.add(btnShowEPG,c);
+		controllerPanel.add(btnShowLogWindow,c);
 		
 		
 		JPanel timerPanel = new JPanel(new GridBagLayout());
@@ -313,7 +359,7 @@ class StationSwitch {
 		
 		SwingUtilities.invokeLater(()->{
 			btnReLoadTimerData.setToolTipText("Reload Timer Data");
-			OpenWebifController.setIcon(btnReLoadTimerData, GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon());
+			OpenWebifController.setIcon(btnReLoadTimerData, GrayCommandIcons.IconGroup.Reload);
 			txtActiveTimers.setEnabled(timerData != null);
 			btnShowTimers.setEnabled(timerData != null);
 			updateActiveTimersText();
@@ -348,7 +394,7 @@ class StationSwitch {
 		
 		SwingUtilities.invokeLater(()->{
 			btnBouquetData.setToolTipText("Reload Bouquet Data");
-			OpenWebifController.setIcon(btnBouquetData, GrayCommandIcons.Reload.getIcon(), GrayCommandIcons.Reload_Dis.getIcon());
+			OpenWebifController.setIcon(btnBouquetData, GrayCommandIcons.IconGroup.Reload);
 			cmbbxBouquet.setModel  (bouquetData==null ? new DefaultComboBoxModel<Bouquet>() : new DefaultComboBoxModel<Bouquet>(bouquetData.bouquets));
 			cmbbxBouquet.setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
 			labBouquet  .setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());

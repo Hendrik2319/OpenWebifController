@@ -103,6 +103,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 	
 	private final EPG epg;
 	private final TimersPanel timers;
+	private final Timers timerData;
 	private final BouquetsNStations bouquetsNStations;
 	private final Vector<SubService> stations;
 	private final LoadEPGThread loadEPGThread;
@@ -113,6 +114,16 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 	private int leadTime_s;
 	private int rangeTime_s;
 
+	public static void showDialog(Window parent, String baseURL, EPG epg, Timers timerData, Bouquet bouquet, ExternCommands externCommands) {
+		if (parent           ==null) throw new IllegalArgumentException();
+		if (baseURL          ==null) throw new IllegalArgumentException();
+		if (epg              ==null) throw new IllegalArgumentException();
+		if (timerData        ==null) throw new IllegalArgumentException();
+		if (bouquet          ==null) throw new IllegalArgumentException();
+		if (externCommands   ==null) throw new IllegalArgumentException();
+		new EPGDialog(parent, ModalityType.APPLICATION_MODAL, false, baseURL, epg, null, timerData, null, bouquet, externCommands)
+			.showDialog();
+	}
 	public static void showDialog(Window parent, String baseURL, EPG epg, TimersPanel timers, BouquetsNStations bouquetsNStations, Bouquet bouquet, ExternCommands externCommands) {
 		if (parent           ==null) throw new IllegalArgumentException();
 		if (baseURL          ==null) throw new IllegalArgumentException();
@@ -123,25 +134,32 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		if (externCommands   ==null) throw new IllegalArgumentException();
 		if (!timers           .hasData()) throw new IllegalStateException();
 		if (!bouquetsNStations.hasData()) throw new IllegalStateException();
-		new EPGDialog(parent, ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, bouquetsNStations, bouquet, externCommands)
+		new EPGDialog(parent, ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, null, bouquetsNStations, bouquet, externCommands)
 			.showDialog();
 	}
 	
-	public interface ExternCommands {
+	public interface StationCommands {
 		void zapToStation (String baseURL, StationID stationID);
 		void streamStation(String baseURL, StationID stationID);
+	}
+	
+	public interface TimerCommands {
 		void addTimer     (String baseURL, String sRef, int eventID, Timers.Timer.Type type);
-		void deleteTimer  (String baseURL, String sRef, long begin, long end);
-		void toggleTimer  (String baseURL, String sRef, long begin, long end);
+		void deleteTimer  (String baseURL, Timers.Timer timer);
+		void toggleTimer  (String baseURL, Timers.Timer timer);
+	}
+	
+	public interface ExternCommands extends StationCommands, TimerCommands {
 	}
 
-	public EPGDialog(
+	private EPGDialog(
 			Window parent, ModalityType modality, boolean repeatedUseOfDialogObject,
-			String baseURL, EPG epg, TimersPanel timers, BouquetsNStations bouquetsNStations, Bouquet bouquet,
+			String baseURL, EPG epg, TimersPanel timers, Timers timerData, BouquetsNStations bouquetsNStations, Bouquet bouquet,
 			ExternCommands externCommands) {
 		super(parent, getTitle(bouquet), modality, repeatedUseOfDialogObject);
 		this.epg = epg;
 		this.timers = timers;
+		this.timerData = timerData==null && this.timers!=null ? this.timers.getData() : timerData;
 		this.bouquetsNStations = bouquetsNStations;
 		this.stations = bouquet.subservices;
 		
@@ -155,7 +173,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		};
 		epgView = new EPGView(this.stations);
 		epgViewRepainter = new OpenWebifController.Updater(20, epgView::repaint);
-		timersHasUpdated(this.timers.getData(), false);
+		timersHasUpdated(this.timerData, false);
 		
 		int rowHeight = OpenWebifController.settings.getInt(ValueKey.EPGDialog_RowHeight, -1);
 		if (rowHeight<0) rowHeight = epgView.getRowHeight();
@@ -232,7 +250,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		//epgViewHorizScrollBar.setValues(epgView.getRowOffsetY(), epgView.getRowViewHeight(), 0, epgView.getContentHeight());
 		
 		StationContextMenu stationContextMenu = externCommands==null ? null : new StationContextMenu(externCommands, baseURL);
-		EventContextMenu eventContextMenu = externCommands==null ? null : new EventContextMenu(externCommands, baseURL, epgView);
+		EventContextMenu     eventContextMenu = externCommands==null ? null : new   EventContextMenu(externCommands, baseURL, epgView);
 		new EPGViewMouseHandler(this, epgView, epgViewHorizScrollBar, epgViewVertScrollBar, eventContextMenu, stationContextMenu, this.stations);
 		
 		JButton closeButton = OpenWebifController.createButton("Close", true, e->closeDialog());
@@ -364,11 +382,14 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 			Dimension size = OpenWebifController.settings.getDimension(ValueKey.EPGDialogWidth,ValueKey.EPGDialogHeight);
 			setPositionAndSize(null, size);
 		}
-		timers.addListener(this);
-		bouquetsNStations.addListener(this);
+		
+		if (timers           !=null) timers           .addListener(this);
+		if (bouquetsNStations!=null) bouquetsNStations.addListener(this);
+		
 		super.showDialog();
-		timers.removeListener(this);
-		bouquetsNStations.removeListener(this);
+		
+		if (timers           !=null) timers           .removeListener(this);
+		if (bouquetsNStations!=null) bouquetsNStations.removeListener(this);
 	}
 
 	@Override
@@ -405,7 +426,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 	static class EventContextMenu extends ContextMenu {
 		private static final long serialVersionUID = -8844749957308284885L;
 		
-		private final ExternCommands externCommands;
+		private final TimerCommands externCommands;
 		private final String baseURL;
 		private final EPGView epgView;
 		
@@ -418,7 +439,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		private EPGViewEvent event;
 		private EPGView.Timer timer;
 
-		EventContextMenu(ExternCommands externCommands, String baseURL, EPGView epgView) {
+		EventContextMenu(TimerCommands externCommands, String baseURL, EPGView epgView) {
 			this.externCommands = externCommands;
 			this.baseURL = baseURL;
 			this.epgView = epgView;
@@ -432,8 +453,8 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		}
 		
 		private void addTimer(Timers.Timer.Type type) { externCommands.addTimer   (baseURL, event.event.sref, event.event.id.intValue(), type); }
-		private void deleteTimer()                    { externCommands.deleteTimer(baseURL, event.event.sref, timer.timer.begin, timer.timer.end); }
-		private void toggleTimer()                    { externCommands.toggleTimer(baseURL, event.event.sref, timer.timer.begin, timer.timer.end); }
+		private void deleteTimer()                    { externCommands.deleteTimer(baseURL, timer.timer); }
+		private void toggleTimer()                    { externCommands.toggleTimer(baseURL, timer.timer); }
 
 		public void setEvent(EPGViewEvent event) {
 			this.event = event;
@@ -466,7 +487,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		private final JMenuItem miSwitchToStation;
 		private final JMenuItem miStreamStation;
 		
-		StationContextMenu(ExternCommands externCommands, String baseURL) {
+		StationContextMenu(StationCommands externCommands, String baseURL) {
 			add(miSwitchToStation = OpenWebifController.createMenuItem("Switch to Station",                                   e->externCommands. zapToStation(baseURL,stationID)));
 			add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->externCommands.streamStation(baseURL,stationID)));
 		}

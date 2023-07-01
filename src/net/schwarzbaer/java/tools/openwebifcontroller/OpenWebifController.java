@@ -363,7 +363,16 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		JPanel epgControlPanel = new JPanel(new BorderLayout());
 		epgControlPanel.setBorder(BorderFactory.createTitledBorder("EPG"));
 		epgControlPanel.add(createButton("Show EPG", true, e->{
-			if (!timers.hasData()) return;
+			if (!timers.hasData())
+			{
+				if (!askUserIfDataShouldBeInitialized(mainWindow, "Timer")) return;
+				getBaseURLAndRunWithProgressDialog("Init Timers", timers::readData);
+			}
+			if (!bouquetsNStations.hasData())
+			{
+				if (!askUserIfDataShouldBeInitialized(mainWindow, "Bouquet")) return;
+				getBaseURLAndRunWithProgressDialog("Init Bouquets 'n' Stations", bouquetsNStations ::readData);
+			}
 			Bouquet bouquet = bouquetsNStations.showBouquetSelector(mainWindow);
 			if (bouquet==null) return;
 			openEPGDialog(bouquet);
@@ -598,8 +607,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	public static JButton createButton(String text, Icon icon, boolean enabled, ActionListener al) {
 		return createButton(text, icon, null, enabled, al);
 	}
+	public static JButton createButton(GeneralIcons.IconGroup icons, boolean enabled, ActionListener al) {
+		return createButton(icons.getEnabledIcon(), icons.getDisabledIcon(), enabled, al);
+	}
 	public static JButton createButton(Icon icon, Icon disabledIcon, boolean enabled, ActionListener al) {
 		return createButton(null, icon, disabledIcon, enabled, al);
+	}
+	public static JButton createButton(String text, GeneralIcons.IconGroup icons, boolean enabled, ActionListener al) {
+		return createButton(text, icons.getEnabledIcon(), icons.getDisabledIcon(), enabled, al);
 	}
 	public static JButton createButton(String text, Icon icon, Icon disabledIcon, boolean enabled, ActionListener al) {
 		JButton comp = new JButton(text);
@@ -607,6 +622,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		comp.setEnabled(enabled);
 		if (al!=null) comp.addActionListener(al);
 		return comp;
+	}
+	public static void setIcon(AbstractButton btn, GeneralIcons.IconGroup icons) {
+		setIcon(btn, icons.getEnabledIcon(), icons.getDisabledIcon());
 	}
 	public static void setIcon(AbstractButton btn, Icon icon, Icon disabledIcon) {
 		if (icon        !=null) btn.setIcon        (icon        );
@@ -718,69 +736,81 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		out.add(level+1, "", event.longdesc );
 	}
 
-	@Override
-	public void addTimer(String baseURL, String sRef, int eventID, Timers.Timer.Type type) {
-		runWithProgressDialog("Add Timer", pd->{
-			MessageResponse response = Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
-				setIndeterminateProgressTask(pd, taskTitle);
-			});
-			showMessageResponse(response, "Add Timer");
-			timers.readData(baseURL,pd);
-		});
-	}
-	@Override
-	public void deleteTimer(String baseURL, String sRef, long begin, long end) {
-		runWithProgressDialog("Delete Timer", pd->{
-			MessageResponse response = Timers.deleteTimer(baseURL, sRef, begin, end, taskTitle->{
-				setIndeterminateProgressTask(pd, taskTitle);
-			});
-			showMessageResponse(response, "Delete Timer");
-			timers.readData(baseURL,pd);
-		});
-	}
-	public void deleteTimer(Timers.Timer timer)
-	{
-		deleteTimer(timer, mainWindow, logWindow);
-	}
-	
-	@Override
-	public void toggleTimer(String baseURL, String sRef, long begin, long end) {
-		runWithProgressDialog("Toggle Timer", pd->{
-			MessageResponse response = Timers.toggleTimer(baseURL, sRef, begin, end, taskTitle->{
-				setIndeterminateProgressTask(pd, taskTitle);
-			});
-			showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
-			timers.readData(baseURL,pd);
-		});
-	}
-	public void toggleTimer(Timers.Timer timer)
-	{
-		toggleTimer(timer, mainWindow, logWindow);
-	}
-
 	public interface LogWindowInterface {
 		void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight);
 	}
 
+	public interface UpdateTask {
+		void updateTimers(String baseURL, ProgressDialog pd);
+	}
+
+	@Override
+	public void addTimer(String baseURL, String sRef, int eventID, Timers.Timer.Type type)
+	{
+		addTimer(baseURL, sRef, eventID, type, mainWindow, logWindow, timers::readData);
+	}
+	public static void addTimer(String baseURL, String sRef, int eventID, Timers.Timer.Type type, Window window, LogWindowInterface lwi, UpdateTask updateTimersTask)
+	{
+		runWithProgressDialog(window, "Add Timer", pd->{
+			String baseURL_ = baseURL;
+			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
+			if (baseURL_==null) return;
+			MessageResponse response = Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
+				setIndeterminateProgressTask(pd, taskTitle);
+			});
+			lwi.showMessageResponse(response, "Add Timer");
+			updateTimersTask.updateTimers(baseURL_,pd);
+		});
+	}
+	@Override
+	public void deleteTimer(String baseURL, Timers.Timer timer)
+	{
+		deleteTimer(baseURL, timer, mainWindow, logWindow, timers::readData);
+	}
+	public void deleteTimer(Timers.Timer timer)
+	{
+		deleteTimer(null, timer, mainWindow, logWindow, null);
+	}
 	public static void deleteTimer(Timers.Timer timer, Window window, LogWindowInterface lwi)
 	{
+		deleteTimer(null, timer, window, lwi, null);
+	}
+	public static void deleteTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTimersTask)
+	{
 		runWithProgressDialog(window, "Delete Timer", pd->{
-			String baseURL = getBaseURL(true, window);
-			MessageResponse response = Timers.deleteTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
+			String baseURL_ = baseURL;
+			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
+			if (baseURL_==null) return;
+			MessageResponse response = Timers.deleteTimer(baseURL_, timer.serviceref, timer.begin, timer.end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Delete Timer");
+			updateTimersTask.updateTimers(baseURL_,pd);
 		});
 	}
-
+	@Override
+	public void toggleTimer(String baseURL, Timers.Timer timer) {
+		toggleTimer(baseURL, timer, mainWindow, logWindow, timers::readData);
+	}
+	public void toggleTimer(Timers.Timer timer)
+	{
+		toggleTimer(null, timer, mainWindow, logWindow, null);
+	}
 	public static void toggleTimer(Timers.Timer timer, Window window, LogWindowInterface lwi)
 	{
+		toggleTimer(null, timer, window, lwi, null);
+	}
+	public static void toggleTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTimersTask)
+	{
 		runWithProgressDialog(window, "Toggle Timer", pd->{
-			String baseURL = getBaseURL(true, window);
-			MessageResponse response = Timers.toggleTimer(baseURL, timer.serviceref, timer.begin, timer.end, taskTitle->{
+			String baseURL_ = baseURL;
+			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
+			if (baseURL_==null) return;
+			MessageResponse response = Timers.toggleTimer(baseURL_, timer.serviceref, timer.begin, timer.end, taskTitle->{
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
+			updateTimersTask.updateTimers(baseURL_,pd);
 		});
 	}
 	
@@ -878,6 +908,22 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		return baseURL;
 	}
 
+	public static boolean askUserIfDataShouldBeInitialized(Component parent, String dataLabel)
+	{
+		String dataLabelLC = dataLabel.toLowerCase();
+		String title = "No Timer Data";
+		String[] msg = new String[] {
+			String.format("Currently there are no %s data loaded.", dataLabelLC),
+			String.format("Do you want to initialize %s data?", dataLabelLC)
+		};
+		String[] opts = new String[] { String.format("Initialize %s Data", dataLabel), "Cancel" };
+		return JOptionPane.showOptionDialog(
+			parent, msg, title,
+			JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE,
+			null, opts, opts[0]
+		) == JOptionPane.OK_OPTION;
+	}
+	
 	static boolean hasJavaVM     () { return hasExecutable(AppSettings.ValueKey.JavaVM     ); }
 	static boolean hasVideoPlayer() { return hasExecutable(AppSettings.ValueKey.VideoPlayer); }
 	static boolean hasBrowser    () { return hasExecutable(AppSettings.ValueKey.Browser    ); }

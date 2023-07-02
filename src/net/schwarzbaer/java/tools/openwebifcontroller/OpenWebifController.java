@@ -759,7 +759,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Add Timer");
-			updateTimersTask.updateTimers(baseURL_,pd);
+			if (updateTimersTask!=null) updateTimersTask.updateTimers(baseURL_,pd);
 		});
 	}
 	@Override
@@ -785,7 +785,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Delete Timer");
-			updateTimersTask.updateTimers(baseURL_,pd);
+			if (updateTimersTask!=null) updateTimersTask.updateTimers(baseURL_,pd);
 		});
 	}
 	@Override
@@ -810,7 +810,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
-			updateTimersTask.updateTimers(baseURL_,pd);
+			if (updateTimersTask!=null) updateTimersTask.updateTimers(baseURL_,pd);
 		});
 	}
 	

@@ -80,6 +80,8 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 			return null;
 		}
 		@Override public String toString() { return label; }
+		
+		static RangeTime getMax() { return _48h; }
 	}
 	
 	private enum RowHeight {
@@ -105,6 +107,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 	private final TimersPanel timers;
 	private final Timers timerData;
 	private final BouquetsNStations bouquetsNStations;
+	private final Bouquet bouquet;
 	private final Vector<SubService> stations;
 	private final LoadEPGThread loadEPGThread;
 	private final EPGView epgView;
@@ -159,14 +162,16 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		super(parent, getTitle(bouquet), modality, repeatedUseOfDialogObject);
 		this.epg = epg;
 		this.timers = timers;
+		this.bouquet = bouquet;
 		this.timerData = timerData==null && this.timers!=null ? this.timers.getData() : timerData;
 		this.bouquetsNStations = bouquetsNStations;
-		this.stations = bouquet.subservices;
+		this.stations = this.bouquet.subservices;
 		
 		JLabel statusOutput = new JLabel("");
 		statusOutput.setBorder(BorderFactory.createLoweredSoftBevelBorder());
 		
-		loadEPGThread = new LoadEPGThread(baseURL, this.epg, this.stations) {
+		//loadEPGThread = new LoadEPGThread(baseURL, this.epg, this.stations) {
+		loadEPGThread = new LoadEPGThread(baseURL, this.epg, this.bouquet) {
 			@Override public void setStatusOutput(String text) { statusOutput.setText(text); }
 			@Override public void updateEPGView            () { EPGDialog.this.updateEPGView(); }
 			@Override public void reconfigureHorizScrollBar() { EPGDialog.this.reconfigureEPGViewHorizScrollBar(); }
@@ -188,7 +193,8 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		
 		leadTime_s  = OpenWebifController.settings.getInt(ValueKey.EPGDialog_LeadTime , LeadTime._1_30h.time_s);
 		rangeTime_s = OpenWebifController.settings.getInt(ValueKey.EPGDialog_RangeTime, RangeTime._4h  .time_s);
-		loadEPGThread.setLeadTime(leadTime_s);
+		loadEPGThread.setLeadTime (leadTime_s);
+		loadEPGThread.setRangeTime(rangeTime_s<0 ? RangeTime.getMax().time_s : rangeTime_s);
 		
 		JComboBox<LeadTime > cmbbxLeadTime = OpenWebifController.createComboBox(LeadTime.values(), LeadTime.get(leadTime_s), e->{
 			int oldLeadTime_s = leadTime_s;
@@ -215,6 +221,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		});
 		JComboBox<RangeTime> cmbbxRangeTime = OpenWebifController.createComboBox(RangeTime.values(), RangeTime.get(rangeTime_s), e->{
 			OpenWebifController.settings.putInt(ValueKey.EPGDialog_RangeTime, rangeTime_s = e.time_s);
+			loadEPGThread.setRangeTime(rangeTime_s<0 ? RangeTime.getMax().time_s : rangeTime_s);
 			if (!loadEPGThread.isRunning()) {
 				updateEPGView();
 				reconfigureEPGViewHorizScrollBar();

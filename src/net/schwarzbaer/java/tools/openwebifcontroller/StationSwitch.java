@@ -12,6 +12,7 @@ import java.awt.Window;
 import java.awt.image.BufferedImage;
 import java.util.Locale;
 import java.util.Vector;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
@@ -453,7 +454,7 @@ class StationSwitch {
 			});
 			tableModel.setTable(table);
 			tableModel.setColumnWidths(table);
-			tableModel.setAllDefaultRenderers();
+			tableModel.setDefaultCellEditorsAndRenderers();
 			
 			new TimersTableContextMenu().addTo(table);
 			
@@ -486,7 +487,8 @@ class StationSwitch {
 			tableRowSorter.setModel(tableModel);
 			tableModel.setTable(table);
 			tableModel.setColumnWidths(table);
-			tableModel.setAllDefaultRenderers();
+		//	tableModel.setAllDefaultRenderers();
+			tableModel.setDefaultCellEditorsAndRenderers();
 		}
 		
 		static void showDialog(Window window, LogWindow logWindow, Vector<Timer> data, Supplier<Vector<Timer>> updateData) {
@@ -558,94 +560,95 @@ class StationSwitch {
 			rendererComp = new Tables.LabelRendererComponent();
 		}
 
-		@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV) {
+		@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV)
+		{
+			int columnM = table.convertColumnIndexToModel(columnV);
+			TimersTableModel.ColumnID columnID = tableModel.getColumnID(columnM);
 			
 			Supplier<Color> bgCol = null;
 			Supplier<Color> fgCol = null;
-			String valueStr = value==null ? null : value.toString();
 			
-			int columnM = table.convertColumnIndexToModel(columnV);
-			TimersTableModel.ColumnID columnID = tableModel.getColumnID(columnM);
+			String valueStr;
+			if (columnID!=null && columnID.toString!=null)
+				valueStr = columnID.toString.apply(value);
+			else
+				valueStr = value==null ? null : value.toString();
 			
 			if (value instanceof Timer.Type)
 				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((Timer.Type) value);
 				
 			if (value instanceof Timer.State)
 				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((Timer.State) value);
-				
+			
+			
 			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
-			rendererComp.setHorizontalAlignment(columnID.horizontalAlignment);
+			if (columnID.horizontalAlignment!=null)
+				rendererComp.setHorizontalAlignment(columnID.horizontalAlignment);
 			
 			return rendererComp;
 		}
 	}
 	
-	private static class TimersTableModel extends Tables.SimplifiedTableModel<TimersTableModel.ColumnID> {
-
-		enum ColumnID implements Tables.SimplifiedColumnIDInterface {
-			type               ("Type"               , Timer.Type .class,  90, SwingConstants.CENTER),
-			state              ("State"              , Timer.State.class,  70, SwingConstants.CENTER),
-			servicename        ("Station"            , String     .class, 110),
-			name               ("Name"               , String     .class, 220),
-			_date_             ("Date"               , String     .class, 115, SwingConstants.RIGHT),
-			begin              ("Begin"              , String     .class,  55, SwingConstants.RIGHT),
-			end                ("End"                , String     .class,  55, SwingConstants.RIGHT),
-			duration           ("Duration"           , String     .class,  60, SwingConstants.RIGHT),
+	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
+	{
+		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>
+		{
+			type       ("Type"    , Timer.Type .class,  90, SwingConstants.CENTER, timer -> timer.type       ),
+			state      ("State"   , Timer.State.class,  70, SwingConstants.CENTER, timer -> timer.state2     ),
+			servicename("Station" , String     .class, 110, null                 , timer -> timer.servicename),
+			name       ("Name"    , String     .class, 220, null                 , timer -> timer.name       ),
+			_date_     ("Date"    , Long       .class, 115, SwingConstants.RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false, false, false)),
+			begin      ("Begin"   , Long       .class,  55, SwingConstants.RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
+			end        ("End"     , Long       .class,  55, SwingConstants.RIGHT , timer -> timer.end     , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
+			duration   ("Duration", Long       .class,  60, SwingConstants.RIGHT , timer -> timer.duration, val -> DateTimeFormatter.getDurationStr(val)),
 			;
-			private final SimplifiedColumnConfig config;
-			private final int horizontalAlignment;
+			private final SimplifiedColumnConfig cfg;
+			private final Function<Timer, ?> getValue;
+			private final Integer horizontalAlignment;
+			private final Function<Object, String> toString;
 			ColumnID(String name, Class<?> columnClass, int width) {
-				this(name, columnClass, width, SwingConstants.LEFT);
+				this(name, columnClass, width, null, null);
 			}
-			ColumnID(String name, Class<?> columnClass, int width, int horizontalAlignment) {
+			ColumnID(String name, Class<?> columnClass, int width, Integer horizontalAlignment) {
+				this(name, columnClass, width, horizontalAlignment, null);
+			}
+			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue)
+			{
+				this(name, columnClass, width, horizontalAlignment, getValue, null);
+			}
+			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue, Function<T,String> toString)
+			{
 				this.horizontalAlignment = horizontalAlignment;
-				config = new SimplifiedColumnConfig(name, columnClass, 20, -1, width, width);
+				this.getValue = getValue;
+				this.toString = toString==null ? null : obj -> {
+					if (columnClass.isInstance(obj))
+						return toString.apply(columnClass.cast(obj));
+					if (obj!=null)
+						return obj.toString();
+					return null;
+				};
+				this.cfg = new SimplifiedColumnConfig(name, columnClass, 20, -1, width, width);
 			}
-			@Override public SimplifiedColumnConfig getColumnConfig() { return config; }
+			@Override public Function<Timer, ?> getGetValue() { return getValue; }
+			@Override public SimplifiedColumnConfig getColumnConfig() { return cfg; }
 		}
 
-		private final Vector<Timer> data;
-
-		private TimersTableModel() {
+		private TimersTableModel()
+		{
 			this(new Vector<>());
 		}
-		private TimersTableModel(Vector<Timer> data) {
-			super(ColumnID.values());
-			if (data==null) throw new IllegalArgumentException();
-			this.data = data;
+		public TimersTableModel(Vector<Timer> data)
+		{
+			super(ColumnID.values(), data);
 		}
-
-		private void setAllDefaultRenderers() {
+		
+		@Override public void setDefaultCellEditorsAndRenderers()
+		{
 			TimersTableRenderer renderer = new TimersTableRenderer(this);
 			table.setDefaultRenderer(Timer.Type .class, renderer);
 			table.setDefaultRenderer(Timer.State.class, renderer);
 			table.setDefaultRenderer(String     .class, renderer);
-		}
-
-		@Override public int getRowCount() {
-			return data.size();
-		}
-
-		private Timer getRow(int rowIndex) {
-			if (rowIndex < 0 || data.size() <= rowIndex) return null;
-			return data.get(rowIndex);
-		}
-
-		@Override public Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID) {
-			Timer timer = getRow(rowIndex);
-			
-			if (timer!=null)
-				switch (columnID) {
-				case state      : return timer.state2;
-				case type       : return timer.type;
-				case servicename: return timer.servicename;
-				case name       : return timer.name;
-				case _date_     : return OpenWebifController.dateTimeFormatter.getTimeStr( timer.begin*1000, Locale.GERMANY,   true,   true, false, false, false);
-				case begin      : return OpenWebifController.dateTimeFormatter.getTimeStr( timer.begin*1000, Locale.GERMANY,  false,  false, false,  true, false);
-				case end        : return OpenWebifController.dateTimeFormatter.getTimeStr( timer.end  *1000, Locale.GERMANY,  false,  false, false,  true, false);
-				case duration   : return DateTimeFormatter.getDurationStr(timer.duration);
-				}
-			return null;
+			table.setDefaultRenderer(Long       .class, renderer);
 		}
 	}
 }

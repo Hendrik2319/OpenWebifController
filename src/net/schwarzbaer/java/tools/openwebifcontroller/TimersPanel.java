@@ -302,57 +302,62 @@ public class TimersPanel extends JSplitPane {
 		}
 		
 	}
-
-	private static class TimersTableModel extends Tables.SimplifiedTableModel<TimersTableModel.ColumnID> {
+/*
+	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
+	{
+		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>
+		{
+ */
+	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
+	{
 		
 		// [70, 190, 180, 110, 220, 120, 350, 100, 100, 170, 170, 60, 170, 170, 50, 50, 70, 50, 60, 65, 90, 45, 70, 50, 60, 90, 50, 60, 45, 85, 100, 110, 110, 90]
-		enum ColumnID implements Tables.SimplifiedColumnIDInterface {
-			isAutoTimer        ("isAutoTimer"        , Long       .class,  70, SwingConstants.CENTER),
-			type               ("Type"               , Timer.Type .class,  90),
-			state_             ("State"              , Timer.State.class,  70),
-			tags               ("tags"               , String     .class, 190),
-			serviceref         ("serviceref"         , String     .class, 180),
-			servicename        ("servicename"        , String     .class, 110),
-			name               ("name"               , String     .class, 220),
-			dirname            ("dirname"            , String     .class, 120),
-			filename           ("filename"           , String     .class, 350),
-			realbegin          ("realbegin"          , String     .class, 100),
-			realend            ("realend"            , String     .class, 100),
-			begin              ("begin"              , Long       .class, 170),
-			end                ("end"                , Long       .class, 170),
-			duration           ("duration"           , Long       .class,  60),
-			startprepare       ("startprepare"       , Double     .class, 170),
-			nextactivation     ("nextactivation"     , Long       .class, 170),
-			eit                ("eit"                , Long       .class,  50),
-			state              ("state"              , Long       .class,  45),
-			justplay           ("justplay"           , Long       .class,  50),
-			always_zap         ("always_zap"         , Long       .class,  70),
-			disabled           ("disabled"           , Long       .class,  50),
-			cancelled          ("cancelled"          , Boolean    .class,  60),
-			toggledisabled     ("toggledisabled"     , Long       .class,  85),
-			toggledisabledimg  ("toggledisabledimg"  , String     .class, 100, SwingConstants.RIGHT),
-			
-			afterevent         ("afterevent"         , Long       .class,  65),
-			allow_duplicate    ("allow_duplicate"    , Long       .class,  90),
-			asrefs             ("asrefs"             , String     .class,  45),
-			autoadjust         ("autoadjust"         , Long       .class,  70),
-			backoff            ("backoff"            , Long       .class,  50),
-			dontsave           ("dontsave"           , Long       .class,  60),
-			firsttryprepare    ("firsttryprepare"    , Long       .class,  90),
-			pipzap             ("pipzap"             , Long       .class,  50),
-			repeated           ("repeated"           , Long       .class,  60),
-			vpsplugin_enabled  ("vpsplugin_enabled"  , Boolean    .class, 110),
-			vpsplugin_overwrite("vpsplugin_overwrite", Boolean    .class, 110),
-			vpsplugin_time     ("vpsplugin_time"     , Long       .class,  90),
+		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer> {
+			isAutoTimer        ("isAutoTimer"        , Long       .class,  70, SwingConstants.CENTER, timer -> timer.isAutoTimer        ),
+			type               ("Type"               , Timer.Type .class,  90, null                 , timer -> timer.type               ),
+			state_             ("State"              , Timer.State.class,  70, null                 , timer -> timer.state2             ),
+			tags               ("tags"               , String     .class, 190, null                 , timer -> timer.tags               ),
+			serviceref         ("serviceref"         , String     .class, 180, null                 , timer -> timer.serviceref         ),
+			servicename        ("servicename"        , String     .class, 110, null                 , timer -> timer.servicename        ),
+			name               ("name"               , String     .class, 220, null                 , timer -> timer.name               ),
+			dirname            ("dirname"            , String     .class, 120, null                 , timer -> timer.dirname            ),
+			filename           ("filename"           , String     .class, 350, null                 , timer -> timer.filename           ),
+			realbegin          ("realbegin"          , String     .class, 100, null                 , timer -> timer.realbegin          ),
+			realend            ("realend"            , String     .class, 100, null                 , timer -> timer.realend            ),
+			begin              ("begin"              , Long       .class, 170, null                 , timer -> timer.begin              ),
+			end                ("end"                , Long       .class, 170, null                 , timer -> timer.end                ),
+			duration           ("duration"           , Long       .class,  60, null                 , timer -> timer.duration           ),
+			startprepare       ("startprepare"       , Double     .class, 170, null                 , timer -> timer.startprepare       ),
+			nextactivation     ("nextactivation"     , Long       .class, 170, null                 , timer -> timer.nextactivation     ),
+			eit                ("eit"                , Long       .class,  50, null                 , timer -> timer.eit                ),
+			state              ("state"              , Long       .class,  45, null                 , timer -> timer.state              ),
+			justplay           ("justplay"           , Long       .class,  50, null                 , timer -> timer.justplay           ),
+			always_zap         ("always_zap"         , Long       .class,  70, null                 , timer -> timer.always_zap         ),
+			disabled           ("disabled"           , Long       .class,  50, null                 , timer -> timer.disabled           ),
+			cancelled          ("cancelled"          , Boolean    .class,  60, null                 , timer -> timer.cancelled          ),
+			toggledisabled     ("toggledisabled"     , Long       .class,  85, null                 , timer -> timer.toggledisabled     ),
+			toggledisabledimg  ("toggledisabledimg"  , String     .class, 100, SwingConstants.RIGHT , timer -> timer.toggledisabledimg  ),
+			                   
+			afterevent         ("afterevent"         , Long       .class,  65, null                 , timer -> timer.afterevent         ),
+			allow_duplicate    ("allow_duplicate"    , Long       .class,  90, null                 , timer -> timer.allow_duplicate    ),
+			asrefs             ("asrefs"             , String     .class,  45, null                 , timer -> timer.asrefs             ),
+			autoadjust         ("autoadjust"         , Long       .class,  70, null                 , timer -> timer.autoadjust         ),
+			backoff            ("backoff"            , Long       .class,  50, null                 , timer -> timer.backoff            ),
+			dontsave           ("dontsave"           , Long       .class,  60, null                 , timer -> timer.dontsave           ),
+			firsttryprepare    ("firsttryprepare"    , Long       .class,  90, null                 , timer -> timer.firsttryprepare    ),
+			pipzap             ("pipzap"             , Long       .class,  50, null                 , timer -> timer.pipzap             ),
+			repeated           ("repeated"           , Long       .class,  60, null                 , timer -> timer.repeated           ),
+			vpsplugin_enabled  ("vpsplugin_enabled"  , Boolean    .class, 110, null                 , timer -> timer.vpsplugin_enabled  ),
+			vpsplugin_overwrite("vpsplugin_overwrite", Boolean    .class, 110, null                 , timer -> timer.vpsplugin_overwrite),
+			vpsplugin_time     ("vpsplugin_time"     , Long       .class,  90, null                 , timer -> timer.vpsplugin_time     ),
 			;
 			private final SimplifiedColumnConfig config;
 			private final int horizontalAlignment;
-			ColumnID(String name, Class<?> columnClass, int prefWidth) {
-				this(name, columnClass, prefWidth, getDefaultHorizontalAlignment(columnClass));
-			}
-			ColumnID(String name, Class<?> columnClass, int prefWidth, int horizontalAlignment) {
-				this.horizontalAlignment = horizontalAlignment;
+			private final Function<Timer, ?> getValue;
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<Timer, T> getValue) {
+				this.horizontalAlignment = horizontalAlignment==null ? getDefaultHorizontalAlignment(columnClass) : horizontalAlignment;
 				config = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
+				this.getValue = getValue;
 			}
 			private static int getDefaultHorizontalAlignment(Class<?> columnClass) {
 				if (columnClass == null) return SwingConstants.LEFT;
@@ -361,16 +366,14 @@ public class TimersPanel extends JSplitPane {
 				return SwingConstants.LEFT;
 			}
 			@Override public SimplifiedColumnConfig getColumnConfig() { return this.config; }
+			@Override public Function<Timer, ?> getGetValue() { return getValue; }
 		}
-
-		private final Vector<Timer> timers;
 
 		public TimersTableModel() {
 			this(new Vector<>());
 		}
 		public TimersTableModel(Vector<Timer> timers) {
-			super(ColumnID.values());
-			this.timers = timers;
+			super(ColumnID.values(), timers);
 		}
 
 		public void setAllDefaultRenderers() {
@@ -382,61 +385,6 @@ public class TimersPanel extends JSplitPane {
 			table.setDefaultRenderer(Double     .class, renderer);
 			table.setDefaultRenderer(Long       .class, renderer);
 		}
-
-		@Override public int getRowCount() {
-			return timers.size();
-		}
-
-		public Timer getRow(int rowIndex) {
-			if (rowIndex<0 || rowIndex>=timers.size()) return null;
-			return timers.get(rowIndex);
-		}
-
-		@Override public Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID) {
-			Timer timer = getRow(rowIndex);
-			if (timer==null) return null;
-			
-			switch (columnID) {
-			case name               : return timer.name               ;
-			case dirname            : return timer.dirname            ;
-			case filename           : return timer.filename           ;
-			case servicename        : return timer.servicename        ;
-			case serviceref         : return timer.serviceref         ;
-			case realbegin          : return timer.realbegin          ;
-			case realend            : return timer.realend            ;
-			case begin              : return timer.begin              ;
-			case end                : return timer.end                ;
-			case duration           : return timer.duration           ;
-			case startprepare       : return timer.startprepare       ;
-			case nextactivation     : return timer.nextactivation     ;
-			case eit                : return timer.eit                ;
-			case isAutoTimer        : return timer.isAutoTimer        ;
-			case tags               : return timer.tags               ;
-			case afterevent         : return timer.afterevent         ;
-			case allow_duplicate    : return timer.allow_duplicate    ;
-			case always_zap         : return timer.always_zap         ;
-			case asrefs             : return timer.asrefs             ;
-			case autoadjust         : return timer.autoadjust         ;
-			case backoff            : return timer.backoff            ;
-			case cancelled          : return timer.cancelled          ;
-			case disabled           : return timer.disabled           ;
-			case dontsave           : return timer.dontsave           ;
-			case firsttryprepare    : return timer.firsttryprepare    ;
-			case justplay           : return timer.justplay           ;
-			case pipzap             : return timer.pipzap             ;
-			case repeated           : return timer.repeated           ;
-			case state              : return timer.state              ;
-			case toggledisabled     : return timer.toggledisabled     ;
-			case toggledisabledimg  : return timer.toggledisabledimg  ;
-			case vpsplugin_enabled  : return timer.vpsplugin_enabled  ;
-			case vpsplugin_overwrite: return timer.vpsplugin_overwrite;
-			case vpsplugin_time     : return timer.vpsplugin_time     ;
-			case type               : return timer.type;
-			case state_             : return timer.state2;
-			}
-			return null;
-		}
-	
 	}
 
 	public static String generateDetailsOutput(Timer timer) {

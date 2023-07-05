@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.Point;
 import java.util.Comparator;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Vector;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -270,20 +271,7 @@ public class TimersPanel extends JSplitPane {
 					if (columnID.config.columnClass==Timer.Type.class && value instanceof Timer.Type)
 						bgCol = ()->getBgColor((Timer.Type) value);
 					
-					String valueStr = null;
-					switch (columnID) {
-					
-					case duration    : valueStr = generateText(Long  .class, value, DateTimeFormatter::getDurationStr); break;
-					case startprepare: valueStr = generateText(Double.class, value, d->formatSec(Math.round(d*1000))); break;
-					
-					case begin: case end: case nextactivation:
-						valueStr = generateText(Long.class, value, t->formatSec(t*1000));
-						break;
-						
-					default:
-						valueStr = value==null ? null : value.toString();
-						break;
-					}
+					String valueStr = columnID.toString!=null ? columnID.toString.apply(value) : value!=null ? value.toString() : null;
 					labRenderer.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
 					labRenderer.setHorizontalAlignment(columnID.horizontalAlignment);
 				}
@@ -291,79 +279,79 @@ public class TimersPanel extends JSplitPane {
 			
 			return rendererComp;
 		}
-
-		private String formatSec(long millis) {
-			return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  true,  true, false, true, false);
-		}
-		
-		private <V> String generateText(Class<V> class_, Object value, Function<V,String> toString) {
-			if (!class_.isInstance(value)) return null;
-			return toString.apply(class_.cast(value));
-		}
-		
 	}
-/*
+	
 	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
 	{
-		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>
-		{
- */
-	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
-	{
-		
-		// [70, 190, 180, 110, 220, 120, 350, 100, 100, 170, 170, 60, 170, 170, 50, 50, 70, 50, 60, 65, 90, 45, 70, 50, 60, 90, 50, 60, 45, 85, 100, 110, 110, 90]
-		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer> {
-			isAutoTimer        ("isAutoTimer"        , Long       .class,  70, SwingConstants.CENTER, timer -> timer.isAutoTimer        ),
-			type               ("Type"               , Timer.Type .class,  90, null                 , timer -> timer.type               ),
-			state_             ("State"              , Timer.State.class,  70, null                 , timer -> timer.state2             ),
-			tags               ("tags"               , String     .class, 190, null                 , timer -> timer.tags               ),
-			serviceref         ("serviceref"         , String     .class, 180, null                 , timer -> timer.serviceref         ),
-			servicename        ("servicename"        , String     .class, 110, null                 , timer -> timer.servicename        ),
-			name               ("name"               , String     .class, 220, null                 , timer -> timer.name               ),
-			dirname            ("dirname"            , String     .class, 120, null                 , timer -> timer.dirname            ),
-			filename           ("filename"           , String     .class, 350, null                 , timer -> timer.filename           ),
-			realbegin          ("realbegin"          , String     .class, 100, null                 , timer -> timer.realbegin          ),
-			realend            ("realend"            , String     .class, 100, null                 , timer -> timer.realend            ),
-			begin              ("begin"              , Long       .class, 170, null                 , timer -> timer.begin              ),
-			end                ("end"                , Long       .class, 170, null                 , timer -> timer.end                ),
-			duration           ("duration"           , Long       .class,  60, null                 , timer -> timer.duration           ),
-			startprepare       ("startprepare"       , Double     .class, 170, null                 , timer -> timer.startprepare       ),
-			nextactivation     ("nextactivation"     , Long       .class, 170, null                 , timer -> timer.nextactivation     ),
-			eit                ("eit"                , Long       .class,  50, null                 , timer -> timer.eit                ),
-			state              ("state"              , Long       .class,  45, null                 , timer -> timer.state              ),
-			justplay           ("justplay"           , Long       .class,  50, null                 , timer -> timer.justplay           ),
-			always_zap         ("always_zap"         , Long       .class,  70, null                 , timer -> timer.always_zap         ),
-			disabled           ("disabled"           , Long       .class,  50, null                 , timer -> timer.disabled           ),
-			cancelled          ("cancelled"          , Boolean    .class,  60, null                 , timer -> timer.cancelled          ),
-			toggledisabled     ("toggledisabled"     , Long       .class,  85, null                 , timer -> timer.toggledisabled     ),
-			toggledisabledimg  ("toggledisabledimg"  , String     .class, 100, SwingConstants.RIGHT , timer -> timer.toggledisabledimg  ),
+		// [90, 70, 120, 60, 60, 60, 220, 110, 180, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
+		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants {
+			type               ("Type"                 , Timer.Type .class,  90, CENTER, t->t.type               ),
+			state_             ("State"                , Timer.State.class,  70, CENTER, t->t.state2             ),
+			begin_date         ("Date (Begin)"         , Long       .class, 120, null  , t->t.begin              , t->formatDate(t*1000,  true,  true, false, false, false)),
+			begin              ("Begin"                , Long       .class,  60, null  , t->t.begin              , t->formatDate(t*1000, false, false, false,  true, false)),
+			end                ("End"                  , Long       .class,  60, null  , t->t.end                , t->formatDate(t*1000, false, false, false,  true, false)),
+			duration           ("Duration"             , Long       .class,  60, null  , t->t.duration           , DateTimeFormatter::getDurationStr),
+			name               ("Name"                 , String     .class, 220, null  , t->t.name               ),
+			servicename        ("Station"              , String     .class, 110, null  , t->t.servicename        ),
+			serviceref         ("Service Reference"    , String     .class, 180, null  , t->t.serviceref         ),
+			isAutoTimer        ("is AutoTimer"         , Long       .class,  70, CENTER, t->t.isAutoTimer        ),
+			tags               ("Tags"                 , String     .class, 190, null  , t->t.tags               ),
+			dirname            ("Dir Name"             , String     .class, 120, null  , t->t.dirname            ),
+			filename           ("File Name"            , String     .class, 350, null  , t->t.filename           ),
+			
+			realbegin          ("<realbegin>"          , String     .class, 100, null  , t->t.realbegin          ),
+			realend            ("<realend>"            , String     .class, 100, null  , t->t.realend            ),
+			startprepare       ("<startprepare>"       , Double     .class, 170, null  , t->t.startprepare       , d->formatDate(Math.round(d*1000), true, true, false, true, false)),
+			nextactivation     ("<nextactivation>"     , Long       .class, 170, null  , t->t.nextactivation     , t->formatDate(           t*1000 , true, true, false, true, false)),
+			eit                ("<eit>"                , Long       .class,  60, null  , t->t.eit                ),
+			state              ("<state>"              , Long       .class,  55, CENTER, t->t.state              ),
+			justplay           ("<justplay>"           , Long       .class,  65, CENTER, t->t.justplay           ),
+			always_zap         ("<always_zap>"         , Long       .class,  85, CENTER, t->t.always_zap         ),
+			disabled           ("<disabled>"           , Long       .class,  65, CENTER, t->t.disabled           ),
+			cancelled          ("<cancelled>"          , Boolean    .class,  70, CENTER, t->t.cancelled          ),
+			toggledisabled     ("<toggledisabled>"     , Long       .class,  95, CENTER, t->t.toggledisabled     ),
+			toggledisabledimg  ("<toggledisabledimg>"  , String     .class, 115, CENTER, t->t.toggledisabledimg  ),
 			                   
-			afterevent         ("afterevent"         , Long       .class,  65, null                 , timer -> timer.afterevent         ),
-			allow_duplicate    ("allow_duplicate"    , Long       .class,  90, null                 , timer -> timer.allow_duplicate    ),
-			asrefs             ("asrefs"             , String     .class,  45, null                 , timer -> timer.asrefs             ),
-			autoadjust         ("autoadjust"         , Long       .class,  70, null                 , timer -> timer.autoadjust         ),
-			backoff            ("backoff"            , Long       .class,  50, null                 , timer -> timer.backoff            ),
-			dontsave           ("dontsave"           , Long       .class,  60, null                 , timer -> timer.dontsave           ),
-			firsttryprepare    ("firsttryprepare"    , Long       .class,  90, null                 , timer -> timer.firsttryprepare    ),
-			pipzap             ("pipzap"             , Long       .class,  50, null                 , timer -> timer.pipzap             ),
-			repeated           ("repeated"           , Long       .class,  60, null                 , timer -> timer.repeated           ),
-			vpsplugin_enabled  ("vpsplugin_enabled"  , Boolean    .class, 110, null                 , timer -> timer.vpsplugin_enabled  ),
-			vpsplugin_overwrite("vpsplugin_overwrite", Boolean    .class, 110, null                 , timer -> timer.vpsplugin_overwrite),
-			vpsplugin_time     ("vpsplugin_time"     , Long       .class,  90, null                 , timer -> timer.vpsplugin_time     ),
+			afterevent         ("<afterevent>"         , Long       .class,  80, CENTER, t->t.afterevent         ),
+			allow_duplicate    ("<allow_duplicate>"    , Long       .class, 100, CENTER, t->t.allow_duplicate    ),
+			asrefs             ("<asrefs>"             , String     .class,  60, CENTER, t->t.asrefs             ),
+			autoadjust         ("<autoadjust>"         , Long       .class,  80, CENTER, t->t.autoadjust         ),
+			backoff            ("<backoff>"            , Long       .class,  65, CENTER, t->t.backoff            ),
+			dontsave           ("<dontsave>"           , Long       .class,  75, CENTER, t->t.dontsave           ),
+			firsttryprepare    ("<firsttryprepare>"    , Long       .class, 100, CENTER, t->t.firsttryprepare    ),
+			pipzap             ("<pipzap>"             , Long       .class,  60, CENTER, t->t.pipzap             ),
+			repeated           ("<repeated>"           , Long       .class,  70, CENTER, t->t.repeated           ),
+			vpsplugin_enabled  ("<vpsplugin_enabled>"  , Boolean    .class, 120, CENTER, t->t.vpsplugin_enabled  ),
+			vpsplugin_overwrite("<vpsplugin_overwrite>", Boolean    .class, 125, CENTER, t->t.vpsplugin_overwrite),
+			vpsplugin_time     ("<vpsplugin_time>"     , Long       .class, 100, CENTER, t->t.vpsplugin_time     ),
 			;
 			private final SimplifiedColumnConfig config;
 			private final int horizontalAlignment;
 			private final Function<Timer, ?> getValue;
+			private final Function<Object,String> toString;
 			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<Timer, T> getValue) {
+				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null);
+			}
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<Timer, T> getValue, Function<T,String> toString) {
 				this.horizontalAlignment = horizontalAlignment==null ? getDefaultHorizontalAlignment(columnClass) : horizontalAlignment;
 				config = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
-				this.getValue = getValue;
+				this.getValue = Objects.requireNonNull(getValue);
+				this.toString = toString==null ? null : obj -> {
+					if (columnClass.isInstance(obj))
+						return toString.apply(columnClass.cast(obj));
+					if (obj!=null)
+						return obj.toString();
+					return null;
+				};
 			}
 			private static int getDefaultHorizontalAlignment(Class<?> columnClass) {
 				if (columnClass == null) return SwingConstants.LEFT;
 				if (columnClass == String.class) return SwingConstants.LEFT;
 				if (Number.class.isAssignableFrom(columnClass)) return SwingConstants.RIGHT;
 				return SwingConstants.LEFT;
+			}
+			private static String formatDate(long millis, boolean withTextDay, boolean withDate, boolean dateIsLong, boolean withTime, boolean withTimeZone) {
+				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
 			}
 			@Override public SimplifiedColumnConfig getColumnConfig() { return this.config; }
 			@Override public Function<Timer, ?> getGetValue() { return getValue; }

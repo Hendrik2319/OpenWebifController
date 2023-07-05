@@ -584,6 +584,10 @@ class StationSwitch {
 			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
 			if (columnID.horizontalAlignment!=null)
 				rendererComp.setHorizontalAlignment(columnID.horizontalAlignment);
+			else if (columnID!=null && Number.class.isAssignableFrom(columnID.cfg.columnClass))
+				rendererComp.setHorizontalAlignment(SwingConstants.RIGHT);
+			else
+				rendererComp.setHorizontalAlignment(SwingConstants.LEFT);
 			
 			return rendererComp;
 		}
@@ -591,16 +595,16 @@ class StationSwitch {
 	
 	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
 	{
-		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>
+		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants
 		{
-			type       ("Type"    , Timer.Type .class,  90, SwingConstants.CENTER, timer -> timer.type       ),
-			state      ("State"   , Timer.State.class,  70, SwingConstants.CENTER, timer -> timer.state2     ),
-			servicename("Station" , String     .class, 110, null                 , timer -> timer.servicename),
-			name       ("Name"    , String     .class, 220, null                 , timer -> timer.name       ),
-			_date_     ("Date"    , Long       .class, 115, SwingConstants.RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false, false, false)),
-			begin      ("Begin"   , Long       .class,  55, SwingConstants.RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
-			end        ("End"     , Long       .class,  55, SwingConstants.RIGHT , timer -> timer.end     , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
-			duration   ("Duration", Long       .class,  60, SwingConstants.RIGHT , timer -> timer.duration, val -> DateTimeFormatter.getDurationStr(val)),
+			type       ("Type"        , Timer.Type .class,  90, CENTER, timer -> timer.type       ),
+			state      ("State"       , Timer.State.class,  70, CENTER, timer -> timer.state2     ),
+			servicename("Station"     , String     .class, 110, null  , timer -> timer.servicename),
+			name       ("Name"        , String     .class, 220, null  , timer -> timer.name       ),
+			_date_     ("Date (Begin)", Long       .class, 115, RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false, false, false)),
+			begin      ("Begin"       , Long       .class,  55, RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
+			end        ("End"         , Long       .class,  55, RIGHT , timer -> timer.end     , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
+			duration   ("Duration"    , Long       .class,  60, RIGHT , timer -> timer.duration, val -> DateTimeFormatter.getDurationStr(val)),
 			;
 			private final SimplifiedColumnConfig cfg;
 			private final Function<Timer, ?> getValue;

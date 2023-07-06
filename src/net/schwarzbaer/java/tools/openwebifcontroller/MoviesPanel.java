@@ -33,7 +33,6 @@ import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
-import net.schwarzbaer.java.lib.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
@@ -49,7 +48,6 @@ class MoviesPanel extends JSplitPane {
 	private static final DateTimeFormatter dtFormatter = new DateTimeFormatter();
 
 	private final OpenWebifController main;
-	private final StandardMainWindow mainWindow;
 	
 	private final JTree locationsTree;
 	private final JTable movieTable;
@@ -63,11 +61,11 @@ class MoviesPanel extends JSplitPane {
 	private TreePath selectedTreePath;
 	private LocationTreeNode selectedTreeNode;
 
-	MoviesPanel(OpenWebifController main, StandardMainWindow mainWindow) {
+	MoviesPanel(OpenWebifController main) {
+		super(HORIZONTAL_SPLIT, true);
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		this.main = main;
-		this.mainWindow = mainWindow;
 		locationsRoot = null;
 		locationsTreeModel = null;
 		selectedTreePath = null;
@@ -339,7 +337,7 @@ class MoviesPanel extends JSplitPane {
 	}
 
 	private MovieList getMovieList(String dir) {
-		return ProgressDialog.runWithProgressDialogRV(mainWindow, "Load MovieList", 400, pd->{
+		return ProgressDialog.runWithProgressDialogRV(main.mainWindow, "Load MovieList", 400, pd->{
 			String baseURL = main.getBaseURL();
 			return getMovieList(baseURL, dir, pd);
 		});

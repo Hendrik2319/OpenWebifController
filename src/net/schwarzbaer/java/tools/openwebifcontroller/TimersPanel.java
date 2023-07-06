@@ -19,11 +19,13 @@ import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SortOrder;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.table.TableCellRenderer;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressView;
+import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedTableModel;
@@ -59,36 +61,36 @@ public class TimersPanel extends JSplitPane {
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		dataUpdateListeners = new Vector<>();
-		
 		timers = null;
-		tableModel = new TimersTableModel();
 		
 		textArea = new ExtendedTextArea(false);
 		textArea.setLineWrap(true);
 		textArea.setWrapStyleWord(true);
+		JScrollPane textAreaScrollPane = new JScrollPane(textArea);
 		
-		table = new JTable(tableModel);
+		table = new JTable(tableModel = new TimersTableModel());
 		table.setRowSorter(tableRowSorter = new TimersTableRowSorter(tableModel));
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+		table.setColumnSelectionAllowed(false);
+		table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		tableModel.setTable(table);
 		tableModel.setColumnWidths(table);
 		tableModel.setAllDefaultRenderers();
-		table.setColumnSelectionAllowed(false);
-		table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-		table.getSelectionModel().addListSelectionListener(e->{
-			int rowV = table.getSelectedRow();
-			int rowM = table.convertRowIndexToModel(rowV);
-			textArea.setText(generateShortInfo(tableModel.getRow(rowM)));
-		});
 		tableScrollPane = new JScrollPane(table);
 		tableScrollPane.setPreferredSize(new Dimension(1000,500));
 		
+		table.getSelectionModel().addListSelectionListener(e->{
+			int rowV = table.getSelectedRow();
+			int rowM = table.convertRowIndexToModel(rowV);
+			ScrollPosition scrollPos = ScrollPosition.getVertical(textAreaScrollPane);
+			textArea.setText(generateShortInfo(tableModel.getRow(rowM)));
+			if (scrollPos!=null) SwingUtilities.invokeLater(()->scrollPos.setVertical(textAreaScrollPane));
+		});
+		
 		new TableContextMenu();
 		
-		JScrollPane textScrollPane = textArea.createScrollPane(500,500);
-		
 		setLeftComponent(tableScrollPane);
-		setRightComponent(textScrollPane);
+		setRightComponent(textAreaScrollPane);
 	}
 	
 	private class TableContextMenu extends ContextMenu {

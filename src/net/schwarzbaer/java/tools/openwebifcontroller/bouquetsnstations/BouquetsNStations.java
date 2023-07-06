@@ -35,25 +35,25 @@ import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.FileChooser;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
-import net.schwarzbaer.java.lib.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
 import net.schwarzbaer.java.lib.openwebif.StationID;
+import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings;
 
 public class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
 	static final PiconLoader PICON_LOADER = new PiconLoader();
 	
 	private final OpenWebifController main;
-	private final StandardMainWindow mainWindow;
 	private final JTree bsTree;
 	private final StatusOut statusLine;
 	private final ValuePanel valuePanel;
@@ -64,31 +64,21 @@ public class BouquetsNStations extends JPanel {
 	
 	private BSTreeNode.RootNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
-	private TreePath clickedTreePath;
-	@SuppressWarnings("unused")
-	private BSTreeNode.RootNode    clickedRootNode;
-	private BSTreeNode.BouquetNode clickedBouquetNode;
-	private BSTreeNode.StationNode clickedStationNode;
 	private boolean updatePlayableStatesPeriodically;
 	private boolean updateCurrentStationPeriodically;
 	private CurrentStation currentStationData;
 	private final Vector<BSTreeNode.StationNode> selectedStationNodes;
 
-	public BouquetsNStations(OpenWebifController main, StandardMainWindow mainWindow) {
+	public BouquetsNStations(OpenWebifController main) {
 		super(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		this.main = main;
-		this.mainWindow = mainWindow;
 		
 		bouquetsNStationsListeners = new Vector<>();
 		bsTreeRoot = null;
 		bsTreeModel = null;
 		PICON_LOADER.clear();
-		clickedTreePath = null;
-		clickedRootNode    = null;
-		clickedBouquetNode = null;
-		clickedStationNode = null;
 		selectedStationNodes = new Vector<>();
 		
 		m3uFileChooser = new FileChooser("Playlist", "m3u");
@@ -101,44 +91,17 @@ public class BouquetsNStations extends JPanel {
 		JScrollPane treeScrollPane = new JScrollPane(bsTree);
 		treeScrollPane.setPreferredSize(new Dimension(300,500));
 		
-		valuePanel = new ValuePanel(()->this.main.getBaseURL());
+		valuePanel = new ValuePanel(this.main::getBaseURL);
 		
 		statusLine = new StatusOut();
 		PICON_LOADER.setStatusOutput(statusLine);
 		
-		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,treeScrollPane,valuePanel.panel);
+		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true, treeScrollPane, valuePanel.panel);
 		add(centerPanel,BorderLayout.CENTER);
 		add(statusLine.comp,BorderLayout.SOUTH);
 		
-		JMenuItem miLoadPicons, miSwitchToStation, miStreamStation, miWriteBouquetStreamsToM3U, miWriteSelectedStreamsToM3U;
-		JMenuItem miUpdatePlayableStatesNow, miUpdatePlayableStatesBouquet, miUpdateCurrentStationNow;
-		ContextMenu treeContextMenu = new ContextMenu();
-		
-		treeContextMenu.add(OpenWebifController.createMenuItem("Reload Bouquets", GrayCommandIcons.IconGroup.Reload, e->{
-			this.main.getBaseURLAndRunWithProgressDialog("Reload Bouquets", this::readData);
-		}));
-		
-		treeContextMenu.add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", GrayCommandIcons.IconGroup.Save, e->{
-			if (bsTreeRoot==null) return;
-			
-			this.main.runWithProgressDialog("Save Stations to TabSeparated-File", pd -> {
-				OpenWebifController.setIndeterminateProgressTask(pd, "Choose Output File");
-				
-				if (txtFileChooser.showSaveDialog(mainWindow)!=FileChooser.APPROVE_OPTION) return;
-				File outFile = txtFileChooser.getSelectedFile();
-				
-				OpenWebifController.setIndeterminateProgressTask(pd, "Write to Output File");
-				try (PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outFile), StandardCharsets.UTF_8))) {
-					
-					for (Bouquet bouquet:bsTreeRoot.bouquetData.bouquets)
-						for (Bouquet.SubService subservice:bouquet.subservices)
-							out.printf("%s\t%s\t%s%n", bouquet.name, subservice.name, subservice.service.stationID.toJoinedStrings("\t","%d"));
-					
-				} catch (FileNotFoundException ex) {
-					ex.printStackTrace();
-				}
-			});
-		}));
+		updatePlayableStatesPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, false);
+		updateCurrentStationPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, false);
 		
 		periodicUpdater10s = new OpenWebifController.Updater(10, () -> {
 			if (updatePlayableStatesPeriodically) {
@@ -152,137 +115,7 @@ public class BouquetsNStations extends JPanel {
 			statusLine.clear();
 		});
 		
-		updatePlayableStatesPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, false);
-		treeContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Update 'Is Playable' States Periodically", updatePlayableStatesPeriodically, isChecked->{
-			startStopPeriodicUpdater10s( ()->updatePlayableStatesPeriodically=isChecked );
-			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, isChecked);
-		}));
-		treeContextMenu.add(miUpdatePlayableStatesNow = OpenWebifController.createMenuItem("Update 'Is Playable' States Now", GrayCommandIcons.IconGroup.Reload, e->{
-			periodicUpdater10s.runOnce( () -> updatePlayableStates() );
-		}));
-		
-		updateCurrentStationPeriodically = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, false);
-		treeContextMenu.add(OpenWebifController.createCheckBoxMenuItem("Update 'Current Station' Periodically", updateCurrentStationPeriodically, isChecked->{
-			startStopPeriodicUpdater10s( ()->updateCurrentStationPeriodically=isChecked );
-			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, isChecked);
-		}));
-		treeContextMenu.add(miUpdateCurrentStationNow = OpenWebifController.createMenuItem("Update 'Current Station' Now", GrayCommandIcons.IconGroup.Reload, e->{
-			periodicUpdater10s.runOnce( () -> updateCurrentStation() );
-		}));
-		treeContextMenu.add(OpenWebifController.createMenuItem("Show 'Current Station' Data", e->{
-			String msg = toString( currentStationData );
-			TextAreaDialog.showText(mainWindow, "Current Station", 800, 500, true, msg);
-			//JOptionPane.showMessageDialog(mainWindow, msg, "Current Station", JOptionPane.INFORMATION_MESSAGE);
-		}));
-		
-		treeContextMenu.add(miWriteSelectedStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Selected Stations to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
-			if (selectedStationNodes.isEmpty()) return;
-			
-			String baseURL = this.main.getBaseURL();
-			if (baseURL==null) return;
-			
-			if (m3uFileChooser.showSaveDialog(this.mainWindow)!=FileChooser.APPROVE_OPTION) return;
-			File m3uFile = m3uFileChooser.getSelectedFile();
-			
-			writeStreamsToM3U(selectedStationNodes,baseURL,m3uFile);
-			this.main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Selected Stations"));
-		}));
-		
-		treeContextMenu.addSeparator();
-		
-		treeContextMenu.add(miUpdatePlayableStatesBouquet = OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", GrayCommandIcons.IconGroup.Reload, e->{
-			String baseURL = this.main.getBaseURL();
-			if (baseURL==null) return;
-			periodicUpdater10s.runOnce( () -> updatePlayableStates(baseURL, clickedBouquetNode) );
-		}));
-		
-		treeContextMenu.add(miWriteBouquetStreamsToM3U = OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
-			if (clickedBouquetNode==null) return;
-			
-			String baseURL = this.main.getBaseURL();
-			if (baseURL==null) return;
-			
-			if (m3uFileChooser.showSaveDialog(this.mainWindow)!=FileChooser.APPROVE_OPTION) return;
-			File m3uFile = m3uFileChooser.getSelectedFile();
-			
-			writeStreamsToM3U(clickedBouquetNode.bouquet,baseURL,m3uFile);
-			this.main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Bouquet: %s", clickedBouquetNode.bouquet.name));
-		}));
-		
-		JMenuItem miShowEPGforBouquet;
-		treeContextMenu.add(miShowEPGforBouquet = OpenWebifController.createMenuItem("Show EPG for Bouquet", e->{
-			if (clickedBouquetNode==null) return;
-			this.main.openEPGDialog(clickedBouquetNode.bouquet);
-		}));
-		
-		treeContextMenu.addSeparator();
-		
-		treeContextMenu.add(miLoadPicons = OpenWebifController.createMenuItem("Load Picons", GrayCommandIcons.IconGroup.Image, e->{
-			if (clickedBouquetNode!=null) {
-				String baseURL = this.main.getBaseURL();
-				if (baseURL==null) return;
-				PICON_LOADER.setBaseURL(baseURL);
-				for (BSTreeNode.StationNode stationNode:clickedBouquetNode.children)
-					PICON_LOADER.addTask(stationNode.getStationID());
-			} else if (clickedStationNode!=null) {
-				String baseURL = this.main.getBaseURL();
-				if (baseURL==null) return;
-				PICON_LOADER.setBaseURL(baseURL);
-				PICON_LOADER.addTask(clickedStationNode.getStationID());
-			}
-		}));
-		treeContextMenu.add(miSwitchToStation = OpenWebifController.createMenuItem("Switch To Station",                                   e->this.main. zapToStation(clickedStationNode.getStationID())));
-		treeContextMenu.add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->this.main.streamStation(clickedStationNode.getStationID())));
-		
-		treeContextMenu.addTo(bsTree);
-		treeContextMenu.addContextMenuInvokeListener((comp, x, y) -> {
-			clickedTreePath = bsTree.getPathForLocation(x,y);
-			clickedRootNode    = null;
-			clickedBouquetNode = null;
-			clickedStationNode = null;
-			if (clickedTreePath!=null) {
-				Object obj = clickedTreePath.getLastPathComponent();
-				if (obj instanceof BSTreeNode.RootNode   ) clickedRootNode    = (BSTreeNode.RootNode   ) obj;
-				if (obj instanceof BSTreeNode.BouquetNode) clickedBouquetNode = (BSTreeNode.BouquetNode) obj;
-				if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
-			}
-			
-			miLoadPicons     .setEnabled(clickedBouquetNode!=null || (clickedStationNode!=null && !clickedStationNode.subservice.isMarker()));
-			miSwitchToStation.setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
-			miStreamStation  .setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
-			miLoadPicons.setText(
-					clickedBouquetNode!=null ?
-							String.format("Load Picons of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
-							(clickedStationNode!=null && !clickedStationNode.subservice.isMarker()) ?
-									String.format("Load Picon of \"%s\"", clickedStationNode.subservice.name) :
-									"Load Picons"
-			);
-			miSwitchToStation.setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
-			miStreamStation  .setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
-			
-			miShowEPGforBouquet.setEnabled(clickedBouquetNode!=null);
-			miShowEPGforBouquet.setText(
-					clickedBouquetNode!=null ?
-							String.format("Show EPG for Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
-							"Show EPG for Bouquet"
-			);
-			miUpdatePlayableStatesBouquet.setEnabled(clickedBouquetNode!=null && !updatePlayableStatesPeriodically);
-			miUpdatePlayableStatesBouquet.setText(
-					clickedBouquetNode!=null ?
-							String.format("Update 'Is Playable' States of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
-							"Update 'Is Playable' States of Bouquet"
-			);
-			miWriteBouquetStreamsToM3U.setEnabled(clickedBouquetNode!=null);
-			miWriteBouquetStreamsToM3U.setText(
-					clickedBouquetNode!=null ?
-							String.format("Write Streams of Bouquet \"%s\" to M3U-File", clickedBouquetNode.bouquet.name) :
-							"Write Streams of Bouquet to M3U-File"
-			);
-			miWriteSelectedStreamsToM3U.setEnabled(!selectedStationNodes.isEmpty());
-			
-			miUpdateCurrentStationNow.setEnabled(!updateCurrentStationPeriodically);
-			miUpdatePlayableStatesNow.setEnabled(!updatePlayableStatesPeriodically);
-		});
+		new TreeContextMenu().addTo(bsTree);
 		
 		bsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION);
 		bsTree.addTreeSelectionListener(e->{
@@ -299,8 +132,184 @@ public class BouquetsNStations extends JPanel {
 			}
 		});
 		
+		OpenWebifController.settings.registerSplitPaneDividers(
+				new SplitPaneDividersDefinition<>(this.main.mainWindow, AppSettings.ValueKey.class)
+				.add(centerPanel     , AppSettings.ValueKey.SplitPaneDivider_BouquetsNStations_CenterPanel)
+				.add(valuePanel.panel, AppSettings.ValueKey.SplitPaneDivider_BouquetsNStations_ValuePanel)
+		);
+		
 		if (shouldPeriodicUpdaterRun())
 			periodicUpdater10s.start();
+	}
+	
+	private class TreeContextMenu extends ContextMenu {
+		private static final long serialVersionUID = -5273880699058313222L;
+		
+		@SuppressWarnings("unused")
+		private BSTreeNode.RootNode    clickedRootNode;
+		private BSTreeNode.BouquetNode clickedBouquetNode;
+		private BSTreeNode.StationNode clickedStationNode;
+
+		TreeContextMenu() {
+			clickedRootNode    = null;
+			clickedBouquetNode = null;
+			clickedStationNode = null;
+			
+			add(OpenWebifController.createMenuItem("Reload Bouquets", GrayCommandIcons.IconGroup.Reload, e->{
+				main.getBaseURLAndRunWithProgressDialog("Reload Bouquets", BouquetsNStations.this::readData);
+			}));
+			
+			add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", GrayCommandIcons.IconGroup.Save, e->{
+				if (bsTreeRoot==null) return;
+				
+				main.runWithProgressDialog("Save Stations to TabSeparated-File", pd -> {
+					OpenWebifController.setIndeterminateProgressTask(pd, "Choose Output File");
+					
+					if (txtFileChooser.showSaveDialog(main.mainWindow)!=FileChooser.APPROVE_OPTION) return;
+					File outFile = txtFileChooser.getSelectedFile();
+					
+					OpenWebifController.setIndeterminateProgressTask(pd, "Write to Output File");
+					try (PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outFile), StandardCharsets.UTF_8))) {
+						
+						for (Bouquet bouquet:bsTreeRoot.bouquetData.bouquets)
+							for (Bouquet.SubService subservice:bouquet.subservices)
+								out.printf("%s\t%s\t%s%n", bouquet.name, subservice.name, subservice.service.stationID.toJoinedStrings("\t","%d"));
+						
+					} catch (FileNotFoundException ex) {
+						ex.printStackTrace();
+					}
+				});
+			}));
+			
+			
+			add(OpenWebifController.createCheckBoxMenuItem("Update 'Is Playable' States Periodically", updatePlayableStatesPeriodically, isChecked->{
+				startStopPeriodicUpdater10s( ()->updatePlayableStatesPeriodically=isChecked );
+				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, isChecked);
+			}));
+			JMenuItem miUpdatePlayableStatesNow = add(OpenWebifController.createMenuItem("Update 'Is Playable' States Now", GrayCommandIcons.IconGroup.Reload, e->{
+				periodicUpdater10s.runOnce( () -> updatePlayableStates() );
+			}));
+			
+			add(OpenWebifController.createCheckBoxMenuItem("Update 'Current Station' Periodically", updateCurrentStationPeriodically, isChecked->{
+				startStopPeriodicUpdater10s( ()->updateCurrentStationPeriodically=isChecked );
+				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, isChecked);
+			}));
+			JMenuItem miUpdateCurrentStationNow = add(OpenWebifController.createMenuItem("Update 'Current Station' Now", GrayCommandIcons.IconGroup.Reload, e->{
+				periodicUpdater10s.runOnce( () -> updateCurrentStation() );
+			}));
+			add(OpenWebifController.createMenuItem("Show 'Current Station' Data", e->{
+				String msg = BouquetsNStations.toString( currentStationData );
+				TextAreaDialog.showText(main.mainWindow, "Current Station", 800, 500, true, msg);
+				//JOptionPane.showMessageDialog(mainWindow, msg, "Current Station", JOptionPane.INFORMATION_MESSAGE);
+			}));
+			
+			JMenuItem miWriteSelectedStreamsToM3U = add(OpenWebifController.createMenuItem("Write Streams of Selected Stations to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
+				if (selectedStationNodes.isEmpty()) return;
+				
+				String baseURL = main.getBaseURL();
+				if (baseURL==null) return;
+				
+				if (m3uFileChooser.showSaveDialog(main.mainWindow)!=FileChooser.APPROVE_OPTION) return;
+				File m3uFile = m3uFileChooser.getSelectedFile();
+				
+				writeStreamsToM3U(selectedStationNodes,baseURL,m3uFile);
+				main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Selected Stations"));
+			}));
+			
+			addSeparator();
+			
+			JMenuItem miUpdatePlayableStatesBouquet = add(OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", GrayCommandIcons.IconGroup.Reload, e->{
+				String baseURL = main.getBaseURL();
+				if (baseURL==null) return;
+				periodicUpdater10s.runOnce( () -> updatePlayableStates(baseURL, clickedBouquetNode) );
+			}));
+			
+			JMenuItem miWriteBouquetStreamsToM3U = add(OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
+				if (clickedBouquetNode==null) return;
+				
+				String baseURL = main.getBaseURL();
+				if (baseURL==null) return;
+				
+				if (m3uFileChooser.showSaveDialog(main.mainWindow)!=FileChooser.APPROVE_OPTION) return;
+				File m3uFile = m3uFileChooser.getSelectedFile();
+				
+				writeStreamsToM3U(clickedBouquetNode.bouquet,baseURL,m3uFile);
+				main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Bouquet: %s", clickedBouquetNode.bouquet.name));
+			}));
+			
+			JMenuItem miShowEPGforBouquet = add(OpenWebifController.createMenuItem("Show EPG for Bouquet", e->{
+				if (clickedBouquetNode==null) return;
+				main.openEPGDialog(clickedBouquetNode.bouquet);
+			}));
+			
+			addSeparator();
+			
+			JMenuItem miLoadPicons = add(OpenWebifController.createMenuItem("Load Picons", GrayCommandIcons.IconGroup.Image, e->{
+				if (clickedBouquetNode!=null) {
+					String baseURL = main.getBaseURL();
+					if (baseURL==null) return;
+					PICON_LOADER.setBaseURL(baseURL);
+					for (BSTreeNode.StationNode stationNode:clickedBouquetNode.children)
+						PICON_LOADER.addTask(stationNode.getStationID());
+				} else if (clickedStationNode!=null) {
+					String baseURL = main.getBaseURL();
+					if (baseURL==null) return;
+					PICON_LOADER.setBaseURL(baseURL);
+					PICON_LOADER.addTask(clickedStationNode.getStationID());
+				}
+			}));
+			JMenuItem miSwitchToStation = add(OpenWebifController.createMenuItem("Switch To Station",                                   e->main. zapToStation(clickedStationNode.getStationID())));
+			JMenuItem miStreamStation   = add(OpenWebifController.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->main.streamStation(clickedStationNode.getStationID())));
+			
+			addContextMenuInvokeListener((comp, x, y) -> {
+				TreePath clickedTreePath = bsTree.getPathForLocation(x,y);
+				clickedRootNode    = null;
+				clickedBouquetNode = null;
+				clickedStationNode = null;
+				if (clickedTreePath!=null) {
+					Object obj = clickedTreePath.getLastPathComponent();
+					if (obj instanceof BSTreeNode.RootNode   ) clickedRootNode    = (BSTreeNode.RootNode   ) obj;
+					if (obj instanceof BSTreeNode.BouquetNode) clickedBouquetNode = (BSTreeNode.BouquetNode) obj;
+					if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
+				}
+				
+				miLoadPicons     .setEnabled(clickedBouquetNode!=null || (clickedStationNode!=null && !clickedStationNode.subservice.isMarker()));
+				miSwitchToStation.setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
+				miStreamStation  .setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
+				miLoadPicons.setText(
+						clickedBouquetNode!=null ?
+								String.format("Load Picons of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
+								(clickedStationNode!=null && !clickedStationNode.subservice.isMarker()) ?
+										String.format("Load Picon of \"%s\"", clickedStationNode.subservice.name) :
+										"Load Picons"
+				);
+				miSwitchToStation.setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
+				miStreamStation  .setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
+				
+				miShowEPGforBouquet.setEnabled(clickedBouquetNode!=null);
+				miShowEPGforBouquet.setText(
+						clickedBouquetNode!=null ?
+								String.format("Show EPG for Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
+								"Show EPG for Bouquet"
+				);
+				miUpdatePlayableStatesBouquet.setEnabled(clickedBouquetNode!=null && !updatePlayableStatesPeriodically);
+				miUpdatePlayableStatesBouquet.setText(
+						clickedBouquetNode!=null ?
+								String.format("Update 'Is Playable' States of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
+								"Update 'Is Playable' States of Bouquet"
+				);
+				miWriteBouquetStreamsToM3U.setEnabled(clickedBouquetNode!=null);
+				miWriteBouquetStreamsToM3U.setText(
+						clickedBouquetNode!=null ?
+								String.format("Write Streams of Bouquet \"%s\" to M3U-File", clickedBouquetNode.bouquet.name) :
+								"Write Streams of Bouquet to M3U-File"
+				);
+				miWriteSelectedStreamsToM3U.setEnabled(!selectedStationNodes.isEmpty());
+				
+				miUpdateCurrentStationNow.setEnabled(!updateCurrentStationPeriodically);
+				miUpdatePlayableStatesNow.setEnabled(!updatePlayableStatesPeriodically);
+			});
+		}
 	}
 
 	public Bouquet showBouquetSelector(Component parent) {

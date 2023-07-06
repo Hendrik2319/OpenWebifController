@@ -44,7 +44,7 @@ class ValuePanel {
 		textView = new ExtendedTextArea(false);
 		JScrollPane textViewScrollPane = textView.createScrollPane(400,500);
 		
-		panel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, imageView, textViewScrollPane);
+		panel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true, imageView, textViewScrollPane);
 		panel.setPreferredSize(new Dimension(300,500));
 		
 		ContextMenu textViewContextMenu = textView.createContextMenu(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_TextViewLineWrap);

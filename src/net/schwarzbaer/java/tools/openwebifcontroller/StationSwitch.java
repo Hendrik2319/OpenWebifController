@@ -40,6 +40,7 @@ import javax.swing.table.TableCellRenderer;
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
+import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
@@ -133,18 +134,25 @@ class StationSwitch {
 			String baseURL = OpenWebifController.getBaseURL(true, mainWindow);
 			if (baseURL==null) return;
 			
-			if (timerData==null)
+			if (timerData==null && bouquetData==null)
+			{
+				if (!OpenWebifController.askUserIfDataShouldBeInitialized(mainWindow, "Timer", "Bouquet")) return;
+				reloadTimerData();
+				reloadBouquetData();
+				mainWindow.pack();
+			}
+			else if (timerData==null)
 			{
 				if (!OpenWebifController.askUserIfDataShouldBeInitialized(mainWindow, "Timer")) return;
 				reloadTimerData();
 			}
-			
-			if (bouquetData==null)
+			else if (bouquetData==null)
 			{
 				if (!OpenWebifController.askUserIfDataShouldBeInitialized(mainWindow, "Bouquet")) return;
 				reloadBouquetData();
 				mainWindow.pack();
 			}
+			
 			Bouquet bouquet = BouquetsNStations.showBouquetSelector(mainWindow, bouquetData);
 			if (bouquet==null) return;
 			
@@ -440,6 +448,7 @@ class StationSwitch {
 			textArea = new ExtendedTextArea(false);
 			textArea.setLineWrap(true);
 			textArea.setWrapStyleWord(true);
+			JScrollPane textAreaScrollPane = textArea.createScrollPane(500, 500);
 			
 			tableModel = new TimersTableModel();
 			table = new JTable(tableModel);
@@ -447,23 +456,25 @@ class StationSwitch {
 			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 			table.setColumnSelectionAllowed(false);
 			table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-			table.getSelectionModel().addListSelectionListener(e->{
-				int rowV = table.getSelectedRow();
-				int rowM = table.convertRowIndexToModel(rowV);
-				textArea.setText(TimersPanel.generateShortInfo(tableModel.getRow(rowM)));
-			});
 			tableModel.setTable(table);
 			tableModel.setColumnWidths(table);
 			tableModel.setDefaultCellEditorsAndRenderers();
-			
-			new TimersTableContextMenu().addTo(table);
-			
 			tableScrollPane = new JScrollPane(table);
 			tableScrollPane.setPreferredSize(new Dimension(300, 600));
 			
+			table.getSelectionModel().addListSelectionListener(e->{
+				int rowV = table.getSelectedRow();
+				int rowM = table.convertRowIndexToModel(rowV);
+				ScrollPosition scrollPos = ScrollPosition.getVertical(textAreaScrollPane);
+				textArea.setText(TimersPanel.generateShortInfo(tableModel.getRow(rowM)));
+				if (scrollPos!=null) SwingUtilities.invokeLater(()->scrollPos.setVertical(textAreaScrollPane));
+			});
+			
+			new TimersTableContextMenu().addTo(table);
+			
 			JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true);
 			splitPane.setLeftComponent(tableScrollPane);
-			splitPane.setRightComponent(textArea.createScrollPane(500, 500));
+			splitPane.setRightComponent(textAreaScrollPane);
 			
 			setContentPane(splitPane);
 		}

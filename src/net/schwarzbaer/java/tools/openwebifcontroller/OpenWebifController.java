@@ -72,6 +72,7 @@ import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.lib.system.Settings;
+import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.MessageControl;
@@ -190,7 +191,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			VideoPlayer, BaseURL, Browser, JavaVM,
 			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates, BouquetsNStations_UpdateCurrentStation,
 			EPGDialogWidth, EPGDialogHeight, EPGDialog_TimeScale, EPGDialog_RowHeight, EPGDialog_LeadTime, EPGDialog_RangeTime,
-			LogWindow_WindowX, LogWindow_WindowY, LogWindow_WindowWidth, LogWindow_WindowHeight, 
+			LogWindow_WindowX, LogWindow_WindowY, LogWindow_WindowWidth, LogWindow_WindowHeight,
+			SplitPaneDivider_TimersPanel,
+			SplitPaneDivider_SystemInfoPanel,
+			SplitPaneDivider_MoviesPanel,
+			SplitPaneDivider_BouquetsNStations_CenterPanel,
+			SplitPaneDivider_BouquetsNStations_ValuePanel, 
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {
@@ -292,8 +298,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		
 		logWindow = new LogWindow(mainWindow, "Response Log");
 		
-		movies = new MoviesPanel(this,mainWindow);
-		bouquetsNStations = new BouquetsNStations(this,mainWindow);
+		movies = new MoviesPanel(this);
+		bouquetsNStations = new BouquetsNStations(this);
 		timers = new TimersPanel(this);
 		screenShot = new ScreenShot(this, remoteControl = new RemoteControlPanel(this));
 		systemInfoPanel = new SystemInfoPanel();
@@ -363,18 +369,26 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		JPanel epgControlPanel = new JPanel(new BorderLayout());
 		epgControlPanel.setBorder(BorderFactory.createTitledBorder("EPG"));
 		epgControlPanel.add(createButton("Show EPG", true, e->{
-			if (!timers.hasData())
+			if (!timers.hasData() && !bouquetsNStations.hasData())
+			{
+				if (!askUserIfDataShouldBeInitialized(mainWindow, "Timer", "Bouquet")) return;
+				getBaseURLAndRunWithProgressDialog("Init Timers", timers::readData);
+				getBaseURLAndRunWithProgressDialog("Init Bouquets 'n' Stations", bouquetsNStations ::readData);
+			}
+			else if (!timers.hasData())
 			{
 				if (!askUserIfDataShouldBeInitialized(mainWindow, "Timer")) return;
 				getBaseURLAndRunWithProgressDialog("Init Timers", timers::readData);
 			}
-			if (!bouquetsNStations.hasData())
+			else if (!bouquetsNStations.hasData())
 			{
 				if (!askUserIfDataShouldBeInitialized(mainWindow, "Bouquet")) return;
 				getBaseURLAndRunWithProgressDialog("Init Bouquets 'n' Stations", bouquetsNStations ::readData);
 			}
+			
 			Bouquet bouquet = bouquetsNStations.showBouquetSelector(mainWindow);
 			if (bouquet==null) return;
+			
 			openEPGDialog(bouquet);
 		}));
 		
@@ -401,6 +415,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			AppSettings.ValueKey.LogWindow_WindowY,
 			AppSettings.ValueKey.LogWindow_WindowWidth,
 			AppSettings.ValueKey.LogWindow_WindowHeight
+		);
+		settings.registerSplitPaneDividers(
+				new SplitPaneDividersDefinition<>(mainWindow, AppSettings.ValueKey.class)
+				.add(timers, AppSettings.ValueKey.SplitPaneDivider_TimersPanel)
+				.add(movies, AppSettings.ValueKey.SplitPaneDivider_MoviesPanel)
+				.add(systemInfoPanel, AppSettings.ValueKey.SplitPaneDivider_SystemInfoPanel)
 		);
 	}
 	
@@ -908,15 +928,23 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		return baseURL;
 	}
 
-	public static boolean askUserIfDataShouldBeInitialized(Component parent, String dataLabel)
+	public static boolean askUserIfDataShouldBeInitialized(Component parent, String... dataLabels)
 	{
-		String dataLabelLC = dataLabel.toLowerCase();
-		String title = "No Timer Data";
+		if (dataLabels==null || dataLabels.length<1)
+			throw new IllegalArgumentException();
+		
+		Iterable<String> it;
+		it = ()->Arrays.stream(dataLabels).map(str->String.format("No %s Data", str)).iterator();
+		String title = String.join(" & ", it);
+		
 		String[] msg = new String[] {
-			String.format("Currently there are no %s data loaded.", dataLabelLC),
-			String.format("Do you want to initialize %s data?", dataLabelLC)
+			String.format("Currently there are %s loaded.", title.toLowerCase()),
+			"Do you want to initialize that?"
 		};
-		String[] opts = new String[] { String.format("Initialize %s Data", dataLabel), "Cancel" };
+		
+		String dataLabel_ = dataLabels.length>1 ? "" : dataLabels[0]+" ";
+		String[] opts = new String[] { String.format("Initialize %sData", dataLabel_), "Cancel" };
+		
 		return JOptionPane.showOptionDialog(
 			parent, msg, title,
 			JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE,

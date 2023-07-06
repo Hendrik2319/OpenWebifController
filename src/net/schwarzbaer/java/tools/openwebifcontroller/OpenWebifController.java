@@ -79,6 +79,7 @@ import net.schwarzbaer.java.tools.openwebifcontroller.controls.MessageControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.PowerControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.VolumeControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
+import net.schwarzbaer.java.tools.openwebifcontroller.stationswitch.StationSwitch;
 
 public class OpenWebifController implements EPGDialog.ExternCommands, AbstractControlPanel.ExternCommands {
 	
@@ -424,7 +425,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		);
 	}
 	
-	static StandardMainWindow createMainWindow(String title, boolean asSubWindow) {
+	public static StandardMainWindow createMainWindow(String title, boolean asSubWindow) {
 		StandardMainWindow.DefaultCloseOperation defaultCloseOperation;
 		if (asSubWindow) defaultCloseOperation = StandardMainWindow.DefaultCloseOperation.DISPOSE_ON_CLOSE;
 		else             defaultCloseOperation = StandardMainWindow.DefaultCloseOperation.EXIT_ON_CLOSE;

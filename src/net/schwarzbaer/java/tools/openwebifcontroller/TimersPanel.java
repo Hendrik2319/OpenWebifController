@@ -205,7 +205,7 @@ public class TimersPanel extends JSplitPane {
 		
 	}
 	
-	static class TimersTableCellRenderer implements TableCellRenderer {
+	public static class TimersTableCellRenderer implements TableCellRenderer {
 		
 		private static final Color COLOR_Type_Record        = new Color(0xD9D9FF);
 		private static final Color COLOR_Type_RecordNSwitch = new Color(0xD9FFFF);
@@ -226,7 +226,7 @@ public class TimersPanel extends JSplitPane {
 			this.tableModel = tableModel;
 		}
 		
-		static Color getBgColor(Timer.Type type) {
+		public static Color getBgColor(Timer.Type type) {
 			switch (type) {
 			case Record       : return COLOR_Type_Record;
 			case RecordNSwitch: return COLOR_Type_RecordNSwitch;
@@ -236,7 +236,7 @@ public class TimersPanel extends JSplitPane {
 			return null;
 		}
 		
-		static Color getBgColor(Timer.State state) {
+		public static Color getBgColor(Timer.State state) {
 			switch (state) {
 			case Running    : return COLOR_State_Running;
 			case Waiting    : return COLOR_State_Waiting;

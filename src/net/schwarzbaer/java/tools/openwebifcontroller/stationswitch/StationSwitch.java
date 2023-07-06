@@ -4,10 +4,14 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.image.BufferedImage;
+import java.util.HashSet;
+import java.util.Vector;
+import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultComboBoxModel;
@@ -56,36 +60,36 @@ public class StationSwitch {
 	}
 
 	private final StandardMainWindow mainWindow;
+	private final LogWindow logWindow;
 	private final JPanel stationsPanel;
 	private final PowerControl powerControl;
 	private final VolumeControl volumeControl;
-	private final JButton btnBouquetData;
+	private final JTextArea txtActiveTimers;
+	private final JButton btnReLoadTimerData;
+	private final JButton btnShowTimers;
+	private final JButton btnReLoadBouquetData;
 	private final JButton btnAddStation;
 	private final JLabel labBouquet;
 	private final JComboBox<Bouquet> cmbbxBouquet;
-	private final JLabel labStation;
 	private final JComboBox<Bouquet.SubService> cmbbxStation;
+	//private JLabel labActiveTimers;
+	private final HashSet<String> addedStations;
 	private String baseURL;
 	private BouquetData bouquetData;
 	private Bouquet.SubService selectedStation;
-	private final JButton btnReLoadTimerData;
-	private final JButton btnShowTimers;
 	private Timers timerData;
-	//private JLabel labActiveTimers;
-	private final JTextArea txtActiveTimers;
-	private final LogWindow logWindow;
-	private final EPG epg;
 	
 	StationSwitch(boolean asSubWindow) {
 		baseURL = null;
 		bouquetData = null;
 		selectedStation = null;
 		timerData = null;
+		addedStations = new HashSet<>();
 		
 		mainWindow = OpenWebifController.createMainWindow("Station Switch",asSubWindow);
 		logWindow = new LogWindow(mainWindow, "Response Log");
 		
-		epg = new EPG(new EPG.Tools() {
+		EPG epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
 				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
 			}
@@ -148,12 +152,12 @@ public class StationSwitch {
 		btnReLoadTimerData.setToolTipText("Load Timer Data");
 		
 		txtActiveTimers = new JTextArea();
-		JScrollPane scrlpActiveTimers = new JScrollPane(txtActiveTimers);
+		JScrollPane scrollPaneActiveTimers = new JScrollPane(txtActiveTimers);
 		//labActiveTimers = new JLabel("Currently no Active Timers");
 		txtActiveTimers.setEditable(false);
 		txtActiveTimers  .setToolTipText("Active Timers");
-		scrlpActiveTimers.setToolTipText("Active Timers");
-		scrlpActiveTimers.setPreferredSize(new Dimension(300,70));
+		scrollPaneActiveTimers.setToolTipText("Active Timers");
+		scrollPaneActiveTimers.setPreferredSize(new Dimension(300,70));
 		btnShowTimers = OpenWebifController.createButton("Timer", false, e-> {
 			if (timerData==null) {
 				//System.err.printf("timerData == null%n");
@@ -171,57 +175,25 @@ public class StationSwitch {
 		
 		stationsPanel = new JPanel(new GridBagLayout());
 		
-		btnBouquetData = OpenWebifController.createButton(GrayCommandIcons.IconGroup.Download, true, e->{
+		btnReLoadBouquetData = OpenWebifController.createButton(GrayCommandIcons.IconGroup.Download, true, e->{
 			reloadBouquetData();
 			mainWindow.pack();
 		});
-		btnBouquetData.setToolTipText("Load Bouquet Data");
+		btnReLoadBouquetData.setToolTipText("Load Bouquet Data");
 		
 		btnAddStation = OpenWebifController.createButton("Add", false, e->{
 			Bouquet.SubService station = selectedStation;
 			if (station==null) return;
 			
-			JLabel label = new JLabel(station.name);
-			
-			JButton btnZap = OpenWebifController.createButton("Switch", true, e1->{
-				if (baseURL==null) return;
-				OpenWebifController.zapToStation(station.service.stationID, baseURL, logWindow);
-			});
-			
-			JButton btnStream = OpenWebifController.createButton("Stream", true, e1->{
-				if (baseURL==null) return;
-				OpenWebifController.streamStation(station.service.stationID, baseURL);
-			});
-			btnStream.setEnabled(OpenWebifController.canStreamStation());
-			
-			GridBagConstraints c = new GridBagConstraints();
-			c.fill = GridBagConstraints.BOTH;
-			c.gridwidth = 1;
-			c.weightx = 0;
-			stationsPanel.add(label,c);
-			c.weightx = 1;
-			stationsPanel.add(btnZap,c);
-			c.gridwidth = GridBagConstraints.REMAINDER;
-			stationsPanel.add(btnStream,c);
+			addStationRow(station);
 			
 			mainWindow.pack();
-			
-			if (baseURL!=null)
-				new Thread(()->{
-					BufferedImage picon = OpenWebifTools.getPicon(baseURL, station.service.stationID);
-					Icon icon = picon==null ? null : BouquetsNStations.getScaleIcon(picon, 20, Color.BLACK);
-					if (icon!=null)
-						SwingUtilities.invokeLater(()->{
-							label.setIcon(icon);
-							mainWindow.pack();
-						});
-				}).start();
 		});
 		
-		labStation = new JLabel("Station: ");
+		JLabel labStation = new JLabel("Station: ");
 		cmbbxStation = OpenWebifController.createComboBox((Bouquet.SubService subService)->{
 			selectedStation = subService;
-			btnAddStation.setEnabled(selectedStation!=null && !selectedStation.isMarker());
+			updateBtnAddStation();
 		});
 		cmbbxStation.setRenderer(new StationListRenderer());
 		labStation.setEnabled(false);
@@ -238,8 +210,75 @@ public class StationSwitch {
 		labBouquet.setEnabled(false);
 		cmbbxBouquet.setEnabled(false);
 		
+		JPanel contentPane = buildGUI(btnShowLogWindow, btnShowEPG, scrollPaneActiveTimers, labStation);
+		mainWindow.startGUI(contentPane);
+	}
+	
+	private void addStationRow(Bouquet.SubService station)
+	{
+		String stationIdStr = station.service.stationID.toIDStr();
+		if (addedStations.contains(stationIdStr)) return;
+		addedStations.add(stationIdStr);
 		
+		Vector<Component> comps = new Vector<>();
 		
+		JLabel label = new JLabel(station.name);
+		comps.add(label);
+		
+		JButton btnZap = OpenWebifController.createButton("Switch", baseURL!=null, e1->{
+			if (baseURL==null) return;
+			OpenWebifController.zapToStation(station.service.stationID, baseURL, logWindow);
+		});
+		comps.add(btnZap);
+		
+		JButton btnStream = OpenWebifController.createButton("Stream", baseURL!=null, e1->{
+			if (baseURL==null) return;
+			OpenWebifController.streamStation(station.service.stationID, baseURL);
+		});
+		btnStream.setEnabled(OpenWebifController.canStreamStation());
+		comps.add(btnStream);
+		
+		JButton btnDelete = OpenWebifController.createButton(GrayCommandIcons.IconGroup.Delete , true, e1->{
+			SwingUtilities.invokeLater(()->{
+				for (Component comp : comps)
+					stationsPanel.remove(comp);
+				stationsPanel.revalidate();
+				mainWindow.pack();
+				addedStations.remove(stationIdStr);
+				updateBtnAddStation();
+			});
+		});
+		btnDelete.setMargin(new Insets(2, 2, 2, 2));
+		comps.add(btnDelete);
+		
+		GridBagConstraints c = new GridBagConstraints();
+		c.fill = GridBagConstraints.BOTH;
+		c.gridwidth = 1;
+		c.weightx = 0;
+		stationsPanel.add(label,c);
+		c.weightx = 1;
+		stationsPanel.add(btnZap,c);
+		stationsPanel.add(btnStream,c);
+		c.weightx = 0;
+		c.gridwidth = GridBagConstraints.REMAINDER;
+		stationsPanel.add(btnDelete,c);
+		
+		updateBtnAddStation();
+		
+		if (baseURL!=null)
+			new Thread(()->{
+				BufferedImage picon = OpenWebifTools.getPicon(baseURL, station.service.stationID);
+				Icon icon = picon==null ? null : BouquetsNStations.getScaleIcon(picon, 20, Color.BLACK);
+				if (icon!=null)
+					SwingUtilities.invokeLater(()->{
+						label.setIcon(icon);
+						mainWindow.pack();
+					});
+			}).start();
+	}
+
+	private JPanel buildGUI(JButton btnShowLogWindow, JButton btnShowEPG, JScrollPane scrollPaneActiveTimers, JLabel labStation)
+	{
 		GridBagConstraints c;
 		JPanel controllerPanel = new JPanel(new GridBagLayout());
 		c = new GridBagConstraints();
@@ -262,7 +301,7 @@ public class StationSwitch {
 		
 		c.insets = new Insets(1, 1, 1, 1);
 		c.weightx = 1;
-		timerPanel.add(scrlpActiveTimers,c);
+		timerPanel.add(scrollPaneActiveTimers,c);
 		c.gridwidth = GridBagConstraints.REMAINDER;
 		c.weightx = 0;
 		timerPanel.add(btnShowTimers,c);
@@ -276,7 +315,7 @@ public class StationSwitch {
 		c.gridwidth = 1;
 		c.weightx = 0;
 		c.gridheight = 2;
-		bouquetPanel.add(btnBouquetData,c);
+		bouquetPanel.add(btnReLoadBouquetData,c);
 		c.gridheight = 1;
 		c.insets = new Insets(1, 1, 1, 1);
 		
@@ -311,8 +350,7 @@ public class StationSwitch {
 		contentPane.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
 		contentPane.add(configPanel,BorderLayout.NORTH);
 		contentPane.add(stationsPanel,BorderLayout.CENTER);
-		
-		mainWindow.startGUI(contentPane);
+		return contentPane;
 	}
 
 	private void reloadBouquetData()
@@ -358,6 +396,23 @@ public class StationSwitch {
 		});
 	}
 	
+	private void initializeBouquetData(ProgressDialog pd) {
+		bouquetData = null;
+		
+		if (baseURL!=null)
+			bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquet Data: "+taskTitle));
+		
+		SwingUtilities.invokeLater(()->{
+			btnReLoadBouquetData.setToolTipText("Reload Bouquet Data");
+			OpenWebifController.setIcon(btnReLoadBouquetData, GrayCommandIcons.IconGroup.Reload);
+			cmbbxBouquet.setModel  (bouquetData==null ? new DefaultComboBoxModel<Bouquet>() : new DefaultComboBoxModel<Bouquet>(bouquetData.bouquets));
+			cmbbxBouquet.setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
+			labBouquet  .setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
+			cmbbxBouquet.setSelectedItem(null);
+			stationsPanel.removeAll();
+		});
+	}
+
 	private void updateActiveTimersText() {
 		if (timerData == null) {
 			txtActiveTimers.setText("<No Data>");
@@ -378,32 +433,55 @@ public class StationSwitch {
 		txtActiveTimers.setText(str);
 	}
 
-	private void initializeBouquetData(ProgressDialog pd) {
-		bouquetData = null;
-		
-		if (baseURL!=null)
-			bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquet Data: "+taskTitle));
-		
-		SwingUtilities.invokeLater(()->{
-			btnBouquetData.setToolTipText("Reload Bouquet Data");
-			OpenWebifController.setIcon(btnBouquetData, GrayCommandIcons.IconGroup.Reload);
-			cmbbxBouquet.setModel  (bouquetData==null ? new DefaultComboBoxModel<Bouquet>() : new DefaultComboBoxModel<Bouquet>(bouquetData.bouquets));
-			cmbbxBouquet.setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
-			labBouquet  .setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
-			cmbbxBouquet.setSelectedItem(null);
-			stationsPanel.removeAll();
-		});
+	private void updateBtnAddStation()
+	{
+		btnAddStation.setEnabled(
+				selectedStation!=null &&
+				!selectedStation.isMarker() &&
+				!wasStationAdded(selectedStation)
+		);
 	}
 
-	private static class StationListRenderer implements ListCellRenderer<Bouquet.SubService> {
+	private boolean wasStationAdded(Bouquet.SubService station)
+	{
+		return addedStations.contains(station.service.stationID.toIDStr());
+	}
+
+	private class StationListRenderer implements ListCellRenderer<Bouquet.SubService> {
 		
-		Tables.LabelRendererComponent rendererComp = new Tables.LabelRendererComponent();
+		private final Tables.LabelRendererComponent rendererComp;
+		private final Font defaultFont;
+		private final Font markerFont;
+		
+		StationListRenderer() {
+			rendererComp = new Tables.LabelRendererComponent();
+			defaultFont = rendererComp.getFont();
+			int style = 0;;
+			style += defaultFont.isBold  () ? Font.BOLD : 0;
+			style += defaultFont.isItalic() ? 0 : Font.ITALIC;
+			markerFont = defaultFont.deriveFont(style);
+		}
 		
 		@Override
-		public Component getListCellRendererComponent(JList<? extends Bouquet.SubService> list, Bouquet.SubService value, int index, boolean isSelected, boolean hasFocus) {
+		public Component getListCellRendererComponent(JList<? extends Bouquet.SubService> list, Bouquet.SubService value, int index, boolean isSelected, boolean hasFocus)
+		{
 			String valueStr = value==null ? "" : value.toString();
 			if (value!=null && value.isMarker()) valueStr = String.format("--  %s  --", valueStr);
-			rendererComp.configureAsListCellRendererComponent(list, null, valueStr, index, isSelected, hasFocus, null, ()->value!=null && value.isMarker() ? Color.GRAY : list.getForeground());
+			
+			Supplier<Color> getCustomForeground = ()->{
+				if (value == null) return list.getForeground();
+				if (value.isMarker()) return Color.GRAY;
+				if (wasStationAdded(value)) return Color.GRAY;
+				return list.getForeground();
+			};
+			
+			rendererComp.configureAsListCellRendererComponent(list, null, valueStr, index, isSelected, hasFocus, null, getCustomForeground);
+			
+			if (value!=null && value.isMarker())
+				rendererComp.setFont(markerFont);
+			else
+				rendererComp.setFont(defaultFont);
+			
 			return rendererComp;
 		}
 	

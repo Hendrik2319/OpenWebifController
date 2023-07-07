@@ -7,8 +7,10 @@ import java.awt.Window;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTextPane;
+import javax.swing.SwingUtilities;
 import javax.swing.text.DefaultStyledDocument;
 
+import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.gui.StyledDocumentInterface;
 import net.schwarzbaer.java.lib.gui.StyledDocumentInterface.Style;
@@ -28,6 +30,7 @@ public class LogWindow extends StandardDialog implements LogWindowInterface
 	private static final Style STYLE_MESSAGE_HIGHLIGHTED = new Style(new Color(0x0090AD), true, false);
 	
 	private final StyledDocumentInterface sdi;
+	private final JScrollPane contentPane;
 
 	public LogWindow(Window parent, String title)
 	{
@@ -37,7 +40,7 @@ public class LogWindow extends StandardDialog implements LogWindowInterface
 		sdi = new StyledDocumentInterface(doc, "LogWindow", null, 12);
 		JTextPane textPane = new JTextPane(doc);
 		
-		JScrollPane contentPane = new JScrollPane(textPane);
+		contentPane = new JScrollPane(textPane);
 		contentPane.setPreferredSize(new Dimension(600, 600));
 		
 		createGUI(contentPane, OpenWebifController.createButton("Close", true, e->closeDialog()));
@@ -79,6 +82,8 @@ public class LogWindow extends StandardDialog implements LogWindowInterface
 
 	private void printToDoc(MessageResponse response, String title, String[] stringsToHighlight)
 	{
+		ScrollPosition scrollPos = ScrollPosition.getVertical(contentPane);
+		
 		if (response==null)
 			sdi.append(STYLE_NORESPONSE, "[-------] ");
 		else if (response.result)
@@ -101,6 +106,11 @@ public class LogWindow extends StandardDialog implements LogWindowInterface
 		if (!message.isEmpty())
 			sdi.append(STYLE_MESSAGE, "%s", message);
 		sdi.append("%n");
+		
+		if (scrollPos!=null)
+			SwingUtilities.invokeLater(()->{
+				scrollPos.setVertical(contentPane);
+			});
 	}
 
 	private static void printToSystemOut(MessageResponse response, String title)

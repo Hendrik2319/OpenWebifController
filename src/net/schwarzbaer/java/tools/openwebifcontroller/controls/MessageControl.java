@@ -1,5 +1,6 @@
 package net.schwarzbaer.java.tools.openwebifcontroller.controls;
 
+import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 
@@ -30,7 +31,9 @@ public class MessageControl extends AbstractControlPanel<OpenWebifTools.MessageR
 		messageType = OpenWebifTools.MessageType.INFO;
 		
 		txtfldMessage = OpenWebifController.createTextField("", 10, null);
+		txtfldMessage.setMinimumSize(new Dimension(85,20));
 		txtfldTimeOut = OpenWebifController.createTextField("", 4, OpenWebifController::parseInt, n->n>0, n->timeOut=n);
+		txtfldTimeOut.setMinimumSize(new Dimension(35,20));
 		
 		chkbxTimeOut = OpenWebifController.createCheckBox("Time Out", false, b->{
 			txtfldTimeOut.setEditable(b);

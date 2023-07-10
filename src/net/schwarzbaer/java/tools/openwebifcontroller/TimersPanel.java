@@ -335,22 +335,10 @@ public class TimersPanel extends JSplitPane {
 				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null);
 			}
 			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<Timer, T> getValue, Function<T,String> toString) {
-				this.horizontalAlignment = horizontalAlignment==null ? getDefaultHorizontalAlignment(columnClass) : horizontalAlignment;
+				this.horizontalAlignment = Tables.UseFulColumnDefMethods.getHorizontalAlignment(horizontalAlignment, columnClass);
 				config = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
 				this.getValue = Objects.requireNonNull(getValue);
-				this.toString = toString==null ? null : obj -> {
-					if (columnClass.isInstance(obj))
-						return toString.apply(columnClass.cast(obj));
-					if (obj!=null)
-						return obj.toString();
-					return null;
-				};
-			}
-			private static int getDefaultHorizontalAlignment(Class<?> columnClass) {
-				if (columnClass == null) return SwingConstants.LEFT;
-				if (columnClass == String.class) return SwingConstants.LEFT;
-				if (Number.class.isAssignableFrom(columnClass)) return SwingConstants.RIGHT;
-				return SwingConstants.LEFT;
+				this.toString = Tables.UseFulColumnDefMethods.createToString(columnClass, toString);
 			}
 			private static String formatDate(long millis, boolean withTextDay, boolean withDate, boolean dateIsLong, boolean withTime, boolean withTimeZone) {
 				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);

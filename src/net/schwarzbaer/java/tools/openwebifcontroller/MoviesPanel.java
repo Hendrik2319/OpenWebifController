@@ -1,8 +1,10 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -14,13 +16,17 @@ import java.util.Vector;
 import java.util.function.Function;
 
 import javax.swing.BorderFactory;
+import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTree;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -37,6 +43,7 @@ import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
+import net.schwarzbaer.java.lib.openwebif.MovieList.Movie;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
@@ -81,6 +88,7 @@ class MoviesPanel extends JSplitPane {
 		
 		movieTable = new JTable(movieTableModel);
 		movieTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+		movieTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		JScrollPane tableScrollPane = new JScrollPane(movieTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
@@ -132,7 +140,7 @@ class MoviesPanel extends JSplitPane {
 		movieTable.getSelectionModel().addListSelectionListener(e -> {
 			int rowV = movieTable.getSelectedRow();
 			int rowM = movieTable.convertRowIndexToModel(rowV);
-			showValues(movieTableModel.getValue(rowM));
+			showValues(movieTableModel.getRow(rowM));
 		});
 		
 		movieTable.addMouseListener(new MouseAdapter() {
@@ -141,7 +149,7 @@ class MoviesPanel extends JSplitPane {
 					if (e.getClickCount()<2) return;
 					int rowV = movieTable.rowAtPoint(e.getPoint());
 					int rowM = movieTable.convertRowIndexToModel(rowV);
-					showMovie(movieTableModel.getValue(rowM));
+					showMovie(movieTableModel.getRow(rowM));
 				}
 				if (e.getButton()==MouseEvent.BUTTON3) {
 					
@@ -212,7 +220,7 @@ class MoviesPanel extends JSplitPane {
 				int rowV = movieTable.rowAtPoint(new Point(x,y));
 				int rowM = movieTable.convertRowIndexToModel(rowV);
 				if (movieTableModel!=null)
-					clickedMovie = movieTableModel.getValue(rowM);
+					clickedMovie = movieTableModel.getRow(rowM);
 				
 				miReloadTable.setEnabled(selectedTreeNode!=null);
 				miOpenVideoPlayer.setEnabled(clickedMovie!=null);
@@ -227,7 +235,10 @@ class MoviesPanel extends JSplitPane {
 
 	private void updateMovieTableModel(Vector<MovieList.Movie> movies) {
 		movieTable.setModel(movieTableModel = new MovieTableModel(movies));
-		movieTableModel.initializeWith(movieTable);
+		movieTable.setRowSorter( new Tables.SimplifiedRowSorter(movieTableModel) );
+		movieTableModel.setTable(movieTable);
+		movieTableModel.setColumnWidths(movieTable);
+		movieTableModel.setCellRenderers();
 	}
 
 	private void reloadTreeNode(LocationTreeNode treeNode) {
@@ -522,70 +533,113 @@ class MoviesPanel extends JSplitPane {
 		@Override public Enumeration<LocationTreeNode> children() { return children.elements(); }
 	}
 
-	static class MovieTableModel extends Tables.SimplifiedTableModel<MovieTableModel.ColumnID> {
+	static class MovieTableModel extends Tables.SimpleGetValueTableModel<MovieList.Movie, MovieTableModel.ColumnID> {
 	
-		private enum ColumnID implements Tables.SimplifiedColumnIDInterface {
-			Name   ("Name"   ,  String.class, 280, m->m.eventname          ),
-			Length ("Length" , Integer.class,  60, m->m.length_s     , m->m.lengthStr),
-			Station("Station",  String.class,  80, m->m.servicename        ),
-			File   ("File"   ,  String.class, 450, m->m.filename_stripped  ),
-			Size   ("Size"   ,    Long.class,  70, m->m.filesize     , m->m.filesize_readable),
-			Time   ("Time"   ,    Long.class, 100, m->m.recordingtime, m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false)),
+		// Column Widths: [280, 50, 109, 450, 59, 108]
+		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<MovieList.Movie>, SwingConstants {
+			Name    ("Name"    ,  String.class, 280, null, m->m.eventname          ),
+			Progress("Progress",    Long.class,  60, null, m->m.lastseen           ),
+			Length  ("Length"  , Integer.class,  50, null, m->m.length_s     , m->m.lengthStr),
+			Time    ("Time"    ,    Long.class, 110, null, m->m.recordingtime, m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false)),
+			Station ("Station" ,  String.class, 110, null, m->m.servicename        ),
+			File    ("File"    ,  String.class, 450, null, m->m.filename_stripped  ),
+			Size    ("Size"    ,    Long.class,  60, null, m->m.filesize     , m->m.filesize_readable),
 			;
 		
 			final SimplifiedColumnConfig cfg;
-			final Function<MovieList.Movie, Object> getValue;
+			final Function<MovieList.Movie, ?> getValue;
 			final Function<MovieList.Movie, String> getDisplayStr;
+			final int horizontalAlignment;
 			
-			ColumnID(String name, Class<?> columnClass, int prefWidth, Function<MovieList.Movie,Object> getValue) {
-				this(name, columnClass, prefWidth, getValue, null);
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<MovieList.Movie,T> getValue) {
+				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null);
 			}
-			ColumnID(String name, Class<?> columnClass, int prefWidth, Function<MovieList.Movie,Object> getValue, Function<MovieList.Movie,String> getDisplayStr) {
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<MovieList.Movie,T> getValue, Function<MovieList.Movie,String> getDisplayStr) {
+				this.horizontalAlignment = Tables.UseFulColumnDefMethods.getHorizontalAlignment(horizontalAlignment, columnClass);
 				this.getValue = getValue;
 				this.getDisplayStr = getDisplayStr;
 				cfg = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
 			}
 			
-			@Override public SimplifiedColumnConfig getColumnConfig() {
-				return cfg;
-			}
-			
+			@Override public SimplifiedColumnConfig getColumnConfig() { return cfg; }
+			@Override public Function<Movie,?> getGetValue() { return getValue; }
 		}
-	
-		private final Vector<MovieList.Movie> movies;
-		private final CustomCellRenderer customCellRenderer;
 	
 		private MovieTableModel(Vector<MovieList.Movie> movies) {
-			super(ColumnID.values());
-			this.movies = movies;
-			customCellRenderer = new CustomCellRenderer();
+			super(ColumnID.values(), movies);
 		}
 	
-		public void initializeWith(JTable table) {
-			setColumnWidths(table);
+		private void setCellRenderers()
+		{
+			CustomCellRenderer customCellRenderer = new CustomCellRenderer();
+			ScaleCellRenderer scaleCellRenderer = new ScaleCellRenderer();
+			forEachColum((ColumnID columnID, TableColumn column) -> {
+				if (column!=null && columnID!=null)
+				{
+					if (columnID==ColumnID.Progress)
+						column.setCellRenderer(scaleCellRenderer);
+					else if (columnID.getDisplayStr!=null)
+						column.setCellRenderer(customCellRenderer);
+				}
+			});
+		}
+		
+		private static class ScaleCellRenderer implements TableCellRenderer {
 			
-			TableColumnModel columnModel = table.getColumnModel();
-			for (int i=0; i<columnModel.getColumnCount(); ++i) {
-				TableColumn column = columnModel.getColumn(i);
-				ColumnID columnID = getColumnID(table.convertColumnIndexToModel(i));
-				if (columnID!=null && columnID.getDisplayStr!=null)
-					column.setCellRenderer(customCellRenderer);
+			private final Tables.GraphicRendererComponent<Long> rendComp;
+
+			ScaleCellRenderer() {
+				rendComp = new ScaleRC();
+				rendComp.setDefaultPreferredSize();
+			}
+
+			@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV)
+			{
+				rendComp.configureAsTableCellRendererComponent(table, value, isSelected, hasFocus);
+				return rendComp;
 			}
 			
-			table.setRowSorter( new Tables.SimplifiedRowSorter(this) );
-		}
+			private static class ScaleRC extends Tables.GraphicRendererComponent<Long>
+			{
+				private static final long serialVersionUID = 5308892166500614939L;
+				
+				private Long value = null;
+				private boolean isSelected = false;
+				private JTable table = null;
+				private JList<?> list = null;
+				
+				ScaleRC() { super(Long.class); }
+				
+				@Override protected void setValue(Long value, JTable table, JList<?> list, Integer listIndex, boolean isSelected, boolean hasFocus)
+				{
+					this.value = value;
+					this.table = table;
+					this.list = list;
+					this.isSelected = isSelected;
+				}
 
-		@Override public int getRowCount() { return movies.size(); }
-	
-		@Override public Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID) {
-			MovieList.Movie value = getValue(rowIndex);
-			if (value==null) return null;
-			return columnID.getValue.apply(value);
-		}
-	
-		private MovieList.Movie getValue(int rowIndex) {
-			if (rowIndex<0 || rowIndex>=movies.size()) return null;
-			return movies.get(rowIndex);
+				@Override protected void paintContent(Graphics g, int x, int y, int width, int height)
+				{
+					if (value==null)
+						return;
+					
+					Color color = null;
+					if (value < 30)
+					{
+						if (table!=null) color = isSelected ? table.getSelectionForeground() : table.getForeground();
+						if (list !=null) color = isSelected ? list .getSelectionForeground() : list .getForeground();
+					}
+					else if (value < 90)
+						color = new Color(0xFFCD00);
+					else
+						color = new Color(0x00CD00);
+					
+					int scaleWidth = (width-2)*Math.min(value.intValue(), 100) / 100;
+					g.setColor(color);
+					g.drawRect(x  , y  , width-1   , height-1);
+					g.fillRect(x+1, y+1, scaleWidth, height-2);
+				}
+			}
 		}
 		
 		private class CustomCellRenderer extends DefaultTableCellRenderer {
@@ -597,10 +651,14 @@ class MoviesPanel extends JSplitPane {
 				int columnM = table.convertColumnIndexToModel(columnV);
 				ColumnID columnID = getColumnID(columnM);
 				
-				if (columnID.getDisplayStr!=null) {
-					int rowM = table.convertRowIndexToModel(rowV);
-					MovieList.Movie movie = getValue(rowM);
-					if (movie!=null) setText(columnID.getDisplayStr.apply(movie));
+				if (columnID!=null)
+				{
+					if (columnID.getDisplayStr!=null) {
+						int rowM = table.convertRowIndexToModel(rowV);
+						MovieList.Movie movie = getRow(rowM);
+						if (movie!=null) setText(columnID.getDisplayStr.apply(movie));
+					}
+					setHorizontalAlignment(columnID.horizontalAlignment);
 				}
 				
 				return comp;

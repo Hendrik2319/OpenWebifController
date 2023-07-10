@@ -193,11 +193,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates, BouquetsNStations_UpdateCurrentStation,
 			EPGDialogWidth, EPGDialogHeight, EPGDialog_TimeScale, EPGDialog_RowHeight, EPGDialog_LeadTime, EPGDialog_RangeTime,
 			LogWindow_WindowX, LogWindow_WindowY, LogWindow_WindowWidth, LogWindow_WindowHeight,
+			MoviesPanel_ShowDescriptionInNameColumn, 
 			SplitPaneDivider_TimersPanel,
 			SplitPaneDivider_SystemInfoPanel,
 			SplitPaneDivider_MoviesPanel,
 			SplitPaneDivider_BouquetsNStations_CenterPanel,
-			SplitPaneDivider_BouquetsNStations_ValuePanel, 
+			SplitPaneDivider_BouquetsNStations_ValuePanel,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Vector;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import javax.swing.BorderFactory;
@@ -25,6 +26,7 @@ import javax.swing.JTable;
 import javax.swing.JTree;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -39,6 +41,7 @@ import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
+import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
@@ -59,8 +62,10 @@ class MoviesPanel extends JSplitPane {
 	private final JTree locationsTree;
 	private final JTable movieTable;
 	private final ExtendedTextArea movieInfo1;
+	private final JScrollPane      movieInfo1ScrollPane;
 	private final ExtendedTextArea movieInfo2;
-	
+	private final JScrollPane      movieInfo2ScrollPane;
+
 	private LocationTreeNode locationsRoot;
 	private DefaultTreeModel locationsTreeModel;
 	private MovieTableModel movieTableModel;
@@ -98,14 +103,16 @@ class MoviesPanel extends JSplitPane {
 		movieInfo1 = new ExtendedTextArea(false);
 		//movieInfo1.setLineWrap(true);
 		//movieInfo1.setWrapStyleWord(true);
+		movieInfo1ScrollPane = movieInfo1.createScrollPane(400,330);
 		
 		movieInfo2 = new ExtendedTextArea(false);
 		movieInfo2.setLineWrap(true);
 		movieInfo2.setWrapStyleWord(true);
+		movieInfo2ScrollPane = movieInfo2.createScrollPane(400,300);
 		
 		JPanel movieInfoPanel = new JPanel(new BorderLayout(3,3));
-		movieInfoPanel.add(movieInfo1.createScrollPane(400,330),BorderLayout.NORTH);
-		movieInfoPanel.add(movieInfo2.createScrollPane(400,300),BorderLayout.CENTER);
+		movieInfoPanel.add(movieInfo1ScrollPane,BorderLayout.NORTH);
+		movieInfoPanel.add(movieInfo2ScrollPane,BorderLayout.CENTER);
 		
 		JPanel rightPanel = new JPanel(new BorderLayout(3,3));
 		rightPanel.add(tableScrollPane,BorderLayout.CENTER);
@@ -198,10 +205,19 @@ class MoviesPanel extends JSplitPane {
 		{
 			clickedMovie = null;
 			
-			JMenuItem miOpenVideoPlayer = add(OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image, e->showMovie(clickedMovie)));
-			JMenuItem miOpenBrowser     = add(OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image, e->showMovieInBrowser(clickedMovie)));
-			JMenuItem miZapToMovie      = add(OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play , e->zapToMovie(clickedMovie)));
+			JMenuItem miOpenVideoPlayer = add(OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image , e->showMovie(clickedMovie)));
+			JMenuItem miOpenBrowser     = add(OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image , e->showMovieInBrowser(clickedMovie)));
+			JMenuItem miZapToMovie      = add(OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play  , e->zapToMovie(clickedMovie)));
+			JMenuItem miDeleteMovie     = add(OpenWebifController.createMenuItem("Delete"              , GrayCommandIcons.IconGroup.Delete, e->deleteMovie(clickedMovie)));
+			
 			addSeparator();
+			
+			boolean showDescriptionInNameColumn = MovieTableModel.getShowDescriptionInNameColumn();
+			add(OpenWebifController.createCheckBoxMenuItem("Show description in name column", showDescriptionInNameColumn, b->{
+				if (movieTableModel!=null)
+					movieTableModel.setShowDescriptionInNameColumn(b);
+			}));
+			
 			JMenuItem miReloadTable = add(OpenWebifController.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
 			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 				TableColumnModel columnModel = movieTable.getColumnModel();
@@ -222,13 +238,19 @@ class MoviesPanel extends JSplitPane {
 				if (movieTableModel!=null)
 					clickedMovie = movieTableModel.getRow(rowM);
 				
+				String rowName = MovieTableModel.getRowName(movieTableModel, clickedMovie);
+				if (rowName!=null && rowName.length() > 60)
+					rowName = rowName.substring(0,58) + "...";
+				
 				miReloadTable.setEnabled(selectedTreeNode!=null);
 				miOpenVideoPlayer.setEnabled(clickedMovie!=null);
 				miOpenBrowser    .setEnabled(clickedMovie!=null);
 				miZapToMovie     .setEnabled(clickedMovie!=null);
-				miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer"  : String.format("Show \"%s\" in VideoPlayer" , clickedMovie.eventname));
-				miOpenBrowser    .setText(clickedMovie==null ? "Show in Browser"      : String.format("Show \"%s\" in Browser"     , clickedMovie.eventname));
-				miZapToMovie     .setText(clickedMovie==null ? "Start Playing in STB" : String.format("Start Playing \"%s\" in STB", clickedMovie.eventname));
+				miDeleteMovie    .setEnabled(clickedMovie!=null);
+				miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer"  : String.format("Show \"%s\" in VideoPlayer" , rowName));
+				miOpenBrowser    .setText(clickedMovie==null ? "Show in Browser"      : String.format("Show \"%s\" in Browser"     , rowName));
+				miZapToMovie     .setText(clickedMovie==null ? "Start Playing in STB" : String.format("Start Playing \"%s\" in STB", rowName));
+				miDeleteMovie    .setText(clickedMovie==null ? "Delete"               : String.format("Delete \"%s\""              , rowName));
 			});
 		}
 	}
@@ -261,6 +283,20 @@ class MoviesPanel extends JSplitPane {
 				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
 			});
 			main.showMessageResponse(response, "Zap to Movie");
+		});
+	}
+	
+	private void deleteMovie(MovieList.Movie movie) {
+		if (movie==null) return;
+		
+		String baseURL = main.getBaseURL();
+		if (baseURL==null) return;
+		
+		main.runWithProgressDialog("Delete Movie", pd->{
+			OpenWebifTools.MessageResponse response = OpenWebifTools.deleteMovie(baseURL, movie, taskTitle->{
+				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
+			});
+			main.showMessageResponse(response, "Delete Movie");
 		});
 	}
 
@@ -323,6 +359,9 @@ class MoviesPanel extends JSplitPane {
 			return;
 		}
 		
+		ScrollPosition movieInfo1ScrollPos = ScrollPosition.getVertical(movieInfo1ScrollPane);
+		ScrollPosition movieInfo2ScrollPos = ScrollPosition.getVertical(movieInfo2ScrollPane);
+		
 		ValueListOutput out = new ValueListOutput();
 		out.add(0, "eventname          ", movie.eventname          );
 		out.add(0, "servicename        ", movie.servicename        );
@@ -340,11 +379,15 @@ class MoviesPanel extends JSplitPane {
 		out.add(0, "fullname           ", movie.fullname           );
 		out.add(0, "serviceref         ", movie.serviceref         );
 		movieInfo1.setText(out.generateOutput());
+		if (movieInfo1ScrollPos!=null)
+			SwingUtilities.invokeLater(()->movieInfo1ScrollPos.setVertical(movieInfo1ScrollPane));
 		
 		StringBuilder sb = new StringBuilder();
 		sb.append("description:\r\n").append(movie.description.replace(""+((char)0x8a), "\r\n")).append("\r\n");
 		sb.append("\r\nextended description:\r\n").append(movie.descriptionExtended.replace(""+((char)0x8a), "\r\n")).append("\r\n");
 		movieInfo2.setText(sb.toString());
+		if (movieInfo2ScrollPos!=null)
+			SwingUtilities.invokeLater(()->movieInfo2ScrollPos.setVertical(movieInfo2ScrollPane));
 	}
 
 	private MovieList getMovieList(String dir) {
@@ -534,10 +577,10 @@ class MoviesPanel extends JSplitPane {
 	}
 
 	static class MovieTableModel extends Tables.SimpleGetValueTableModel<MovieList.Movie, MovieTableModel.ColumnID> {
-	
+		
 		// Column Widths: [280, 50, 109, 450, 59, 108]
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<MovieList.Movie>, SwingConstants {
-			Name    ("Name"    ,  String.class, 280, null, m->m.eventname          ),
+			Name    ("Name"    ,  String.class, 280, null, MovieTableModel::getRowName),
 			Progress("Progress",    Long.class,  60, null, m->m.lastseen           ),
 			Length  ("Length"  , Integer.class,  50, null, m->m.length_s     , m->m.lengthStr),
 			Time    ("Time"    ,    Long.class, 110, null, m->m.recordingtime, m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false)),
@@ -548,15 +591,26 @@ class MoviesPanel extends JSplitPane {
 		
 			final SimplifiedColumnConfig cfg;
 			final Function<MovieList.Movie, ?> getValue;
+			final BiFunction<MovieTableModel, Movie, ?> getValue2;
 			final Function<MovieList.Movie, String> getDisplayStr;
 			final int horizontalAlignment;
 			
 			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<MovieList.Movie,T> getValue) {
-				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null);
+				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null, null);
+			}
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<MovieTableModel,MovieList.Movie,T> getValue2) {
+				this(name, columnClass, prefWidth, horizontalAlignment, null, getValue2, null);
 			}
 			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<MovieList.Movie,T> getValue, Function<MovieList.Movie,String> getDisplayStr) {
+				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null, getDisplayStr);
+			}
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<MovieTableModel,MovieList.Movie,T> getValue2, Function<MovieList.Movie,String> getDisplayStr) {
+				this(name, columnClass, prefWidth, horizontalAlignment, null, getValue2, getDisplayStr);
+			}
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<MovieList.Movie,T> getValue, BiFunction<MovieTableModel,MovieList.Movie,T> getValue2, Function<MovieList.Movie,String> getDisplayStr) {
 				this.horizontalAlignment = Tables.UseFulColumnDefMethods.getHorizontalAlignment(horizontalAlignment, columnClass);
 				this.getValue = getValue;
+				this.getValue2 = getValue2;
 				this.getDisplayStr = getDisplayStr;
 				cfg = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
 			}
@@ -565,10 +619,52 @@ class MoviesPanel extends JSplitPane {
 			@Override public Function<Movie,?> getGetValue() { return getValue; }
 		}
 	
-		private MovieTableModel(Vector<MovieList.Movie> movies) {
+		private boolean showDescriptionInNameColumn;
+
+		private MovieTableModel(Vector<MovieList.Movie> movies)
+		{
 			super(ColumnID.values(), movies);
+			showDescriptionInNameColumn = getShowDescriptionInNameColumn();
 		}
 	
+		private static String getRowName(MovieTableModel model, MovieList.Movie movie)
+		{
+			if (movie==null) return null;
+			if (model==null) return movie.eventname;
+			if (!model.showDescriptionInNameColumn) return movie.eventname;
+			if (movie.description == null  ) return movie.eventname;
+			if (movie.description.isBlank()) return movie.eventname;
+			return String.format("%s | %s", movie.eventname, movie.description);
+		}
+
+		public static boolean getShowDescriptionInNameColumn()
+		{
+			return OpenWebifController.settings.getBool(
+					OpenWebifController.AppSettings.ValueKey.MoviesPanel_ShowDescriptionInNameColumn,
+					false
+			);
+		}
+
+		public void setShowDescriptionInNameColumn(boolean showDescriptionInNameColumn)
+		{
+			this.showDescriptionInNameColumn = showDescriptionInNameColumn;
+			OpenWebifController.settings.putBool(
+					OpenWebifController.AppSettings.ValueKey.MoviesPanel_ShowDescriptionInNameColumn,
+					showDescriptionInNameColumn
+			);
+			fireTableColumnUpdate(MovieTableModel.ColumnID.Name);
+		}
+		
+		
+
+		@Override
+		protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, Movie row)
+		{
+			if (columnID.getValue2!=null)
+				return columnID.getValue2.apply(this, row);
+			return super.getValueAt(rowIndex, columnIndex, columnID, row);
+		}
+
 		private void setCellRenderers()
 		{
 			CustomCellRenderer customCellRenderer = new CustomCellRenderer();

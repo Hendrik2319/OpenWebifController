@@ -874,7 +874,10 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		String baseURL = getBaseURL();
 		if (baseURL==null) return;
 		if (!timers.hasData()) return;
-		EPGDialog.showDialog(mainWindow, baseURL, epg, timers, bouquetsNStations, bouquet, this);
+		EPGDialog.showDialog(
+				mainWindow, baseURL, epg, bouquet,
+				timers.timerDataUpdateNotifier, bouquetsNStations.bouquetsNStationsUpdateNotifier,
+				this);
 	}
 	
 	public static void openUrlInVideoPlayer_ (String url, String taskLabel) { openInVideoPlayer(taskLabel, "URL" , url                   , getVideoPlayer_(), getJavaVM_()); }

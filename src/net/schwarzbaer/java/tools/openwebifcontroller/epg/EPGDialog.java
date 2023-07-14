@@ -1,6 +1,7 @@
 package net.schwarzbaer.java.tools.openwebifcontroller.epg;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -34,12 +35,11 @@ import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
-import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel;
-import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
-import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BouquetsNStationsListener;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
+import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BouquetsNStationsUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGView.EPGViewEvent;
 
-public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateListener, BouquetsNStationsListener {
+public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier.DataUpdateListener, BouquetsNStationsUpdateNotifier.BouquetsNStationsListener {
 	private static final long serialVersionUID = 8634962178940555542L;
 	
 	private enum LeadTime {
@@ -104,9 +104,6 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 	}
 	
 	private final EPG epg;
-	private final TimersPanel timers;
-	private final Timers timerData;
-	private final BouquetsNStations bouquetsNStations;
 	private final Bouquet bouquet;
 	private final Vector<SubService> stations;
 	private final LoadEPGThread loadEPGThread;
@@ -117,28 +114,25 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 	private int leadTime_s;
 	private int rangeTime_s;
 
-	public static void showDialog(Window parent, String baseURL, EPG epg, Timers timerData, Bouquet bouquet, ExternCommands externCommands) {
-		if (parent           ==null) throw new IllegalArgumentException();
-		if (baseURL          ==null) throw new IllegalArgumentException();
-		if (epg              ==null) throw new IllegalArgumentException();
-		if (timerData        ==null) throw new IllegalArgumentException();
-		if (bouquet          ==null) throw new IllegalArgumentException();
-		if (externCommands   ==null) throw new IllegalArgumentException();
-		new EPGDialog(parent, ModalityType.APPLICATION_MODAL, false, baseURL, epg, null, timerData, null, bouquet, externCommands)
-			.showDialog();
-	}
-	public static void showDialog(Window parent, String baseURL, EPG epg, TimersPanel timers, BouquetsNStations bouquetsNStations, Bouquet bouquet, ExternCommands externCommands) {
-		if (parent           ==null) throw new IllegalArgumentException();
-		if (baseURL          ==null) throw new IllegalArgumentException();
-		if (epg              ==null) throw new IllegalArgumentException();
-		if (timers           ==null) throw new IllegalArgumentException();
-		if (bouquetsNStations==null) throw new IllegalArgumentException();
-		if (bouquet          ==null) throw new IllegalArgumentException();
-		if (externCommands   ==null) throw new IllegalArgumentException();
-		if (!timers           .hasData()) throw new IllegalStateException();
-		if (!bouquetsNStations.hasData()) throw new IllegalStateException();
-		new EPGDialog(parent, ModalityType.APPLICATION_MODAL, false, baseURL, epg, timers, null, bouquetsNStations, bouquet, externCommands)
-			.showDialog();
+	public static void showDialog(
+			Window parent, String baseURL, EPG epg, Bouquet bouquet,
+			TimerDataUpdateNotifier timerNotifier,
+			BouquetsNStationsUpdateNotifier bouquetsNStationsNotifier,
+			ExternCommands externCommands,
+			Component... additionalButtons)
+	{
+		if (parent                   ==null) throw new IllegalArgumentException();
+		if (baseURL                  ==null) throw new IllegalArgumentException();
+		if (epg                      ==null) throw new IllegalArgumentException();
+		if (timerNotifier            ==null) throw new IllegalArgumentException();
+		if (bouquet                  ==null) throw new IllegalArgumentException();
+		if (bouquetsNStationsNotifier==null) throw new IllegalArgumentException();
+		if (externCommands           ==null) throw new IllegalArgumentException();
+		new EPGDialog(
+				parent, ModalityType.APPLICATION_MODAL, false, baseURL,
+				epg, timerNotifier.getTimers(), bouquet, bouquetsNStationsNotifier.getCurrentStation(),
+				externCommands, additionalButtons
+			).showDialog(timerNotifier, bouquetsNStationsNotifier);
 	}
 	
 	public interface StationCommands {
@@ -157,14 +151,12 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 
 	private EPGDialog(
 			Window parent, ModalityType modality, boolean repeatedUseOfDialogObject,
-			String baseURL, EPG epg, TimersPanel timers, Timers timerData, BouquetsNStations bouquetsNStations, Bouquet bouquet,
-			ExternCommands externCommands) {
+			String baseURL, EPG epg, Timers timerData, Bouquet bouquet, StationID currentStation,
+			 ExternCommands externCommands, Component... additionalButtons
+	) {
 		super(parent, getTitle(bouquet), modality, repeatedUseOfDialogObject);
 		this.epg = epg;
-		this.timers = timers;
 		this.bouquet = bouquet;
-		this.timerData = timerData==null && this.timers!=null ? this.timers.getData() : timerData;
-		this.bouquetsNStations = bouquetsNStations;
 		this.stations = this.bouquet.subservices;
 		
 		JLabel statusOutput = new JLabel("");
@@ -178,7 +170,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		};
 		epgView = new EPGView(this.stations);
 		epgViewRepainter = new OpenWebifController.Updater(20, epgView::repaint);
-		timersHasUpdated(this.timerData, false);
+		timersWereUpdated(timerData, false);
 		
 		int rowHeight = OpenWebifController.settings.getInt(ValueKey.EPGDialog_RowHeight, -1);
 		if (rowHeight<0) rowHeight = epgView.getRowHeight();
@@ -283,7 +275,9 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		JPanel southPanel = new JPanel(new GridBagLayout());
 		set(c,0,0,1,0); southPanel.add(statusOutput,c);
 		set(c,1,0,0,0); southPanel.add(loadEPGThread.getButton(),c);
-		set(c,2,0,0,0); southPanel.add(closeButton,c);
+		for (int i=0; i<additionalButtons.length; i++)
+		{ set(c,2+i,0,0,0); southPanel.add(additionalButtons[i],c); }
+		set(c,2+additionalButtons.length,0,0,0); southPanel.add(closeButton,c);
 		
 		
 		JPanel contentPane = new JPanel(new BorderLayout(3,3));
@@ -323,6 +317,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		reconfigureEPGViewHorizScrollBar();
 		epgViewRepainter.start();
 		
+		setCurrentStation(currentStation);
 	}
 
 	private static String getTitle(Bouquet bouquet) {
@@ -381,8 +376,7 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 		c.weighty = weighty;
 	}
 
-	@Override
-	public void showDialog() {
+	private void showDialog(TimerDataUpdateNotifier timersNotifier, BouquetsNStationsUpdateNotifier bouquetsNStationsNotifier) {
 		if (OpenWebifController.settings.contains(ValueKey.EPGDialogWidth) &&
 			OpenWebifController.settings.contains(ValueKey.EPGDialogHeight))
 		{
@@ -390,13 +384,13 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 			setPositionAndSize(null, size);
 		}
 		
-		if (timers           !=null) timers           .addListener(this);
-		if (bouquetsNStations!=null) bouquetsNStations.addListener(this);
+		if (timersNotifier           !=null) timersNotifier           .addListener(this);
+		if (bouquetsNStationsNotifier!=null) bouquetsNStationsNotifier.addListener(this);
 		
 		super.showDialog();
 		
-		if (timers           !=null) timers           .removeListener(this);
-		if (bouquetsNStations!=null) bouquetsNStations.removeListener(this);
+		if (timersNotifier           !=null) timersNotifier           .removeListener(this);
+		if (bouquetsNStationsNotifier!=null) bouquetsNStationsNotifier.removeListener(this);
 	}
 
 	@Override
@@ -420,11 +414,11 @@ public class EPGDialog extends StandardDialog implements TimersPanel.DataUpdateL
 	}
 
 	@Override
-	public void timersHasUpdated(Timers timers) {
-		timersHasUpdated(timers, true);
+	public void timersWereUpdated(Timers timers) {
+		timersWereUpdated(timers, true);
 	}
 	
-	private void timersHasUpdated(Timers timers, boolean repaintEPGView) {
+	private void timersWereUpdated(Timers timers, boolean repaintEPGView) {
 		Vector<EPGView.Timer> convertedTimers = epgView.convertTimers(timers.timers);
 		epgView.setTimers(convertedTimers);
 		if (repaintEPGView) epgView.repaint();

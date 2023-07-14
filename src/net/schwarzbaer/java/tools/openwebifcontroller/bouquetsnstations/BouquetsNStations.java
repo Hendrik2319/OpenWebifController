@@ -60,7 +60,7 @@ public class BouquetsNStations extends JPanel {
 	private final FileChooser m3uFileChooser;
 	private final FileChooser txtFileChooser;
 	private final OpenWebifController.Updater periodicUpdater10s;
-	private final Vector<BouquetsNStationsListener> bouquetsNStationsListeners;
+	public  final BouquetsNStationsUpdateNotifier bouquetsNStationsUpdateNotifier;
 	
 	private BSTreeNode.RootNode bsTreeRoot;
 	private DefaultTreeModel bsTreeModel;
@@ -75,7 +75,11 @@ public class BouquetsNStations extends JPanel {
 		
 		this.main = main;
 		
-		bouquetsNStationsListeners = new Vector<>();
+		bouquetsNStationsUpdateNotifier = new BouquetsNStationsUpdateNotifier() {
+			@Override public StationID getCurrentStation() {
+				return currentStationData==null || currentStationData.stationInfo==null ? null : currentStationData.stationInfo.stationID;
+			}
+		};
 		bsTreeRoot = null;
 		bsTreeModel = null;
 		PICON_LOADER.clear();
@@ -365,14 +369,11 @@ public class BouquetsNStations extends JPanel {
 		currentStationData = OpenWebifTools.getCurrentStation(baseURL, setIndeterminateProgressTask);
 		updateCurrentlyPlayedStationNodes(true);
 		
-		if (!bouquetsNStationsListeners.isEmpty()) {
-			if (currentStationData!=null && currentStationData.stationInfo!=null)
-				for (BouquetsNStationsListener listener:bouquetsNStationsListeners)
-					listener.setCurrentStation(currentStationData.stationInfo.stationID);
-			else
-				for (BouquetsNStationsListener listener:bouquetsNStationsListeners)
-					listener.setCurrentStation(null);
-		}
+		bouquetsNStationsUpdateNotifier.setCurrentStation(
+				currentStationData==null || currentStationData.stationInfo==null
+					? null
+					: currentStationData.stationInfo.stationID
+		);
 	}
 	
 	
@@ -493,14 +494,24 @@ public class BouquetsNStations extends JPanel {
 		return out.generateOutput();
 	}
 	
-	public interface BouquetsNStationsListener {
-
-		void setCurrentStation(StationID stationID);
+	public static abstract class BouquetsNStationsUpdateNotifier
+	{
+		public interface BouquetsNStationsListener {
+			void setCurrentStation(StationID stationID);
+		}
 		
+		private final Vector<BouquetsNStationsListener> listeners = new Vector<>();
+		
+		public void    addListener(BouquetsNStationsListener listener) { listeners.   add(listener); }
+		public void removeListener(BouquetsNStationsListener listener) { listeners.remove(listener); }
+		
+		public void setCurrentStation(StationID stationID)
+		{
+			for (BouquetsNStationsListener listener : listeners)
+				listener.setCurrentStation(stationID);
+		}
+		public abstract StationID getCurrentStation();
 	}
-	
-	public void    addListener(BouquetsNStationsListener listener) { bouquetsNStationsListeners.   add(listener); }
-	public void removeListener(BouquetsNStationsListener listener) { bouquetsNStationsListeners.remove(listener); }
 
 	public static Icon getScaleIcon(BufferedImage img, int newHeight, Color bgColor) {
 		BufferedImage scaledImage = scaleImage(img, newHeight, bgColor);

@@ -110,6 +110,7 @@ class EPGView extends Canvas {
 
 	public void setCurrentStation(StationID stationID) {
 		currentStation = stationID;
+		repaint();
 	}
 
 	public void setHoveredEvent(EPGViewEvent hoveredEvent) {

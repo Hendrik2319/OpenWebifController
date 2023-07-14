@@ -41,16 +41,12 @@ import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.Extend
 public class TimersPanel extends JSplitPane {
 	private static final long serialVersionUID = -2563250955373710618L;
 	
-	public interface DataUpdateListener {
-		void timersHasUpdated(Timers timers);
-	}
-
 	private final OpenWebifController main;
 	private final JTable table;
 	private final TimersTableRowSorter tableRowSorter;
 	private final JScrollPane tableScrollPane;
 	private final ExtendedTextArea textArea;
-	private final Vector<DataUpdateListener> dataUpdateListeners;
+	public  final TimerDataUpdateNotifier timerDataUpdateNotifier;
 	
 	private Timers timers;
 	private TimersTableModel tableModel;
@@ -60,7 +56,9 @@ public class TimersPanel extends JSplitPane {
 		this.main = main;
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
-		dataUpdateListeners = new Vector<>();
+		timerDataUpdateNotifier = new TimerDataUpdateNotifier() {
+			@Override public Timers getTimers() { return getData(); }
+		};
 		timers = null;
 		
 		textArea = new ExtendedTextArea(false);
@@ -154,8 +152,25 @@ public class TimersPanel extends JSplitPane {
 		}
 	}
 	
-	public void    addListener(DataUpdateListener listener) { dataUpdateListeners.   add(listener); }
-	public void removeListener(DataUpdateListener listener) { dataUpdateListeners.remove(listener); }
+	public static abstract class TimerDataUpdateNotifier
+	{
+		public interface DataUpdateListener {
+			void timersWereUpdated(Timers timers);
+		}
+		
+		private final Vector<DataUpdateListener> dataUpdateListeners = new Vector<>();
+		
+		public void    addListener(DataUpdateListener listener) { dataUpdateListeners.   add(listener); }
+		public void removeListener(DataUpdateListener listener) { dataUpdateListeners.remove(listener); }
+		
+		public void notifyTimersWereUpdated(Timers timers)
+		{
+			for (DataUpdateListener listener:dataUpdateListeners)
+				listener.timersWereUpdated(timers);
+		}
+		
+		public abstract Timers getTimers();
+	}
 
 	public Timers getData() {
 		return timers;
@@ -175,8 +190,7 @@ public class TimersPanel extends JSplitPane {
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 		tableModel.setAllDefaultRenderers();
 		table.repaint();
-		for (DataUpdateListener listener:dataUpdateListeners)
-			listener.timersHasUpdated(timers);
+		timerDataUpdateNotifier.notifyTimersWereUpdated(timers);
 	}
 	
 	public static class TimersTableRowSorter extends Tables.SimplifiedRowSorter

@@ -43,7 +43,9 @@ import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer.Type;
 import net.schwarzbaer.java.tools.openwebifcontroller.LogWindow;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
+import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BouquetsNStationsUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.PowerControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.VolumeControl;
@@ -78,6 +80,8 @@ public class StationSwitch {
 	private BouquetData bouquetData;
 	private Bouquet.SubService selectedStation;
 	private Timers timerData;
+	private final TimerDataUpdateNotifier timerDataUpdateNotifier;
+	private final MyBouquetsNStationsUpdateNotifier bouquetsNStationsUpdateNotifier;
 	
 	StationSwitch(boolean asSubWindow) {
 		baseURL = null;
@@ -89,6 +93,12 @@ public class StationSwitch {
 		mainWindow = OpenWebifController.createMainWindow("Station Switch",asSubWindow);
 		logWindow = new LogWindow(mainWindow, "Response Log");
 		
+		timerDataUpdateNotifier = new TimerDataUpdateNotifier() {
+			@Override public Timers getTimers() { return timerData; }
+		};
+		
+		bouquetsNStationsUpdateNotifier = new MyBouquetsNStationsUpdateNotifier();
+		
 		EPG epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
 				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
@@ -96,7 +106,11 @@ public class StationSwitch {
 		});
 		
 		EPGDialog.ExternCommands epgDialogCommands = new EPGDialog.ExternCommands() {
-			@Override public void  zapToStation(String baseURL, StationID stationID) { OpenWebifController. zapToStation(stationID, baseURL, logWindow); }
+			@Override public void  zapToStation(String baseURL, StationID stationID) {
+				OpenWebifController. zapToStation(stationID, baseURL, logWindow);
+				bouquetsNStationsUpdateNotifier.setCurrentStation(stationID);
+				bouquetsNStationsUpdateNotifier.updateCurrentStation(baseURL);
+			}
 			@Override public void streamStation(String baseURL, StationID stationID) { OpenWebifController.streamStation(stationID, baseURL); }
 			@Override public void    addTimer(String baseURL, String sRef, int eventID, Type type) { OpenWebifController.addTimer(baseURL, sRef, eventID, type, mainWindow, logWindow, null); }
 			@Override public void deleteTimer(String baseURL, Timer timer) { OpenWebifController.deleteTimer(baseURL, timer, mainWindow, logWindow, null); }
@@ -143,7 +157,13 @@ public class StationSwitch {
 			Bouquet bouquet = BouquetsNStations.showBouquetSelector(mainWindow, bouquetData);
 			if (bouquet==null) return;
 			
-			EPGDialog.showDialog(mainWindow, baseURL, epg, timerData, bouquet, epgDialogCommands);
+			EPGDialog.showDialog(
+					mainWindow, baseURL, epg, bouquet,
+					timerDataUpdateNotifier, bouquetsNStationsUpdateNotifier,
+					epgDialogCommands,
+					OpenWebifController.createButton("Update Timer Data", GrayCommandIcons.IconGroup.Reload, true, e1->{
+						reloadTimerData();
+					}));
 		});
 		
 		
@@ -212,6 +232,31 @@ public class StationSwitch {
 		
 		JPanel contentPane = buildGUI(btnShowLogWindow, btnShowEPG, scrollPaneActiveTimers, labStation);
 		mainWindow.startGUI(contentPane);
+	}
+	
+	private class MyBouquetsNStationsUpdateNotifier extends BouquetsNStationsUpdateNotifier
+	{
+		private StationID currentStation = null;
+
+		@Override public StationID getCurrentStation()
+		{
+			return currentStation;
+		}
+
+		private void updateCurrentStation(String baseURL)
+		{
+			OpenWebifController.runWithProgressDialog(mainWindow, "title", pd->{
+				OpenWebifTools.CurrentStation currentStationData = OpenWebifTools.getCurrentStation(
+					baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "CurrentStation: "+taskTitle)
+				);
+				
+				currentStation = currentStationData==null || currentStationData.stationInfo==null
+						? null
+						: currentStationData.stationInfo.stationID;
+				
+				setCurrentStation( currentStation );
+			});
+		}
 	}
 	
 	private void addStationRow(Bouquet.SubService station)
@@ -393,6 +438,7 @@ public class StationSwitch {
 			txtActiveTimers.setEnabled(timerData != null);
 			btnShowTimers.setEnabled(timerData != null);
 			updateActiveTimersText();
+			timerDataUpdateNotifier.notifyTimersWereUpdated(timerData);
 		});
 	}
 	

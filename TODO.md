@@ -6,5 +6,11 @@
 	* [x] add commands to context menu: delete, toggle, [ ] update all
 	* [x] rename Timers to TimerData
 * both
-	* [ ] merge TimerTables of both into one class -> nope
-		* separate classes can be more specific and smaller
+	* TimerTables
+		* [ ] merge TimerTables of both into one class -> nope
+			* separate classes can be more specific and smaller
+		* [ ] add functions
+			* "clean up timers"
+		* [ ] update row view after toggle
+	* EPG dialog
+		* [ ] add "jump to time"

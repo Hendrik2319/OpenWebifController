@@ -7,6 +7,7 @@ import java.awt.Point;
 import java.awt.Window;
 import java.util.Locale;
 import java.util.Vector;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -22,6 +23,7 @@ import javax.swing.table.TableCellRenderer;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
+import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
@@ -31,6 +33,7 @@ import net.schwarzbaer.java.tools.openwebifcontroller.LogWindow;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerStateGuesser;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimersTableRowSorter;
 
 class TimersDialog extends JDialog {
@@ -42,15 +45,17 @@ class TimersDialog extends JDialog {
 	private final JTable table;
 	private final JScrollPane tableScrollPane;
 	private final TimersTableRowSorter tableRowSorter;
+	private final TimerStateGuesser timerStateGuesser;
 	private TimersDialog.TimersTableModel tableModel;
 	private ExtendedTextArea textArea;
-	private Supplier<Vector<Timer>> updateData;
+	private TimersUpdater updateData;
 
 	TimersDialog(Window window, LogWindow logWindow) {
 		super(window, "Timers", ModalityType.APPLICATION_MODAL);
 		this.window = window;
 		this.logWindow = logWindow;
 		updateData = null;
+		timerStateGuesser = new TimerStateGuesser();
 		
 		textArea = new ExtendedTextArea(false);
 		textArea.setLineWrap(true);
@@ -86,7 +91,7 @@ class TimersDialog extends JDialog {
 		setContentPane(splitPane);
 	}
 	
-	void showDialog(Vector<Timer> data, Supplier<Vector<Timer>> updateData) {
+	void showDialog(Vector<Timer> data, TimersUpdater updateData) {
 		this.updateData = updateData;
 		setData(data);
 		
@@ -100,7 +105,8 @@ class TimersDialog extends JDialog {
 
 	private void setData(Vector<Timer> data)
 	{
-		tableModel = new TimersTableModel(data);
+		timerStateGuesser.clearGuessedStates();
+		tableModel = new TimersTableModel(data, timerStateGuesser);
 		table.setModel(tableModel);
 		tableRowSorter.setModel(tableModel);
 		tableModel.setTable(table);
@@ -109,12 +115,17 @@ class TimersDialog extends JDialog {
 		tableModel.setDefaultCellEditorsAndRenderers();
 	}
 	
-	static void showDialog(Window window, LogWindow logWindow, Vector<Timer> data, Supplier<Vector<Timer>> updateData) {
+	static void showDialog(Window window, LogWindow logWindow, Vector<Timer> data, TimersUpdater updateData) {
 		if (instance == null) {
 			instance = new TimersDialog(window, logWindow);
 			instance.setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE);
 		}
 		instance.showDialog(data,updateData);
+	}
+	
+	interface TimersUpdater {
+		Vector<Timer> get();
+		Vector<Timer> get(String baseURL, ProgressDialog pd);
 	}
 	
 	private class TimersTableContextMenu extends ContextMenu {
@@ -124,21 +135,34 @@ class TimersDialog extends JDialog {
 		TimersTableContextMenu() {
 			clickedTimer = null;
 			
-			JMenuItem miReloadTimers = add(OpenWebifController.createMenuItem("Reload Timer Data", GrayCommandIcons.IconGroup.Reload, e->{
+			JMenuItem miReloadTimers = add(OpenWebifController.createMenuItem("Reload Timers", GrayCommandIcons.IconGroup.Reload, e->{
 				if (updateData==null) return;
 				setData(updateData.get());
+			}));
+			
+			add(OpenWebifController.createMenuItem("CleanUp Timers", GrayCommandIcons.IconGroup.Delete, e->{
+				OpenWebifController.cleanUpTimers(null, TimersDialog.this, logWindow, (baseURL, pd) -> {
+					if (updateData!=null)
+						setData(updateData.get(baseURL, pd));
+				});
 			}));
 			
 			addSeparator();
 			
 			JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
 				if (clickedTimer==null) return;
-				OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this, logWindow);
+				OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this, logWindow, response -> {
+					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
+					tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.state);
+				});
 			}));
 			
 			JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
-				OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this, logWindow);
+				OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this, logWindow, response -> {
+					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
+					tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.state);
+				});
 			}));
 			
 			addSeparator();
@@ -194,8 +218,8 @@ class TimersDialog extends JDialog {
 			if (value instanceof Timer.Type)
 				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((Timer.Type) value);
 				
-			if (value instanceof Timer.State)
-				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((Timer.State) value);
+			if (value instanceof TimerStateGuesser.ExtTimerState)
+				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((TimerStateGuesser.ExtTimerState) value);
 			
 			
 			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
@@ -209,13 +233,13 @@ class TimersDialog extends JDialog {
 			return rendererComp;
 		}
 	}
-
+	
 	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
 	{
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants
 		{
 			type       ("Type"        , Timer.Type .class,  90, CENTER, timer -> timer.type       ),
-			state      ("State"       , Timer.State.class,  70, CENTER, timer -> timer.state2     ),
+			state      ("State"       , TimerStateGuesser.ExtTimerState.class, 70, CENTER, (model, timer) -> model.timerStateGuesser.getState(timer)),
 			servicename("Station"     , String     .class, 110, null  , timer -> timer.servicename),
 			name       ("Name"        , String     .class, 220, null  , timer -> timer.name       ),
 			_date_     ("Date (Begin)", Long       .class, 115, RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false, false, false)),
@@ -225,22 +249,30 @@ class TimersDialog extends JDialog {
 			;
 			private final SimplifiedColumnConfig cfg;
 			private final Function<Timer, ?> getValue;
+			private final BiFunction<TimersTableModel, Timer, ?> getValueM;
 			private final Integer horizontalAlignment;
 			private final Function<Object, String> toString;
+			/*
 			ColumnID(String name, Class<?> columnClass, int width) {
 				this(name, columnClass, width, null, null);
 			}
 			ColumnID(String name, Class<?> columnClass, int width, Integer horizontalAlignment) {
 				this(name, columnClass, width, horizontalAlignment, null);
 			}
-			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue)
-			{
-				this(name, columnClass, width, horizontalAlignment, getValue, null);
+			*/
+			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue) {
+				this(name, columnClass, width, horizontalAlignment, getValue, null, null);
 			}
-			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue, Function<T,String> toString)
-			{
+			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, BiFunction<TimersTableModel, Timer, T> getValue) {
+				this(name, columnClass, width, horizontalAlignment, null, getValue, null);
+			}
+			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue, Function<T,String> toString) {
+				this(name, columnClass, width, horizontalAlignment, getValue, null, toString);
+			}
+			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue, BiFunction<TimersTableModel, Timer, T> getValueM, Function<T,String> toString) {
 				this.horizontalAlignment = horizontalAlignment;
 				this.getValue = getValue;
+				this.getValueM = getValueM;
 				this.toString = toString==null ? null : obj -> {
 					if (columnClass.isInstance(obj))
 						return toString.apply(columnClass.cast(obj));
@@ -254,22 +286,30 @@ class TimersDialog extends JDialog {
 			@Override public SimplifiedColumnConfig getColumnConfig() { return cfg; }
 		}
 	
+		private final TimerStateGuesser timerStateGuesser;
+
 		private TimersTableModel()
 		{
-			this(new Vector<>());
+			this(new Vector<>(), null);
 		}
-		public TimersTableModel(Vector<Timer> data)
+		public TimersTableModel(Vector<Timer> data, TimerStateGuesser timerStateGuesser)
 		{
 			super(ColumnID.values(), data);
+			this.timerStateGuesser = timerStateGuesser;
 		}
 		
 		@Override public void setDefaultCellEditorsAndRenderers()
 		{
 			TimersDialog.TimersTableRenderer renderer = new TimersTableRenderer(this);
-			table.setDefaultRenderer(Timer.Type .class, renderer);
-			table.setDefaultRenderer(Timer.State.class, renderer);
-			table.setDefaultRenderer(String     .class, renderer);
-			table.setDefaultRenderer(Long       .class, renderer);
+			setDefaultRenderers(cls -> renderer);
+		}
+		
+		@Override protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, Timer row)
+		{
+			if (columnID!=null && columnID.getValueM!=null)
+				return columnID.getValueM.apply(this, row);
+			
+			return super.getValueAt(rowIndex, columnIndex, columnID, row);
 		}
 	}
 }

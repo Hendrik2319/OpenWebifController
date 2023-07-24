@@ -113,8 +113,8 @@ public class StationSwitch {
 			}
 			@Override public void streamStation(String baseURL, StationID stationID) { OpenWebifController.streamStation(stationID, baseURL); }
 			@Override public void    addTimer(String baseURL, String sRef, int eventID, Type type) { OpenWebifController.addTimer(baseURL, sRef, eventID, type, mainWindow, logWindow, null); }
-			@Override public void deleteTimer(String baseURL, Timer timer) { OpenWebifController.deleteTimer(baseURL, timer, mainWindow, logWindow, null); }
-			@Override public void toggleTimer(String baseURL, Timer timer) { OpenWebifController.toggleTimer(baseURL, timer, mainWindow, logWindow, null); }
+			@Override public void deleteTimer(String baseURL, Timer timer) { OpenWebifController.deleteTimer(baseURL, timer, mainWindow, logWindow, null, null); }
+			@Override public void toggleTimer(String baseURL, Timer timer) { OpenWebifController.toggleTimer(baseURL, timer, mainWindow, logWindow, null, null); }
 		};
 		
 		AbstractControlPanel.ExternCommands controlPanelCommands = new AbstractControlPanel.ExternCommands() {
@@ -183,9 +183,17 @@ public class StationSwitch {
 				//System.err.printf("timerData == null%n");
 				return;
 			}
-			TimersDialog.showDialog(mainWindow, logWindow, timerData.timers, ()->{
-				reloadTimerData();
-				return timerData.timers;
+			TimersDialog.showDialog(mainWindow, logWindow, timerData.timers, new TimersDialog.TimersUpdater() {
+				@Override public Vector<Timer> get()
+				{
+					reloadTimerData();
+					return timerData==null ? null : timerData.timers;
+				}
+				@Override public Vector<Timer> get(String baseURL, ProgressDialog pd)
+				{
+					initializeTimerData(baseURL, pd);
+					return timerData==null ? null : timerData.timers;
+				}
 			});
 		});
 		txtActiveTimers.setEnabled(false);
@@ -407,7 +415,7 @@ public class StationSwitch {
 	private void reloadTimerData()
 	{
 		String title = (timerData == null ? "Load" : "Reload") +" Timer Data";
-		OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeTimerData);
+		OpenWebifController.runWithProgressDialog(mainWindow, title, pd -> initializeTimerData(baseURL, pd));
 	}
 	
 	private void initialize(String baseURL) {
@@ -426,11 +434,12 @@ public class StationSwitch {
 		mainWindow.pack();
 	}
 
-	private void initializeTimerData(ProgressDialog pd) {
+	private void initializeTimerData(String baseURL, ProgressDialog pd)
+	{
 		timerData = null;
 		
 		if (baseURL!=null)
-			timerData = OpenWebifTools.readTimers(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timer Data: "+taskTitle));
+			timerData = Timers.read(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timer Data: "+taskTitle));
 		
 		SwingUtilities.invokeLater(()->{
 			btnReLoadTimerData.setToolTipText("Reload Timer Data");

@@ -771,7 +771,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	{
 		addTimer(baseURL, sRef, eventID, type, mainWindow, logWindow, timers::readData);
 	}
-	public static void addTimer(String baseURL, String sRef, int eventID, Timers.Timer.Type type, Window window, LogWindowInterface lwi, UpdateTask updateTimersTask)
+	public static void addTimer(String baseURL, String sRef, int eventID, Timers.Timer.Type type, Window window, LogWindowInterface lwi, UpdateTask updateTask)
 	{
 		runWithProgressDialog(window, "Add Timer", pd->{
 			String baseURL_ = baseURL;
@@ -781,23 +781,27 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Add Timer");
-			if (updateTimersTask!=null) updateTimersTask.updateTimers(baseURL_,pd);
+			if (updateTask!=null)
+			{
+				setIndeterminateProgressTask(pd, "Update Data");
+				updateTask.updateTimers(baseURL_,pd);
+			}
 		});
 	}
 	@Override
 	public void deleteTimer(String baseURL, Timers.Timer timer)
 	{
-		deleteTimer(baseURL, timer, mainWindow, logWindow, timers::readData);
+		deleteTimer(baseURL, timer, mainWindow, logWindow, timers::readData, null);
 	}
-	public void deleteTimer(Timers.Timer timer)
+	public void deleteTimer(Timers.Timer timer, Consumer<MessageResponse> getResponse)
 	{
-		deleteTimer(null, timer, mainWindow, logWindow, null);
+		deleteTimer(null, timer, mainWindow, logWindow, null, getResponse);
 	}
-	public static void deleteTimer(Timers.Timer timer, Window window, LogWindowInterface lwi)
+	public static void deleteTimer(Timers.Timer timer, Window window, LogWindowInterface lwi, Consumer<MessageResponse> getResponse)
 	{
-		deleteTimer(null, timer, window, lwi, null);
+		deleteTimer(null, timer, window, lwi, null, getResponse);
 	}
-	public static void deleteTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTimersTask)
+	public static void deleteTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTask, Consumer<MessageResponse> getResponse)
 	{
 		runWithProgressDialog(window, "Delete Timer", pd->{
 			String baseURL_ = baseURL;
@@ -807,22 +811,27 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Delete Timer");
-			if (updateTimersTask!=null) updateTimersTask.updateTimers(baseURL_,pd);
+			if (updateTask!=null)
+			{
+				setIndeterminateProgressTask(pd, "Update Data");
+				updateTask.updateTimers(baseURL_,pd);
+			}
+			if (getResponse!=null) getResponse.accept(response);
 		});
 	}
 	@Override
 	public void toggleTimer(String baseURL, Timers.Timer timer) {
-		toggleTimer(baseURL, timer, mainWindow, logWindow, timers::readData);
+		toggleTimer(baseURL, timer, mainWindow, logWindow, timers::readData, null);
 	}
-	public void toggleTimer(Timers.Timer timer)
+	public void toggleTimer(Timers.Timer timer, Consumer<MessageResponse> getResponse)
 	{
-		toggleTimer(null, timer, mainWindow, logWindow, null);
+		toggleTimer(null, timer, mainWindow, logWindow, null, getResponse);
 	}
-	public static void toggleTimer(Timers.Timer timer, Window window, LogWindowInterface lwi)
+	public static void toggleTimer(Timers.Timer timer, Window window, LogWindowInterface lwi, Consumer<MessageResponse> getResponse)
 	{
-		toggleTimer(null, timer, window, lwi, null);
+		toggleTimer(null, timer, window, lwi, null, getResponse);
 	}
-	public static void toggleTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTimersTask)
+	public static void toggleTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTask, Consumer<MessageResponse> getResponse)
 	{
 		runWithProgressDialog(window, "Toggle Timer", pd->{
 			String baseURL_ = baseURL;
@@ -832,7 +841,42 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 				setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
-			if (updateTimersTask!=null) updateTimersTask.updateTimers(baseURL_,pd);
+			if (updateTask!=null)
+			{
+				setIndeterminateProgressTask(pd, "Update Data");
+				updateTask.updateTimers(baseURL_,pd);
+			}
+			if (getResponse!=null) getResponse.accept(response);
+		});
+	}
+	
+	public void cleanUpTimers()
+	{
+		cleanUpTimers(null, mainWindow, logWindow, null);
+	}
+	public void cleanUpTimers(UpdateTask updateTimersTask)
+	{
+		cleanUpTimers(null, mainWindow, logWindow, updateTimersTask);
+	}
+	public static void cleanUpTimers(Window window, LogWindowInterface lwi)
+	{
+		cleanUpTimers(null, window, lwi, null);
+	}
+	public static void cleanUpTimers(String baseURL, Window window, LogWindowInterface lwi, UpdateTask updateTask)
+	{
+		runWithProgressDialog(window, "CleanUp Timers", pd->{
+			String baseURL_ = baseURL;
+			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
+			if (baseURL_==null) return;
+			MessageResponse response = Timers.cleanup(baseURL_, taskTitle->{
+				setIndeterminateProgressTask(pd, taskTitle);
+			});
+			lwi.showMessageResponse(response, "CleanUp Timer"/* , "disabled", "enabled", "nicht aktiviert" */);
+			if (updateTask!=null)
+			{
+				setIndeterminateProgressTask(pd, "Update Data");
+				updateTask.updateTimers(baseURL_,pd);
+			}
 		});
 	}
 	

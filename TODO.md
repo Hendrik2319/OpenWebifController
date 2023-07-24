@@ -7,10 +7,10 @@
 	* [x] rename Timers to TimerData
 * both
 	* TimerTables
-		* [ ] merge TimerTables of both into one class -> nope
+		* [-] merge TimerTables of both into one class -> nope
 			* separate classes can be more specific and smaller
-		* [ ] add functions
+		* [x] add functions
 			* "clean up timers"
-		* [ ] update row view after toggle
+		* [x] update row view after toggle or delete without a full reload of timer data
 	* EPG dialog
 		* [ ] add "jump to time"

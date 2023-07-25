@@ -213,7 +213,7 @@ public class TimersPanel extends JSplitPane {
 	
 	public static class TimerStateGuesser
 	{
-		private static boolean DEBUG_OUT = true;
+		private static boolean DEBUG_OUT = false;
 		
 		public enum ExtTimerState
 		{

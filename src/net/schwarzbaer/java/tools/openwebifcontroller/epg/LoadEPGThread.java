@@ -22,6 +22,8 @@ abstract class LoadEPGThread {
 	private boolean isRunning;
 	private int leadTime_s;
 	private int rangeTime_s;
+	private long focusTime_ms;
+	private Runnable taskAtEnd;
 	
 	LoadEPGThread(String baseURL, EPG epg, Bouquet bouquet) {
 		this(baseURL, epg, Objects.requireNonNull(bouquet), null);
@@ -36,7 +38,9 @@ abstract class LoadEPGThread {
 		this.stations = stations;
 		isRunning = false;
 		thread = null;
+		taskAtEnd = null;
 		button = OpenWebifController.createButton("Load EPG", true, e->startStopThread());
+		focusTime_ms = System.currentTimeMillis(); 
 	}
 	
 	protected abstract void setStatusOutput(String text);
@@ -55,7 +59,7 @@ abstract class LoadEPGThread {
 		return button;
 	}
 
-	private void loadEPG(String baseURL) {
+	private void loadEPG(long focusTime_ms) {
 		
 		synchronized (this) {
 			isRunning = true;
@@ -63,10 +67,11 @@ abstract class LoadEPGThread {
 			button.setEnabled(true);
 		}
 		
-		long now_ms = System.currentTimeMillis();
+		//long focusTime_ms = System.currentTimeMillis();
+		//System.out.printf("LoadEPGThread.loadEPG( %s )%n", OpenWebifController.dateTimeFormatter.getTimeStr(focusTime_ms, true, true, false, true, true));
 		
-		if (stations!=null) scanEPGbyStations(baseURL, now_ms);
-		if (bouquet !=null) scanEPGbyTimeBlocks(baseURL, now_ms);
+		if (stations!=null) scanEPGbyStations  (focusTime_ms);
+		if (bouquet !=null) scanEPGbyTimeBlocks(focusTime_ms);
 		
 		
 		synchronized (this) {
@@ -76,7 +81,7 @@ abstract class LoadEPGThread {
 		}
 	}
 	
-	private void scanEPGbyTimeBlocks(String baseURL, long now_ms)
+	private void scanEPGbyTimeBlocks(long focusTime_ms)
 	{
 		int blockSize_mins = 400;
 		int overlap_mins = 20;
@@ -86,18 +91,24 @@ abstract class LoadEPGThread {
 		{
 			int blockStart_mins = blockStart_s/60;
 			int blockEnd_mins = blockStart_mins + blockSize_mins;
+			long beginTime_UnixTS = focusTime_ms/1000 + blockStart_s;
+			long endTime_Minutes  = blockSize_mins;
 			
 			boolean isInterrupted = Thread.currentThread().isInterrupted();
-			System.out.printf("EPG for Bouquet \"%s\" (%d min - %d min)%s%n", bouquet.name, blockStart_mins, blockEnd_mins, isInterrupted ? " -> omitted" : "");
+			System.out.printf("EPG for Bouquet \"%s\" (%5d min - %5d min) [%s] %s%n",
+					bouquet.name,
+					blockStart_mins, blockEnd_mins,
+					OpenWebifController.dateTimeFormatter.getTimeStr(beginTime_UnixTS*1000, true, true, false, true, false),
+					isInterrupted ? " -> omitted" : ""
+			);
 			if (isInterrupted) continue;
 			
-			long beginTime_UnixTS = now_ms/1000 + blockStart_s;
-			long endTime_Minutes  = blockSize_mins;
-			epg.readEPGforBouquet(baseURL, bouquet, beginTime_UnixTS, endTime_Minutes, taskTitle->{
+			/* int count = */epg.readEPGforBouquet(baseURL, bouquet, beginTime_UnixTS, endTime_Minutes, taskTitle->{
 				SwingUtilities.invokeLater(()->{
 					setStatusOutput(String.format("EPG for Bouquet \"%s\" (%d min - %d min): %s", bouquet.name, blockStart_mins, blockEnd_mins, taskTitle));
 				});
 			});
+			//System.out.printf("%d events found%n", count);
 			updateEPGView();
 			SwingUtilities.invokeLater(this::reconfigureHorizScrollBar);
 		}
@@ -107,14 +118,14 @@ abstract class LoadEPGThread {
 		});
 	}
 	
-	private void scanEPGbyStations(String baseURL, long now_ms)
+	private void scanEPGbyStations(long focusTime_ms)
 	{
 		for (SubService subservice:stations)
 			if (!subservice.isMarker()) {
 				boolean isInterrupted = Thread.currentThread().isInterrupted();
 				System.out.printf("EPG for Station \"%s\"%s%n", subservice.name, isInterrupted ? " -> omitted" : "");
 				if (isInterrupted) continue;
-				long beginTime_UnixTS = now_ms/1000 - leadTime_s;
+				long beginTime_UnixTS = focusTime_ms/1000 - leadTime_s;
 				epg.readEPGforService(baseURL, subservice.service.stationID, beginTime_UnixTS, null, taskTitle->{
 					SwingUtilities.invokeLater(()->{
 						setStatusOutput(String.format("EPG for Station \"%s\": %s", subservice.name, taskTitle));
@@ -134,13 +145,21 @@ abstract class LoadEPGThread {
 	}
 	
 	private synchronized void startStopThread() {
-		if (isRunning()) stop(); else start();
+		if (isRunning()) stop(); else start(focusTime_ms);
 	}
 
-	synchronized void start() {
+	synchronized void start(long focusTime_ms) {
+		this.focusTime_ms = focusTime_ms;
 		if (!isRunning()) {
 			button.setEnabled(false);
-			thread = new Thread(()->loadEPG(baseURL));
+			thread = new Thread(()->{
+				loadEPG(focusTime_ms);
+				if (taskAtEnd!=null)
+				{
+					taskAtEnd.run();
+					taskAtEnd = null;
+				}
+			});
 			thread.start();
 		}
 	}
@@ -151,6 +170,17 @@ abstract class LoadEPGThread {
 				button.setEnabled(false);
 			}
 			thread = null;
+		}
+	}
+	
+	synchronized void execWhenEnded(Runnable taskAtEnd)
+	{
+		if (isRunning())
+			this.taskAtEnd = taskAtEnd;
+		else
+		{
+			this.taskAtEnd = null;
+			taskAtEnd.run();
 		}
 	}
 	

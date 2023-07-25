@@ -11,6 +11,7 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.Rectangle2D;
+import java.io.PrintStream;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
+import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
 class EPGView extends Canvas {
@@ -74,7 +76,7 @@ class EPGView extends Canvas {
 	private Integer hoveredStationIndex;
 	public final ToolTip toolTip;
 	
-	EPGView(Vector<SubService> stations) {
+	EPGView(Vector<SubService> stations, long now_s) {
 		this.stations = stations;
 		repaintCounter = 0;
 		
@@ -86,9 +88,9 @@ class EPGView extends Canvas {
 		long baseTime = calendar.getTimeInMillis();
 		baseTimeOffset_s = baseTime/1000;
 		
-		long currentTimeMillis = System.currentTimeMillis();
-		minTime_s_based = maxTime_s_based = (int) (currentTimeMillis/1000-baseTimeOffset_s);
-		rowAnchorTime_s_based = (int) (currentTimeMillis/1000-baseTimeOffset_s) - 3600/2; // now - 1/2 h
+		int now_s_based = (int) (now_s - baseTimeOffset_s);
+		minTime_s_based = maxTime_s_based = now_s_based;
+		rowAnchorTime_s_based = now_s_based - 3600/2; // now - 1/2 h
 		timeScale = 4*3600f/800f; // 4h ~ 800px
 		updateTimeScaleTicks();
 					
@@ -102,6 +104,15 @@ class EPGView extends Canvas {
 		toolTip = new ToolTip() { @Override protected void repaintView() { repaint(); } };
 		
 		setBorder(BorderFactory.createLineBorder(Color.GRAY));
+	}
+
+	public void showStatus(PrintStream out)
+	{
+		out.printf("EPG View:%n");
+		out.printf("    baseTimeOffset_s      : %12d [%s]%n", baseTimeOffset_s     , OpenWebifController.dateTimeFormatter.getTimeStr(baseTimeOffset_s*1000, true, true, false, true, true));
+		out.printf("    minTime_s_based       : %12d [%s]%n", minTime_s_based      , DateTimeFormatter.getDurationStr(minTime_s_based      ));
+		out.printf("    maxTime_s_based       : %12d [%s]%n", maxTime_s_based      , DateTimeFormatter.getDurationStr(maxTime_s_based      ));
+		out.printf("    rowAnchorTime_s_based : %12d [%s]%n", rowAnchorTime_s_based, DateTimeFormatter.getDurationStr(rowAnchorTime_s_based));
 	}
 
 	public void setHoveredStation(Integer hoveredStationIndex) {
@@ -269,17 +280,17 @@ class EPGView extends Canvas {
 	}
 
 	synchronized void updateMinMaxTime() {
-		int now = (int) (System.currentTimeMillis() / 1000 - baseTimeOffset_s);
-		int min = now;
-		int max = now;
+		Integer min = null;
+		Integer max = null;
 		for (Vector<EPGViewEvent> eventList:events.values()) {
 			for (EPGViewEvent event:eventList) {
-				min = Math.min(min, event.begin_s_based);
-				max = Math.max(max, event.  end_s_based);
+				min = min == null ? event.begin_s_based : Math.min(min, event.begin_s_based);
+				max = max == null ? event.  end_s_based : Math.max(max, event.  end_s_based);
 			}
 		}
-		minTime_s_based = min;
-		maxTime_s_based = max;
+		int now = (int) (System.currentTimeMillis() / 1000 - baseTimeOffset_s);
+		minTime_s_based = min == null ? now : min;
+		maxTime_s_based = max == null ? now : max;
 	}
 	
 	synchronized Vector<EPGViewEvent> getEvents(StationID stationID) {
@@ -575,7 +586,7 @@ class EPGView extends Canvas {
 				g2.drawLine(xTick, y0_, xTick, y0_+HEADERHEIGHT-1);
 				g2.setColor(COLOR_TIMESCALE_TEXT);
 				String str;
-				if ( (scaleTicksBaseHour+iHour)%24 != 0)
+				if ( (scaleTicksBaseHour+iHour)%6 != 0)
 					str = String.format("%02d:00", (scaleTicksBaseHour+iHour)%24);
 				else {
 					long millis = (scaleTicksBaseTime_s_based + iHour*3600 + baseTimeOffset_s)*1000L;

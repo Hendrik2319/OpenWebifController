@@ -10,6 +10,9 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.time.Clock;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoField;
 import java.util.Vector;
 import java.util.function.Consumer;
 
@@ -27,6 +30,7 @@ import javax.swing.SwingUtilities;
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
+import net.schwarzbaer.java.lib.gui.TimeInput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
@@ -113,6 +117,8 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 	private final OpenWebifController.Updater epgViewRepainter;
 	private int leadTime_s;
 	private int rangeTime_s;
+	private final TimeInputDialog epgTimeDialog;
+	private ZonedDateTime epgFocusTime;
 
 	public static void showDialog(
 			Window parent, String baseURL, EPG epg, Bouquet bouquet,
@@ -159,6 +165,9 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		this.bouquet = bouquet;
 		this.stations = this.bouquet.subservices;
 		
+		epgTimeDialog = new TimeInputDialog(this,ModalityType.APPLICATION_MODAL,true,"EPG Focus", "Please enter date and time where EPG should focus on. ");
+		epgFocusTime = epgTimeDialog.getNow();
+		
 		JLabel statusOutput = new JLabel("");
 		statusOutput.setBorder(BorderFactory.createLoweredSoftBevelBorder());
 		
@@ -168,7 +177,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			@Override public void updateEPGView            () { EPGDialog.this.updateEPGView(); }
 			@Override public void reconfigureHorizScrollBar() { EPGDialog.this.reconfigureEPGViewHorizScrollBar(); }
 		};
-		epgView = new EPGView(this.stations);
+		epgView = new EPGView(this.stations, System.currentTimeMillis()/1000);
 		epgViewRepainter = new OpenWebifController.Updater(20, epgView::repaint);
 		timersWereUpdated(timerData, false);
 		
@@ -199,7 +208,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 						String message = "Lead Time was raised.\r\nDo you want to restart EPG loading thread?";
 						int result = JOptionPane.showConfirmDialog(this, message, dlgTitle, JOptionPane.YES_NO_CANCEL_OPTION);
 						if (result==JOptionPane.YES_OPTION)
-							loadEPGThread.start();
+							loadEPGThread.start(epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000);
 						else {
 							updateEPGView();
 							reconfigureEPGViewHorizScrollBar();
@@ -273,11 +282,30 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		set(c,0,1,1,0); centerPanel.add(epgViewHorizScrollBar,c);
 		
 		JPanel southPanel = new JPanel(new GridBagLayout());
-		set(c,0,0,1,0); southPanel.add(statusOutput,c);
-		set(c,1,0,0,0); southPanel.add(loadEPGThread.getButton(),c);
+		int x=0;
+		set(c,x++,0,1,0); southPanel.add(statusOutput,c);
+		set(c,x++,0,0,0); southPanel.add(loadEPGThread.getButton(),c);
+		/*
+		set(c,x++,0,0,0); southPanel.add(OpenWebifController.createButton("Show EPG Status", true, e->{
+			epg.showStatus(System.out);
+			epgView.showStatus(System.out);
+		}),c);
+		*/
+		set(c,x++,0,0,0); southPanel.add(OpenWebifController.createButton("Jump to time", true, e->{
+			ZonedDateTime newValue = epgTimeDialog.showDialog(epgFocusTime);
+			if (newValue!=null)
+			{
+				loadEPGThread.stop();
+				epgFocusTime = newValue;
+				loadEPGThread.execWhenEnded(()->{
+					loadEPGThread.start(epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000);
+				});
+			}
+		}),c);
+		
 		for (int i=0; i<additionalButtons.length; i++)
-		{ set(c,2+i,0,0,0); southPanel.add(additionalButtons[i],c); }
-		set(c,2+additionalButtons.length,0,0,0); southPanel.add(closeButton,c);
+			{ set(c,x+i,0,0,0); southPanel.add(additionalButtons[i],c); }
+		set(c,x+additionalButtons.length,0,0,0); southPanel.add(closeButton,c);
 		
 		
 		JPanel contentPane = new JPanel(new BorderLayout(3,3));
@@ -311,7 +339,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			}
 		});
 		
-		if (this.epg.isEmpty()) loadEPGThread.start();
+		if (this.epg.isEmpty()) loadEPGThread.start(epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000);
 		else updateEPGView();
 		reconfigureEPGViewVertScrollBar();
 		reconfigureEPGViewHorizScrollBar();
@@ -399,8 +427,9 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 	}
 
 	private void updateEPGView() {
-		long now_ms = System.currentTimeMillis();
-		long beginTime_UnixTS = now_ms/1000 - leadTime_s;
+		long epgFocusTime_ms = epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000;
+		//long now_ms = System.currentTimeMillis();
+		long beginTime_UnixTS = epgFocusTime_ms/1000 - leadTime_s;
 		Long endTime_UnixTS   = rangeTime_s<0 ? null : (beginTime_UnixTS + rangeTime_s);
 		for (SubService station:stations) {
 			if (station.isMarker()) continue;
@@ -497,6 +526,52 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			this.stationID = stationID;
 			miSwitchToStation.setText(String.format("Switch to \"%s\"", stationName));
 			miStreamStation  .setText(String.format("Stream \"%s\""   , stationName));
+		}
+	}
+	
+	private static class TimeInputDialog extends StandardDialog
+	{
+		private static final long serialVersionUID = -6346723334363284791L;
+		private final TimeInput timeInput;
+		private Clock clock;
+		private ZonedDateTime initValue;
+		private boolean ignoreValue;
+
+		TimeInputDialog(Window parent, ModalityType modality, boolean repeatedUseOfDialogObject, String title, String text)
+		{
+			super(parent, title, modality, repeatedUseOfDialogObject);
+			
+			clock = Clock.systemDefaultZone();
+			initValue = getNow();
+			ignoreValue = true;
+			
+			timeInput = new TimeInput(initValue);
+			
+			JPanel contentPane = new JPanel(new BorderLayout());
+			contentPane.add(new JLabel(text), BorderLayout.NORTH);
+			contentPane.add(timeInput, BorderLayout.CENTER);
+			contentPane.setBorder(BorderFactory.createEmptyBorder(5,10,5,10));
+			
+			createGUI(contentPane,
+					OpenWebifController.createButton("Reset"     , true, e->timeInput.setValue(initValue)),
+					OpenWebifController.createButton("Set to Now", true, e->timeInput.setValue(getNow())),
+					new JLabel("   "),
+					OpenWebifController.createButton("Ok"    , true, e->{ ignoreValue = false; closeDialog(); }),
+					OpenWebifController.createButton("Cancel", true, e->{ closeDialog(); })
+			);
+		}
+
+		private ZonedDateTime getNow()
+		{
+			return clock.instant().atZone(clock.getZone());
+		}
+		
+		ZonedDateTime showDialog(ZonedDateTime value)
+		{
+			initValue = value;
+			timeInput.setValue(initValue);
+			showDialog(Position.PARENT_CENTER);
+			return ignoreValue ? null : timeInput.getValue();
 		}
 	}
 }

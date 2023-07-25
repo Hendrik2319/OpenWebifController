@@ -13,4 +13,4 @@
 			* "clean up timers"
 		* [x] update row view after toggle or delete without a full reload of timer data
 	* EPG dialog
-		* [ ] add "jump to time"
+		* [x] add "jump to time"

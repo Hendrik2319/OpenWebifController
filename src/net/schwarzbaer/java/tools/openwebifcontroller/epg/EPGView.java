@@ -65,6 +65,7 @@ class EPGView extends Canvas {
 	private int rowHeight;
 	private int rowOffsetY;
 	private int rowAnchorTime_s_based;
+	private Integer rowAnchorTime_s_based_suggested;
 	private int minTime_s_based;
 	private int maxTime_s_based;
 	private float timeScale;
@@ -75,8 +76,8 @@ class EPGView extends Canvas {
 	private StationID currentStation;
 	private Integer hoveredStationIndex;
 	public final ToolTip toolTip;
-	
-	EPGView(Vector<SubService> stations, long now_s) {
+
+	EPGView(Vector<SubService> stations, long focusTime_s) {
 		this.stations = stations;
 		repaintCounter = 0;
 		
@@ -88,9 +89,10 @@ class EPGView extends Canvas {
 		long baseTime = calendar.getTimeInMillis();
 		baseTimeOffset_s = baseTime/1000;
 		
-		int now_s_based = (int) (now_s - baseTimeOffset_s);
-		minTime_s_based = maxTime_s_based = now_s_based;
-		rowAnchorTime_s_based = now_s_based - 3600/2; // now - 1/2 h
+		int focusTime_s_based = (int) (focusTime_s - baseTimeOffset_s);
+		minTime_s_based = maxTime_s_based = focusTime_s_based;
+		rowAnchorTime_s_based = focusTime_s_based - 3600/2; // now - 1/2 h
+		rowAnchorTime_s_based_suggested = rowAnchorTime_s_based;
 		timeScale = 4*3600f/800f; // 4h ~ 800px
 		updateTimeScaleTicks();
 					
@@ -104,6 +106,17 @@ class EPGView extends Canvas {
 		toolTip = new ToolTip() { @Override protected void repaintView() { repaint(); } };
 		
 		setBorder(BorderFactory.createLineBorder(Color.GRAY));
+	}
+
+	public void clearSuggestedFocus()
+	{
+		rowAnchorTime_s_based_suggested = null;
+	}
+
+	public void suggestFocus(long focusTime_s)
+	{
+		int focusTime_s_based = (int) (focusTime_s - baseTimeOffset_s);
+		rowAnchorTime_s_based_suggested = focusTime_s_based - 3600/2; // now - 1/2 h
 	}
 
 	public void showStatus(PrintStream out)
@@ -149,10 +162,12 @@ class EPGView extends Canvas {
 	public void setRowAnchorTime_s(int rowAnchorTime_s) { this.rowAnchorTime_s_based = rowAnchorTime_s; updateTimeScaleTicks(); repaint(); }
 	public int  getRowAnchorTime_s() { return rowAnchorTime_s_based; }
 
+	public Integer getRowAnchorTime_s_based_suggested() { return rowAnchorTime_s_based_suggested; }
 	public int getRowViewWidth_s() { return Math.max(0, Math.round( (width-STATIONWIDTH)*timeScale )); }
+
 	public int getMinTime_s() { return minTime_s_based; }
 	public int getMaxTime_s() { return maxTime_s_based; }
-
+	
 	private String getTimeScaleDateStr(Graphics2D g2, long time_ms, float maxWidth) {
 		String[] formatStrs = new String[] {
 				"%1$tR %1$tA, %1$td.%1$tm.%1$ty",

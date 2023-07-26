@@ -59,20 +59,16 @@ abstract class LoadEPGThread {
 		return button;
 	}
 
-	private void loadEPG(long focusTime_ms) {
-		
+	private void loadEPG(long focusTime_ms)
+	{
 		synchronized (this) {
 			isRunning = true;
 			button.setText("Cancel EPG Loading");
 			button.setEnabled(true);
 		}
 		
-		//long focusTime_ms = System.currentTimeMillis();
-		//System.out.printf("LoadEPGThread.loadEPG( %s )%n", OpenWebifController.dateTimeFormatter.getTimeStr(focusTime_ms, true, true, false, true, true));
-		
 		if (stations!=null) scanEPGbyStations  (focusTime_ms);
 		if (bouquet !=null) scanEPGbyTimeBlocks(focusTime_ms);
-		
 		
 		synchronized (this) {
 			isRunning = false;
@@ -95,10 +91,11 @@ abstract class LoadEPGThread {
 			long endTime_Minutes  = blockSize_mins;
 			
 			boolean isInterrupted = Thread.currentThread().isInterrupted();
-			System.out.printf("EPG for Bouquet \"%s\" (%5d min - %5d min) [%s] %s%n",
+			System.out.printf("EPG for Bouquet \"%s\" (%5d min - %5d min) [%s - %s] %s%n",
 					bouquet.name,
 					blockStart_mins, blockEnd_mins,
 					OpenWebifController.dateTimeFormatter.getTimeStr(beginTime_UnixTS*1000, true, true, false, true, false),
+					OpenWebifController.dateTimeFormatter.getTimeStr((beginTime_UnixTS+endTime_Minutes*60)*1000, false, false, false, true, false),
 					isInterrupted ? " -> omitted" : ""
 			);
 			if (isInterrupted) continue;

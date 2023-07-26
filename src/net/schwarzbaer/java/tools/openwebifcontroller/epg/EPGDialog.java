@@ -119,6 +119,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 	private int rangeTime_s;
 	private final TimeInputDialog epgTimeDialog;
 	private ZonedDateTime epgFocusTime;
+	private boolean saveSuggestedEPGViewFocus;
 
 	public static void showDialog(
 			Window parent, String baseURL, EPG epg, Bouquet bouquet,
@@ -177,7 +178,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			@Override public void updateEPGView            () { EPGDialog.this.updateEPGView(); }
 			@Override public void reconfigureHorizScrollBar() { EPGDialog.this.reconfigureEPGViewHorizScrollBar(); }
 		};
-		epgView = new EPGView(this.stations, System.currentTimeMillis()/1000);
+		epgView = new EPGView(this.stations, getEpgFocusTime_ms()/1000);
 		epgViewRepainter = new OpenWebifController.Updater(20, epgView::repaint);
 		timersWereUpdated(timerData, false);
 		
@@ -208,7 +209,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 						String message = "Lead Time was raised.\r\nDo you want to restart EPG loading thread?";
 						int result = JOptionPane.showConfirmDialog(this, message, dlgTitle, JOptionPane.YES_NO_CANCEL_OPTION);
 						if (result==JOptionPane.YES_OPTION)
-							loadEPGThread.start(epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000);
+							loadEPGThread.start(getEpgFocusTime_ms());
 						else {
 							updateEPGView();
 							reconfigureEPGViewHorizScrollBar();
@@ -251,10 +252,16 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		epgViewHorizScrollBar = new JScrollBar(JScrollBar.HORIZONTAL);
 		epgViewVertScrollBar  = new JScrollBar(JScrollBar.VERTICAL);
 		
-		epgViewVertScrollBar.addAdjustmentListener(e -> epgView.setRowOffsetY_px(e.getValue()));
+		epgViewVertScrollBar.addAdjustmentListener(e -> {
+			epgView.setRowOffsetY_px(e.getValue());
+		});
 		//epgViewVertScrollBar.setValues(epgView.getRowOffsetY(), epgView.getRowViewHeight(), 0, epgView.getContentHeight());
 		
-		epgViewHorizScrollBar.addAdjustmentListener(e -> epgView.setRowAnchorTime_s(e.getValue()));
+		saveSuggestedEPGViewFocus = false;
+		epgViewHorizScrollBar.addAdjustmentListener(e -> {
+			if (!saveSuggestedEPGViewFocus) epgView.clearSuggestedFocus();
+			epgView.setRowAnchorTime_s(e.getValue());
+		});
 		//epgViewHorizScrollBar.setValues(epgView.getRowOffsetY(), epgView.getRowViewHeight(), 0, epgView.getContentHeight());
 		
 		StationContextMenu stationContextMenu = externCommands==null ? null : new StationContextMenu(externCommands, baseURL);
@@ -297,8 +304,10 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			{
 				loadEPGThread.stop();
 				epgFocusTime = newValue;
+				long epgFocusTime_ms = getEpgFocusTime_ms();
+				epgView.suggestFocus(epgFocusTime_ms/1000);
 				loadEPGThread.execWhenEnded(()->{
-					loadEPGThread.start(epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000);
+					loadEPGThread.start(epgFocusTime_ms);
 				});
 			}
 		}),c);
@@ -339,13 +348,18 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			}
 		});
 		
-		if (this.epg.isEmpty()) loadEPGThread.start(epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000);
+		if (this.epg.isEmpty()) loadEPGThread.start(getEpgFocusTime_ms());
 		else updateEPGView();
 		reconfigureEPGViewVertScrollBar();
 		reconfigureEPGViewHorizScrollBar();
 		epgViewRepainter.start();
 		
 		setCurrentStation(currentStation);
+	}
+
+	private long getEpgFocusTime_ms()
+	{
+		return epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000;
 	}
 
 	private static String getTitle(Bouquet bouquet) {
@@ -358,18 +372,22 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		int visible = epgView.getRowViewHeight_px();
 		int minimum = 0;
 		int maximum = epgView.getContentHeight_px();
-		reconfigureScrollBar(epgViewVertScrollBar, epgView::setRowOffsetY_px, value, visible, minimum, maximum);
+		reconfigureScrollBar(epgViewVertScrollBar, epgView::setRowOffsetY_px, value, null, visible, minimum, maximum);
 	}
 
 	private void reconfigureEPGViewHorizScrollBar() {
+		Integer suggestedValue = epgView.getRowAnchorTime_s_based_suggested();
 		int value   = epgView.getRowAnchorTime_s();
 		int visible = epgView.getRowViewWidth_s();
 		int minimum = epgView.getMinTime_s();
 		int maximum = epgView.getMaxTime_s();
-		reconfigureScrollBar(epgViewHorizScrollBar, epgView::setRowAnchorTime_s, value, visible, minimum, maximum);
+		saveSuggestedEPGViewFocus = true;
+		reconfigureScrollBar(epgViewHorizScrollBar, epgView::setRowAnchorTime_s, value, suggestedValue, visible, minimum, maximum);
+		saveSuggestedEPGViewFocus = false;
 	}
 
-	private void reconfigureScrollBar(JScrollBar scrollBar, Consumer<Integer> setValue, int value, int visible, int minimum, int maximum) {
+	private void reconfigureScrollBar(JScrollBar scrollBar, Consumer<Integer> setValue, int currentValue, Integer suggestedValue, int visible, int minimum, int maximum) {
+		int value = suggestedValue!=null ? suggestedValue : currentValue;
 		if (value+visible>maximum) {
 			value = maximum-visible;
 			if (value<minimum) {
@@ -378,7 +396,6 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 				scrollBar.setEnabled(false);
 			} else
 				scrollBar.setEnabled(true);
-			setValue.accept(value);
 			
 		} else if (value<minimum) {
 			value = minimum;
@@ -387,10 +404,12 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 				scrollBar.setEnabled(false);
 			} else
 				scrollBar.setEnabled(true);
-			setValue.accept(value);
 			
 		} else
 			scrollBar.setEnabled(true);
+		
+		if (value != currentValue)
+			setValue.accept(value);
 		
 		scrollBar.setValues(value, visible, minimum, maximum);
 		scrollBar.setUnitIncrement (visible/4);
@@ -427,8 +446,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 	}
 
 	private void updateEPGView() {
-		long epgFocusTime_ms = epgFocusTime.getLong(ChronoField.INSTANT_SECONDS)*1000;
-		//long now_ms = System.currentTimeMillis();
+		long epgFocusTime_ms = getEpgFocusTime_ms();
 		long beginTime_UnixTS = epgFocusTime_ms/1000 - leadTime_s;
 		Long endTime_UnixTS   = rangeTime_s<0 ? null : (beginTime_UnixTS + rangeTime_s);
 		for (SubService station:stations) {

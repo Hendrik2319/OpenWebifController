@@ -46,7 +46,7 @@ class TimersDialog extends JDialog {
 	private final JScrollPane tableScrollPane;
 	private final TimersTableRowSorter tableRowSorter;
 	private final TimerStateGuesser timerStateGuesser;
-	private TimersDialog.TimersTableModel tableModel;
+	private TimersTableModel tableModel;
 	private ExtendedTextArea textArea;
 	private TimersUpdater updateData;
 
@@ -153,7 +153,7 @@ class TimersDialog extends JDialog {
 				if (clickedTimer==null) return;
 				OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this, logWindow, response -> {
 					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
-					tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.state);
+					tableModel.fireTableCellUpdate(clickedTimer, TimersTableModel.ColumnID.state);
 				});
 			}));
 			
@@ -161,7 +161,7 @@ class TimersDialog extends JDialog {
 				if (clickedTimer==null) return;
 				OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this, logWindow, response -> {
 					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
-					tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.state);
+					tableModel.fireTableCellUpdate(clickedTimer, TimersTableModel.ColumnID.state);
 				});
 			}));
 			
@@ -194,9 +194,9 @@ class TimersDialog extends JDialog {
 	private static class TimersTableRenderer implements TableCellRenderer {
 		
 		private final Tables.LabelRendererComponent rendererComp;
-		private final TimersDialog.TimersTableModel tableModel;
+		private final TimersTableModel tableModel;
 	
-		TimersTableRenderer(TimersDialog.TimersTableModel tableModel) {
+		TimersTableRenderer(TimersTableModel tableModel) {
 			this.tableModel = tableModel;
 			rendererComp = new Tables.LabelRendererComponent();
 		}
@@ -242,8 +242,7 @@ class TimersDialog extends JDialog {
 			state      ("State"       , TimerStateGuesser.ExtTimerState.class, 70, CENTER, (model, timer) -> model.timerStateGuesser.getState(timer)),
 			servicename("Station"     , String     .class, 110, null  , timer -> timer.servicename),
 			name       ("Name"        , String     .class, 220, null  , timer -> timer.name       ),
-			_date_     ("Date (Begin)", Long       .class, 115, RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false, false, false)),
-			begin      ("Begin"       , Long       .class,  55, RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
+			begin_date ("Begin"       , Long       .class, 170, RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false,  true, false)),
 			end        ("End"         , Long       .class,  55, RIGHT , timer -> timer.end     , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
 			duration   ("Duration"    , Long       .class,  60, RIGHT , timer -> timer.duration, val -> DateTimeFormatter.getDurationStr(val)),
 			;
@@ -298,9 +297,16 @@ class TimersDialog extends JDialog {
 			this.timerStateGuesser = timerStateGuesser;
 		}
 		
+		void fireTableCellUpdate(Timer row, ColumnID columnID)
+		{	
+			int rowIndex = getRowIndex(row);
+			if (rowIndex>=0)
+				fireTableCellUpdate(rowIndex, columnID);
+		}
+		
 		@Override public void setDefaultCellEditorsAndRenderers()
 		{
-			TimersDialog.TimersTableRenderer renderer = new TimersTableRenderer(this);
+			TimersTableRenderer renderer = new TimersTableRenderer(this);
 			setDefaultRenderers(cls -> renderer);
 		}
 		

@@ -123,7 +123,8 @@ public class TimersPanel extends JSplitPane {
 				if (clickedTimer==null) return;
 				main.toggleTimer(clickedTimer, response -> {
 					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
-					table.repaint();
+					tableModel.fireTableRowUpdate(clickedTimer);
+					//table.repaint();
 				});
 			}));
 			
@@ -131,7 +132,8 @@ public class TimersPanel extends JSplitPane {
 				if (clickedTimer==null) return;
 				main.deleteTimer(clickedTimer, response -> {
 					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
-					table.repaint();
+					tableModel.fireTableRowUpdate(clickedTimer);
+					//table.repaint();
 				});
 			}));
 			
@@ -390,7 +392,7 @@ public class TimersPanel extends JSplitPane {
 				case Finished   : return COLOR_State_Finished;
 				case Deactivated: return COLOR_State_Deactivated;
 				case Unknown    : return COLOR_Unknown;
-				case Deleted    : return COLOR_Unknown; // TODO
+				case Deleted    : return COLOR_Unknown;
 			}
 			return null;
 		}
@@ -433,12 +435,11 @@ public class TimersPanel extends JSplitPane {
 	
 	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
 	{
-		// [90, 70, 120, 60, 60, 60, 220, 110, 180, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
+		// [90, 70, 170, 60, 60, 220, 110, 180, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants {
 			type               ("Type"                 , Timer.Type .class,  90, CENTER, t->t.type               ),
 			state_             ("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER, (m,t)->m.timerStateGuesser.getState(t)),
-			begin_date         ("Date (Begin)"         , Long       .class, 120, null  , t->t.begin              , t->formatDate(t*1000,  true,  true, false, false, false)),
-			begin              ("Begin"                , Long       .class,  60, null  , t->t.begin              , t->formatDate(t*1000, false, false, false,  true, false)),
+			begin_date         ("Begin"                , Long       .class, 170, null  , t->t.begin              , t->formatDate(t*1000,  true,  true, false,  true, false)),
 			end                ("End"                  , Long       .class,  60, null  , t->t.end                , t->formatDate(t*1000, false, false, false,  true, false)),
 			duration           ("Duration"             , Long       .class,  60, null  , t->t.duration           , DateTimeFormatter::getDurationStr),
 			name               ("Name"                 , String     .class, 220, null  , t->t.name               ),
@@ -511,7 +512,14 @@ public class TimersPanel extends JSplitPane {
 			super(ColumnID.values(), timers);
 			this.timerStateGuesser = timerStateGuesser;
 		}
-
+		
+		void fireTableRowUpdate(Timer row)
+		{
+			int rowIndex = getRowIndex(row);
+			if (rowIndex>=0)
+				fireTableRowUpdate(rowIndex);
+		}
+		
 		public void setAllDefaultRenderers() {
 			TimersTableCellRenderer renderer = new TimersTableCellRenderer(this);
 			setDefaultRenderers(cls -> renderer);

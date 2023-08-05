@@ -8,6 +8,7 @@ import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.EPG;
+import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
@@ -100,12 +101,13 @@ abstract class LoadEPGThread {
 			);
 			if (isInterrupted) continue;
 			
-			/* int count = */epg.readEPGforBouquet(baseURL, bouquet, beginTime_UnixTS, endTime_Minutes, taskTitle->{
+			Vector<EPGevent> events = epg.readEPGforBouquet(baseURL, bouquet, beginTime_UnixTS, endTime_Minutes, taskTitle->{
 				SwingUtilities.invokeLater(()->{
 					setStatusOutput(String.format("EPG for Bouquet \"%s\" (%d min - %d min): %s", bouquet.name, blockStart_mins, blockEnd_mins, taskTitle));
 				});
 			});
-			//System.out.printf("%d events found%n", count);
+			//System.out.printf("%d events found%n", events.size());
+			EPGEventGenres.getInstance().scanGenres(events).writeToFile();
 			updateEPGView();
 			SwingUtilities.invokeLater(this::reconfigureHorizScrollBar);
 		}
@@ -123,11 +125,12 @@ abstract class LoadEPGThread {
 				System.out.printf("EPG for Station \"%s\"%s%n", subservice.name, isInterrupted ? " -> omitted" : "");
 				if (isInterrupted) continue;
 				long beginTime_UnixTS = focusTime_ms/1000 - leadTime_s;
-				epg.readEPGforService(baseURL, subservice.service.stationID, beginTime_UnixTS, null, taskTitle->{
+				Vector<EPGevent> events = epg.readEPGforService(baseURL, subservice.service.stationID, beginTime_UnixTS, null, taskTitle->{
 					SwingUtilities.invokeLater(()->{
 						setStatusOutput(String.format("EPG for Station \"%s\": %s", subservice.name, taskTitle));
 					});
 				});
+				EPGEventGenres.getInstance().scanGenres(events).writeToFile();
 				updateEPGView();
 				SwingUtilities.invokeLater(this::reconfigureHorizScrollBar);
 			}

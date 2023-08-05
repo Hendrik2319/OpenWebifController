@@ -1,0 +1,135 @@
+Genre: 0
+Name = 
+
+Genre: 16
+Name = Film/Drama: Film/Drama (allgemein)
+
+Genre: 17
+Name = Film/Drama: Krimi/Thriller
+
+Genre: 18
+Name = Film/Drama: Abenteuer/Western/Krieg
+
+Genre: 20
+Name = Film/Drama: Comedy
+
+Genre: 21
+Name = Film/Drama: Soap/Melodram/Folklore
+
+Genre: 32
+Name = Nachrichten/Aktuelles: Nachrichten (allgemein)
+
+Genre: 33
+Name = Nachrichten/Aktuelles: Nachrichten/Wetterbericht
+
+Genre: 34
+Name = Nachrichten/Aktuelles: Nachrichtenmagazin
+
+Genre: 35
+Name = Nachrichten/Aktuelles: Dokumentation
+
+Genre: 36
+Name = Nachrichten/Aktuelles: Diskussion/Interview/Debatte
+
+Genre: 48
+Name = Show/Spielshow: Show/Spielshow (allgemein)
+
+Genre: 51
+Name = Show/Spielshow: Talkshow
+
+Genre: 64
+Name = Sport: Sport (allgemein)
+
+Genre: 67
+Name = Sport: Fußball
+
+Genre: 71
+Name = Sport: Motorsport
+
+Genre: 72
+Name = Sport: Wassersport
+
+Genre: 80
+Name = Kinder/Jugend: Kinder/Jugendprogramm (allgemein)
+
+Genre: 82
+Name = Kinder/Jugend: Unterhaltung (6-14 Jahre)
+
+Genre: 85
+Name = Kinder/Jugend: Zeichentrick/Puppen
+
+Genre: 96
+Name = Musik/Ballett/Tanz: Musik/Ballett/Tanz (allgemein)
+
+Genre: 97
+Name = Musik/Ballett/Tanz: Rock/Pop
+
+Genre: 98
+Name = Musik/Ballett/Tanz: Ernsthafte Musik/klassische Musik
+
+Genre: 99
+Name = Musik/Ballett/Tanz: Volksmusik/traditionelle Musik
+
+Genre: 100
+Name = Musik/Ballett/Tanz: Jazz
+
+Genre: 112
+Name = Kunst/Kultur: Kunst/Kultur (ohne Musik, allgemein)
+
+Genre: 115
+Name = Kunst/Kultur: Religion
+
+Genre: 116
+Name = Kunst/Kultur: Beliebte Kultur/Traditionelle Kunst
+
+Genre: 117
+Name = Kunst/Kultur: Literatur
+
+Genre: 118
+Name = Kunst/Kultur: Kino/Film
+
+Genre: 122
+Name = Kunst/Kultur: Kunst-/Kulturmagazin
+
+Genre: 128
+Name = Sozial/Politik/Wirtschaft: Sozial/Politik/Wirtschaft (allgemein)
+
+Genre: 129
+Name = Sozial/Politik/Wirtschaft: Magazine/Berichte/Dokumentationen
+
+Genre: 130
+Name = Sozial/Politik/Wirtschaft: Wirtschaft/Soziales
+
+Genre: 144
+Name = Bildung/Wissenschaft/Sachverhalt: Bildung/Wissenschaft/Sachthemen (allgemein)
+
+Genre: 145
+Name = Bildung/Wissenschaft/Sachverhalt: Natur/Tiere/Umwelt
+
+Genre: 160
+Name = Freizeit Hobbys: Freizeithobbys (allgemein)
+
+Genre: 161
+Name = Freizeit Hobbys: Tourismus/Reise
+
+Genre: 162
+Name = Freizeit Hobbys: Handwerk
+
+Genre: 164
+Name = Freizeit Hobbys: Fitness & Gesundheit
+
+Genre: 165
+Name = Freizeit Hobbys: Kochen
+
+Genre: 166
+Name = Freizeit Hobbys: Werbung/Verkauf
+
+Genre: 178
+Name = Andere: unveröffentlicht
+
+Genre: 179
+Name = Andere: Live-Übertragung
+
+Genre: 181
+Name = Andere:
+

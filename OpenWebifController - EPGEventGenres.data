@@ -10,11 +10,17 @@ Name = Film/Drama: Krimi/Thriller
 Genre: 18
 Name = Film/Drama: Abenteuer/Western/Krieg
 
+Genre: 19
+Name = Film/Drama: Science Fiction/Fantasie/Horror
+
 Genre: 20
 Name = Film/Drama: Comedy
 
 Genre: 21
 Name = Film/Drama: Soap/Melodram/Folklore
+
+Genre: 23
+Name = Film/Drama: Ernsthafter/klassischer/religiöser/historischer Film/Drama
 
 Genre: 32
 Name = Nachrichten/Aktuelles: Nachrichten (allgemein)
@@ -40,8 +46,14 @@ Name = Show/Spielshow: Talkshow
 Genre: 64
 Name = Sport: Sport (allgemein)
 
+Genre: 66
+Name = Sport: Sport-Magazin
+
 Genre: 67
 Name = Sport: Fußball
+
+Genre: 70
+Name = Sport: Leichtathletik
 
 Genre: 71
 Name = Sport: Motorsport
@@ -54,6 +66,9 @@ Name = Kinder/Jugend: Kinder/Jugendprogramm (allgemein)
 
 Genre: 82
 Name = Kinder/Jugend: Unterhaltung (6-14 Jahre)
+
+Genre: 84
+Name = Kinder/Jugend: Information/Bildung/Schulprogramm
 
 Genre: 85
 Name = Kinder/Jugend: Zeichentrick/Puppen
@@ -88,6 +103,9 @@ Name = Kunst/Kultur: Literatur
 Genre: 118
 Name = Kunst/Kultur: Kino/Film
 
+Genre: 121
+Name = Kunst/Kultur: Neue Medien
+
 Genre: 122
 Name = Kunst/Kultur: Kunst-/Kulturmagazin
 
@@ -106,6 +124,9 @@ Name = Bildung/Wissenschaft/Sachverhalt: Bildung/Wissenschaft/Sachthemen (allgem
 Genre: 145
 Name = Bildung/Wissenschaft/Sachverhalt: Natur/Tiere/Umwelt
 
+Genre: 146
+Name = Bildung/Wissenschaft/Sachverhalt: Technik/Naturwissenschaft
+
 Genre: 160
 Name = Freizeit Hobbys: Freizeithobbys (allgemein)
 
@@ -123,6 +144,9 @@ Name = Freizeit Hobbys: Kochen
 
 Genre: 166
 Name = Freizeit Hobbys: Werbung/Verkauf
+
+Genre: 175
+Name = Freizeit Hobbys: Benutzerdefiniert
 
 Genre: 178
 Name = Andere: unveröffentlicht

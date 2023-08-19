@@ -46,14 +46,13 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
+import net.schwarzbaer.java.lib.gui.LookAndFeelSwitch;
 import net.schwarzbaer.java.lib.gui.MultiStepProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
@@ -180,10 +179,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			
 		}
 		
-		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
-		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
+//		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
+//		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
+		LookAndFeelSwitch<AppSettings.ValueKey> lookAndFeelSwitch = new LookAndFeelSwitch<>(settings, AppSettings.ValueKey.LookAndFeel);
+		lookAndFeelSwitch.setInitialLookAndFeel();
 		
-		new OpenWebifController()
+		new OpenWebifController(lookAndFeelSwitch)
 			.initialize();
 	}
 	
@@ -199,6 +200,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			SplitPaneDivider_MoviesPanel,
 			SplitPaneDivider_BouquetsNStations_CenterPanel,
 			SplitPaneDivider_BouquetsNStations_ValuePanel,
+			LookAndFeel,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {
@@ -287,7 +289,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	private final RemoteControlPanel remoteControl;
 	private final LogWindow logWindow;
 
-	OpenWebifController() {
+	OpenWebifController(LookAndFeelSwitch<AppSettings.ValueKey> lookAndFeelSwitch) {
 		systemInfo = null;
 		boxSettings = null;
 		
@@ -354,6 +356,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		extrasMenu.add(createMenuItem("Remote Control Tool", e->{
 			new RemoteControlTool(true);
 		}));
+		
+		lookAndFeelSwitch.setUITreeRoot(mainWindow);
+		extrasMenu.add(lookAndFeelSwitch.createMenu("Look & Feel"));
 		
 		JMenu logsMenu = menuBar.add(createMenu("Logs"));
 		logsMenu.add(createMenuItem("Show Response Log", e->{

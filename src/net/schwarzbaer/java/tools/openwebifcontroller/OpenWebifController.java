@@ -65,6 +65,7 @@ import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.OptionalValue;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
@@ -708,29 +709,33 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		out.add(level, "service Reference" , stationInfo.serviceRef  ); // String    serviceRef  ;
 		if (stationInfo.stationID!=null)
 			out.add(level, "StationID", " %s", stationInfo.stationID.toIDStr()); // StationID stationID   ;
-		out.add(level, "Provider"          , stationInfo.provider    ); // String    provider    ;
-		if (stationInfo.width !=null)    out.add(level, "Width"     , stationInfo.width    ); // long      width       ;
-		else                             out.add(level, "Width"     , stationInfo.widthStr ); // String    widthStr    ;
-		if (stationInfo.height!=null)    out.add(level, "Height"    , stationInfo.height   ); // long      height      ;
-		else                             out.add(level, "Height"    , stationInfo.heightStr); // String    heightStr   ;
-		if (stationInfo.aspect!=null)    out.add(level, "\"Aspect\"", stationInfo.aspect   ); // long      aspect      ;
-		else                             out.add(level, "\"Aspect\"", stationInfo.aspectStr); // String    aspectStr   ;
-		                                 out.add(level, "Is WideScreen"          , stationInfo.isWideScreen              ); // boolean   isWideScreen;
-		                                 out.add(level, "[onid]"     , "0x%X, %d", stationInfo.onid, stationInfo.onid    ); // long      onid        ;
-		if (stationInfo.txtpid!=null)    out.add(level, "[txtpid]"   , "0x%X, %d", stationInfo.txtpid, stationInfo.txtpid); // Long      txtpid      ;
-		else                             out.add(level, "[txtpid]"   ,             stationInfo.txtpidStr                 ); // String    txtpidStr   ;
-		if (stationInfo.pmtpid!=null)    out.add(level, "[pmtpid]"   , "0x%X, %d", stationInfo.pmtpid, stationInfo.pmtpid); // long      pmtpid      ;
-		else                             out.add(level, "[pmtpid]"   ,             stationInfo.pmtpidStr                 ); // String    pmtpidStr   ;
-		                                 out.add(level, "[tsid]"     , "0x%X, %d", stationInfo.tsid  , stationInfo.tsid  ); // long      tsid        ;
-		                                 out.add(level, "[pcrpid]"   , "0x%X, %d", stationInfo.pcrpid, stationInfo.pcrpid); // long      pcrpid      ;
-		                                 out.add(level, "[sid]"      , "0x%X, %d", stationInfo.sid   , stationInfo.sid   ); // long      sid         ;
-		if (stationInfo.namespace!=null) out.add(level, "[namespace]", "0x%X, %d", stationInfo.namespace, stationInfo.namespace); // Long      namespace   ;
-		else                             out.add(level, "[namespace]",             stationInfo.namespaceStr                    ); // String    namespaceStr;
-		                                 out.add(level, "[apid]"     , "0x%X, %d", stationInfo.apid  , stationInfo.apid  ); // long      apid        ;
-		                                 out.add(level, "[vpid]"     , "0x%X, %d", stationInfo.vpid  , stationInfo.vpid  ); // long      vpid        ;
-		out.add(level, "result", stationInfo.result); // boolean   result      ;
+		out.add(     level, "Provider"     ,                 stationInfo.provider); // String    provider    ;
+		addLine(out, level, "Width"        ,                 stationInfo.width);
+		addLine(out, level, "Height"       ,                 stationInfo.height);
+		addLine(out, level, "\"Aspect\""   ,                 stationInfo.aspect);
+		out.add(     level, "Is WideScreen",                 stationInfo.isWideScreen); // boolean   isWideScreen;
+		addLine(out, level, "[onid]"       , "0x%1$X, %1$d", stationInfo.onid  );
+		addLine(out, level, "[txtpid]"     , "0x%1$X, %1$d", stationInfo.txtpid);
+		addLine(out, level, "[pmtpid]"     , "0x%1$X, %1$d", stationInfo.pmtpid);
+		addLine(out, level, "[tsid]"       , "0x%1$X, %1$d", stationInfo.tsid  );
+		addLine(out, level, "[pcrpid]"     , "0x%1$X, %1$d", stationInfo.pcrpid);
+		out.add(     level, "[sid]"        , "0x%X, %d"    , stationInfo.sid   , stationInfo.sid   ); // long      sid         ;
+		addLine(out, level, "[namespace]"  , "0x%1$X, %1$d", stationInfo.namespace);
+		addLine(out, level, "[apid]"       , "0x%1$X, %1$d", stationInfo.apid);
+		addLine(out, level, "[vpid]"       , "0x%1$X, %1$d", stationInfo.vpid);
+		out.add(     level, "result"       ,                 stationInfo.result); // boolean   result      ;
 	}
 
+	private static void addLine(ValueListOutput out, int level, String field, OptionalValue optVal) {
+		addLine(out, level, field, null, optVal);
+	}
+	private static void addLine(ValueListOutput out, int level, String field, String format, OptionalValue optVal)
+	{
+		if (optVal.value() == null) out.add(level, field,         optVal.str());
+		else if (format    != null) out.add(level, field, format, optVal.value());
+		else                        out.add(level, field,         optVal.value());
+	}
+	
 	public static void generateOutput(ValueListOutput out, int level, EPGevent event) {
 		out.add(level, "Station"   , event.station_name);
 		out.add(level, "SRef"      , event.sref);

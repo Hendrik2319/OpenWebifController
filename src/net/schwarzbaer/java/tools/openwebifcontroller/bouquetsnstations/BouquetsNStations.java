@@ -490,7 +490,10 @@ public class BouquetsNStations extends JPanel {
 	
 	private static String toString(CurrentStation currentStationData) {
 		ValueListOutput out = new ValueListOutput();
-		OpenWebifController.generateOutput(out, 0, currentStationData);
+		if (currentStationData==null)
+			out.add(0, "No Current Station Data");
+		else
+			OpenWebifController.generateOutput(out, 0, currentStationData);
 		return out.generateOutput();
 	}
 	

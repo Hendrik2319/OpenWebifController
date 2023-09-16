@@ -19,6 +19,9 @@ Name = Film/Drama: Comedy
 Genre: 21
 Name = Film/Drama: Soap/Melodram/Folklore
 
+Genre: 22
+Name = Film/Drama: Romanze
+
 Genre: 23
 Name = Film/Drama: Ernsthafter/klassischer/religiöser/historischer Film/Drama
 
@@ -39,6 +42,9 @@ Name = Nachrichten/Aktuelles: Diskussion/Interview/Debatte
 
 Genre: 48
 Name = Show/Spielshow: Show/Spielshow (allgemein)
+
+Genre: 49
+Name = Show/Spielshow: Spielshow/Quiz/Wettbewerb
 
 Genre: 51
 Name = Show/Spielshow: Talkshow
@@ -66,6 +72,9 @@ Name = Kinder/Jugend: Kinder/Jugendprogramm (allgemein)
 
 Genre: 82
 Name = Kinder/Jugend: Unterhaltung (6-14 Jahre)
+
+Genre: 83
+Name = Kinder/Jugend: Unterhaltung (10-16 Jahre)
 
 Genre: 84
 Name = Kinder/Jugend: Information/Bildung/Schulprogramm
@@ -144,6 +153,9 @@ Name = Freizeit Hobbys: Kochen
 
 Genre: 166
 Name = Freizeit Hobbys: Werbung/Verkauf
+
+Genre: 167
+Name = Freizeit Hobbys: Gartenarbeit
 
 Genre: 175
 Name = Freizeit Hobbys: Benutzerdefiniert

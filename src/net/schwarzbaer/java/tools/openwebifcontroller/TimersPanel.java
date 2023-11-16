@@ -441,7 +441,7 @@ public class TimersPanel extends JSplitPane {
 			state_             ("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER, (m,t)->m.timerStateGuesser.getState(t)),
 			begin_date         ("Begin"                , Long       .class, 170, null  , t->t.begin              , t->formatDate(t*1000,  true,  true, false,  true, false)),
 			end                ("End"                  , Long       .class,  60, null  , t->t.end                , t->formatDate(t*1000, false, false, false,  true, false)),
-			duration           ("Duration"             , Long       .class,  60, null  , t->t.duration           , DateTimeFormatter::getDurationStr),
+			duration           ("Duration"             , Double     .class,  60, null  , t->t.duration           , DateTimeFormatter::getDurationStr),
 			name               ("Name"                 , String     .class, 220, null  , t->t.name               ),
 			servicename        ("Station"              , String     .class, 110, null  , t->t.servicename        ),
 			serviceref         ("Service Reference"    , String     .class, 180, null  , t->t.serviceref         ),

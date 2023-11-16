@@ -244,7 +244,7 @@ class TimersDialog extends JDialog {
 			name       ("Name"        , String     .class, 220, null  , timer -> timer.name       ),
 			begin_date ("Begin"       , Long       .class, 170, RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false,  true, false)),
 			end        ("End"         , Long       .class,  55, RIGHT , timer -> timer.end     , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
-			duration   ("Duration"    , Long       .class,  60, RIGHT , timer -> timer.duration, val -> DateTimeFormatter.getDurationStr(val)),
+			duration   ("Duration"    , Double     .class,  60, RIGHT , timer -> timer.duration, val -> DateTimeFormatter.getDurationStr(val)),
 			;
 			private final SimplifiedColumnConfig cfg;
 			private final Function<Timer, ?> getValue;

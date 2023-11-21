@@ -33,7 +33,7 @@ public class PowerControl extends AbstractControlPanel<Power.Values> {
 		c.fill = GridBagConstraints.BOTH;
 		
 		if (this.isSmall && isStretchable) c.weightx = 1;
-		add(btnPower = OpenWebifController.createButton(isSmall ? null : "Toggle StandBy", GrayCommandIcons.IconGroup.Power_IsOn, true, e->{
+		add2Panel(btnPower = OpenWebifController.createButton(isSmall ? null : "Toggle StandBy", GrayCommandIcons.IconGroup.Power_IsOn, true, e->{
 			callCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->{
 				Power.Values state = Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle);
 				for (UpdateTask ut : updateTasks) ut.update(baseURL);
@@ -46,7 +46,7 @@ public class PowerControl extends AbstractControlPanel<Power.Values> {
 			if (isStretchable) c.weightx = 1;
 			Vector<Power.Commands> items = new Vector<>(Arrays.asList(Power.Commands.values()));
 			items.remove(Power.Commands.ToggleStandBy);
-			add(cmbbxSetOtherState = OpenWebifController.createComboBox(items, Power.Commands.Wakeup, cmd->{
+			add2Panel(cmbbxSetOtherState = OpenWebifController.createComboBox(items, Power.Commands.Wakeup, cmd->{
 				callCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->{
 					Power.Values state = Power.setState(baseURL, cmd, setTaskTitle);
 					for (UpdateTask ut : updateTasks) ut.update(baseURL);
@@ -55,7 +55,7 @@ public class PowerControl extends AbstractControlPanel<Power.Values> {
 			}), c);
 			if (isStretchable) c.weightx = 0;
 			
-			add(btnUpdate = createUpdateButton("Update", GrayCommandIcons.IconGroup.Reload, true), c);
+			add2Panel(btnUpdate = createUpdateButton("Update", GrayCommandIcons.IconGroup.Reload, true), c);
 		} else {
 			cmbbxSetOtherState = null;
 			btnUpdate = null;

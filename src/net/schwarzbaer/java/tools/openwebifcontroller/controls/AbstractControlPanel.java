@@ -4,10 +4,8 @@ import java.awt.LayoutManager;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
-import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JButton;
-import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.java.lib.gui.GeneralIcons;
@@ -15,7 +13,7 @@ import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
-public abstract class AbstractControlPanel<ValueStructType> extends JPanel {
+public abstract class AbstractControlPanel<ValueStructType> extends SwitchablePanel {
 	private static final long serialVersionUID = 1376060978837360833L;
 	
 	public interface ExternCommands {
@@ -28,19 +26,17 @@ public abstract class AbstractControlPanel<ValueStructType> extends JPanel {
 	private final BiFunction<String, Consumer<String>, ValueStructType> updateCommand;
 
 	protected AbstractControlPanel(LayoutManager layout, ExternCommands externCommands, String controlLabel, String borderTitle, BiFunction<String, Consumer<String>, ValueStructType> updateCommand) {
-		super(layout);
-		if (borderTitle!=null)
-			setBorder(BorderFactory.createTitledBorder(borderTitle));
+		super(layout, borderTitle);
 		this.externCommands = externCommands;
 		this.controlLabel = controlLabel;
 		this.updateCommand = updateCommand;
 	}
-	
+
 	public void initialize(String baseURL, ProgressView pd) {
 		if (updateCommand!=null)
 			callCommand(baseURL, pd, "Init"+controlLabel, updateCommand);
 	}
-	
+
 	protected JButton createUpdateButton(String title, boolean withDelayedUpdate) {
 		return createUpdateButton(title, null, null, withDelayedUpdate);
 	}

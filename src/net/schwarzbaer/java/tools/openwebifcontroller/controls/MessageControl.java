@@ -58,12 +58,12 @@ public class MessageControl extends AbstractControlPanel<OpenWebifTools.MessageR
 		c.weighty = 1;
 		c.fill = GridBagConstraints.BOTH;
 		
-		add(btnSend, c);
-		add(txtfldMessage, c);
-		add(cmbbxMessageType, c);
-		add(chkbxTimeOut, c);
-		add(txtfldTimeOut, c);
-		add(btnGetAnswer, c);
+		add2Panel(btnSend, c);
+		add2Panel(txtfldMessage, c);
+		add2Panel(cmbbxMessageType, c);
+		add2Panel(chkbxTimeOut, c);
+		add2Panel(txtfldTimeOut, c);
+		add2Panel(btnGetAnswer, c);
 	}
 
 	@Override protected void updatePanel(OpenWebifTools.MessageResponse values) {

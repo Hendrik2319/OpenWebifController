@@ -39,23 +39,23 @@ public class VolumeControl extends AbstractControlPanel<Volume.Values> {
 		
 		txtVolume = new JTextField("mute",8);
 		if (!this.isSmall) {
-			add(txtVolume, c);
+			add2Panel(txtVolume, c);
 			if (isStretchable) c.weightx = 1;
-			add(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c);
+			add2Panel(sldrVolume = new JSlider(JSlider.HORIZONTAL,0,100,75), c);
 			if (isStretchable) c.weightx = 0;
 		} else {
 			sldrVolume = null;
 		}
 		
 		if (this.isSmall && isStretchable) c.weightx = 1;
-		add(btnVolDown = OpenWebifController.createButton("-", true, e->setVolDown(null)), c);
-		add(btnVolUp   = OpenWebifController.createButton("+", true, e->setVolUp  (null)), c);
-		add(btnVolMute = OpenWebifController.createButton(isSmall ? null : "Mute", GrayCommandIcons.IconGroup.Muted, true, e->setVolMute(null)), c);
-		if (this.isSmall) add(txtVolume, c);
+		add2Panel(btnVolDown = OpenWebifController.createButton("-", true, e->setVolDown(null)), c);
+		add2Panel(btnVolUp   = OpenWebifController.createButton("+", true, e->setVolUp  (null)), c);
+		add2Panel(btnVolMute = OpenWebifController.createButton(isSmall ? null : "Mute", GrayCommandIcons.IconGroup.Muted, true, e->setVolMute(null)), c);
+		if (this.isSmall) add2Panel(txtVolume, c);
 		if (this.isSmall && isStretchable) c.weightx = 0;
 		
 		if (!this.isSmall)
-			add(btnUpdate = createUpdateButton("Update", GrayCommandIcons.IconGroup.Reload, false), c);
+			add2Panel(btnUpdate = createUpdateButton("Update", GrayCommandIcons.IconGroup.Reload, false), c);
 		else
 			btnUpdate = null;
 		

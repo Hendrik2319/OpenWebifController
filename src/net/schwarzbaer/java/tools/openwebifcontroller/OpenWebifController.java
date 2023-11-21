@@ -77,6 +77,7 @@ import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.Bouquets
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.MessageControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.PowerControl;
+import net.schwarzbaer.java.tools.openwebifcontroller.controls.SwitchablePanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.VolumeControl;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog;
 import net.schwarzbaer.java.tools.openwebifcontroller.stationswitch.StationSwitch;
@@ -374,9 +375,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		//	StationSwitch.start(baseURL,true);
 		//}));
 		
-		JPanel epgControlPanel = new JPanel(new BorderLayout());
-		epgControlPanel.setBorder(BorderFactory.createTitledBorder("EPG"));
-		epgControlPanel.add(createButton("Show EPG", true, e->{
+		SwitchablePanel epgControlPanel = new SwitchablePanel(new BorderLayout(), "EPG");
+		epgControlPanel.add2Panel(createButton("Show EPG", true, e->{
 			if (!timers.hasData() && !bouquetsNStations.hasData())
 			{
 				if (!askUserIfDataShouldBeInitialized(mainWindow, "Timer", "Bouquet")) return;
@@ -398,7 +398,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			if (bouquet==null) return;
 			
 			openEPGDialog(bouquet);
-		}));
+		}), BorderLayout.CENTER);
 		
 		JPanel toolBar = new JPanel(new GridBagLayout());
 		GridBagConstraints c = new GridBagConstraints();

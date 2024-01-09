@@ -113,8 +113,8 @@ public class StationSwitch {
 			}
 			@Override public void streamStation(String baseURL, StationID stationID) { OpenWebifController.streamStation(stationID, baseURL); }
 			@Override public void    addTimer(String baseURL, String sRef, int eventID, Type type) { OpenWebifController.addTimer(baseURL, sRef, eventID, type, mainWindow, logWindow, null); }
-			@Override public void deleteTimer(String baseURL, Timer timer) { OpenWebifController.deleteTimer(baseURL, timer, mainWindow, logWindow, null, null); }
-			@Override public void toggleTimer(String baseURL, Timer timer) { OpenWebifController.toggleTimer(baseURL, timer, mainWindow, logWindow, null, null); }
+			@Override public void deleteTimer(String baseURL, Timer timer) { OpenWebifController.deleteTimer(baseURL, timer, mainWindow, logWindow, null); }
+			@Override public void toggleTimer(String baseURL, Timer timer) { OpenWebifController.toggleTimer(baseURL, timer, mainWindow, logWindow, null); }
 		};
 		
 		AbstractControlPanel.ExternCommands controlPanelCommands = new AbstractControlPanel.ExternCommands() {

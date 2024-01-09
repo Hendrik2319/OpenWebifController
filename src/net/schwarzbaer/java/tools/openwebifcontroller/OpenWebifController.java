@@ -798,65 +798,111 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			}
 		});
 	}
+	
 	@Override
 	public void deleteTimer(String baseURL, Timers.Timer timer)
 	{
-		deleteTimer(baseURL, timer, mainWindow, logWindow, timers::readData, null);
+		deleteTimer_single(baseURL, timer, mainWindow, logWindow, timers::readData, null);
 	}
-	public void deleteTimer(Timers.Timer timer, Consumer<MessageResponse> getResponse)
+	public void deleteTimer(String baseURL, Timers.Timer timer, Consumer<MessageResponse> handleResponse)
 	{
-		deleteTimer(null, timer, mainWindow, logWindow, null, getResponse);
+		deleteTimer_single(baseURL, timer, mainWindow, logWindow, null, handleResponse);
 	}
-	public static void deleteTimer(Timers.Timer timer, Window window, LogWindowInterface lwi, Consumer<MessageResponse> getResponse)
+	public void deleteTimer(String baseURL, Timers.Timer[] timers, BiConsumer<Timers.Timer, MessageResponse> handleResponse)
 	{
-		deleteTimer(null, timer, window, lwi, null, getResponse);
+		deleteTimer_multi_NoUT(baseURL, timers, mainWindow, logWindow, handleResponse);
 	}
-	public static void deleteTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTask, Consumer<MessageResponse> getResponse)
+	
+	public static void deleteTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, Consumer<MessageResponse> handleResponse)
+	{
+		deleteTimer_multi_NoUT(baseURL, new Timers.Timer[] { timer }, window, lwi, handleResponse==null ? null : (t,mr) -> handleResponse.accept(mr));
+	}
+	public static void deleteTimer(String baseURL, Timers.Timer[] timers, Window window, LogWindowInterface lwi, BiConsumer<Timers.Timer, MessageResponse> handleResponse)
+	{
+		deleteTimer_multi_NoUT(baseURL, timers, window, lwi, handleResponse);
+	}
+	
+	private static void deleteTimer_single(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTask, Consumer<MessageResponse> handleResponse)
+	{
+		deleteTimer_local(baseURL, new Timers.Timer[] { timer }, window, lwi, updateTask, handleResponse==null ? null : (t,mr) -> handleResponse.accept(mr));
+	}
+	private static void deleteTimer_multi_NoUT(String baseURL, Timers.Timer[] timers, Window window, LogWindowInterface lwi, BiConsumer<Timers.Timer, MessageResponse> handleResponse)
+	{
+		deleteTimer_local(baseURL, timers, window, lwi, null, handleResponse);
+	}
+	private static void deleteTimer_local(String baseURL, Timers.Timer[] timers, Window window, LogWindowInterface lwi, UpdateTask updateTask, BiConsumer<Timers.Timer, MessageResponse> handleResponse)
 	{
 		runWithProgressDialog(window, "Delete Timer", pd->{
 			String baseURL_ = baseURL;
 			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
 			if (baseURL_==null) return;
-			MessageResponse response = Timers.deleteTimer(baseURL_, timer.serviceref, timer.begin, timer.end, taskTitle->{
-				setIndeterminateProgressTask(pd, taskTitle);
-			});
-			lwi.showMessageResponse(response, "Delete Timer");
+			
+			for (Timers.Timer timer : timers) {
+				MessageResponse response = Timers.deleteTimer(baseURL_, timer.serviceref, timer.begin, timer.end, taskTitle->{
+					setIndeterminateProgressTask(pd, taskTitle);
+				});
+				lwi.showMessageResponse(response, "Delete Timer");
+				if (handleResponse!=null) handleResponse.accept(timer,response);
+			}
+			
 			if (updateTask!=null)
 			{
 				setIndeterminateProgressTask(pd, "Update Data");
 				updateTask.updateTimers(baseURL_,pd);
 			}
-			if (getResponse!=null) getResponse.accept(response);
 		});
 	}
+	
 	@Override
 	public void toggleTimer(String baseURL, Timers.Timer timer) {
-		toggleTimer(baseURL, timer, mainWindow, logWindow, timers::readData, null);
+		toggleTimer_single(baseURL, timer, mainWindow, logWindow, timers::readData, null);
 	}
-	public void toggleTimer(Timers.Timer timer, Consumer<MessageResponse> getResponse)
+	public void toggleTimer(String baseURL, Timers.Timer timer, Consumer<MessageResponse> handleResponse)
 	{
-		toggleTimer(null, timer, mainWindow, logWindow, null, getResponse);
+		toggleTimer_single(baseURL, timer, mainWindow, logWindow, null, handleResponse);
 	}
-	public static void toggleTimer(Timers.Timer timer, Window window, LogWindowInterface lwi, Consumer<MessageResponse> getResponse)
+	public void toggleTimer(String baseURL, Timers.Timer[] timers, BiConsumer<Timers.Timer, MessageResponse> handleResponse)
 	{
-		toggleTimer(null, timer, window, lwi, null, getResponse);
+		toggleTimer_multi_NoUT(baseURL, timers, mainWindow, logWindow, handleResponse);
 	}
-	public static void toggleTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTask, Consumer<MessageResponse> getResponse)
+	
+	public static void toggleTimer(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, Consumer<MessageResponse> handleResponse)
+	{
+		toggleTimer_multi_NoUT(baseURL, new Timers.Timer[] { timer }, window, lwi, handleResponse==null ? null : (t,mr) -> handleResponse.accept(mr));
+	}
+	public static void toggleTimer(String baseURL, Timers.Timer[] timers, Window window, LogWindowInterface lwi, BiConsumer<Timers.Timer, MessageResponse> handleResponse)
+	{
+		toggleTimer_multi_NoUT(baseURL, timers, window, lwi, handleResponse);
+	}
+	
+	private static void toggleTimer_single(String baseURL, Timers.Timer timer, Window window, LogWindowInterface lwi, UpdateTask updateTask, Consumer<MessageResponse> handleResponse)
+	{
+		toggleTimer_local(baseURL, new Timers.Timer[] { timer }, window, lwi, updateTask, handleResponse==null ? null : (t,mr) -> handleResponse.accept(mr));
+	}
+	private static void toggleTimer_multi_NoUT(String baseURL, Timers.Timer[] timers, Window window, LogWindowInterface lwi, BiConsumer<Timers.Timer, MessageResponse> handleResponse)
+	{
+		toggleTimer_local(baseURL, timers, window, lwi, null, handleResponse);
+	}
+	private static void toggleTimer_local(String baseURL, Timers.Timer[] timers, Window window, LogWindowInterface lwi, UpdateTask updateTask, BiConsumer<Timers.Timer, MessageResponse> handleResponse)
 	{
 		runWithProgressDialog(window, "Toggle Timer", pd->{
 			String baseURL_ = baseURL;
 			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
 			if (baseURL_==null) return;
-			MessageResponse response = Timers.toggleTimer(baseURL_, timer.serviceref, timer.begin, timer.end, taskTitle->{
-				setIndeterminateProgressTask(pd, taskTitle);
-			});
-			lwi.showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
+			
+			for (Timers.Timer timer : timers) {
+				MessageResponse response = Timers.toggleTimer(baseURL_, timer.serviceref, timer.begin, timer.end, taskTitle->{
+					setIndeterminateProgressTask(pd, taskTitle);
+				});
+				lwi.showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
+				if (handleResponse!=null) handleResponse.accept(timer,response);
+			}
+			
 			if (updateTask!=null)
 			{
 				setIndeterminateProgressTask(pd, "Update Data");
 				updateTask.updateTimers(baseURL_,pd);
 			}
-			if (getResponse!=null) getResponse.accept(response);
 		});
 	}
 	

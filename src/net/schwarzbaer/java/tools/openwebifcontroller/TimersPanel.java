@@ -153,7 +153,7 @@ public class TimersPanel extends JSplitPane {
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Toggle", e->{
 				if (clickedTimer==null) return;
-				main.toggleTimer(clickedTimer, response -> {
+				main.toggleTimer(null, clickedTimer, response -> {
 					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
 					tableModel.fireTableRowUpdate(clickedTimer);
 					//table.repaint();
@@ -162,7 +162,7 @@ public class TimersPanel extends JSplitPane {
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
-				main.deleteTimer(clickedTimer, response -> {
+				main.deleteTimer(null, clickedTimer, response -> {
 					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
 					tableModel.fireTableRowUpdate(clickedTimer);
 					//table.repaint();
@@ -179,21 +179,21 @@ public class TimersPanel extends JSplitPane {
 			add(menuSelectedTimers = new JMenu("Selected Timers"));
 			
 			menuSelectedTimers.add(OpenWebifController.createMenuItem("Toggle", e->{
-//				if (clickedTimer==null) return;
-//				main.toggleTimer(clickedTimer, response -> {
-//					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
-//					tableModel.fireTableRowUpdate(clickedTimer);
-//					//table.repaint();
-//				});
+				if (selectedTimers.length<1) return;
+				main.toggleTimer(null, selectedTimers, (timer, response) -> {
+					timerStateGuesser.updateStateAfterToggle(timer, response);
+					tableModel.fireTableRowUpdate(timer);
+					//table.repaint();
+				});
 			}));
 			
 			menuSelectedTimers.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
-//				if (clickedTimer==null) return;
-//				main.deleteTimer(clickedTimer, response -> {
-//					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
-//					tableModel.fireTableRowUpdate(clickedTimer);
-//					//table.repaint();
-//				});
+				if (selectedTimers.length<1) return;
+				main.deleteTimer(null, selectedTimers, (timer, response) -> {
+					timerStateGuesser.updateStateAfterDelete(timer, response);
+					tableModel.fireTableRowUpdate(timer);
+					//table.repaint();
+				});
 			}));
 			
 			addSeparator();

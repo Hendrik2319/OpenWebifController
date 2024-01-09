@@ -46,6 +46,9 @@ Name = Show/Spielshow: Show/Spielshow (allgemein)
 Genre: 49
 Name = Show/Spielshow: Spielshow/Quiz/Wettbewerb
 
+Genre: 50
+Name = Show/Spielshow: Variete
+
 Genre: 51
 Name = Show/Spielshow: Talkshow
 
@@ -99,6 +102,12 @@ Name = Musik/Ballett/Tanz: Volksmusik/traditionelle Musik
 
 Genre: 100
 Name = Musik/Ballett/Tanz: Jazz
+
+Genre: 101
+Name = Musik/Ballett/Tanz: Musical/Oper
+
+Genre: 102
+Name = Musik/Ballett/Tanz: Ballett
 
 Genre: 112
 Name = Kunst/Kultur: Kunst/Kultur (ohne Musik, allgemein)

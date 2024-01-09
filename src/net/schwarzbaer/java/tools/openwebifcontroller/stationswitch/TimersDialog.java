@@ -5,6 +5,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Window;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Vector;
 import java.util.function.BiFunction;
@@ -12,19 +13,18 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import javax.swing.JDialog;
+import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
 import javax.swing.table.TableCellRenderer;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
-import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
@@ -67,7 +67,7 @@ class TimersDialog extends JDialog {
 		table.setRowSorter(tableRowSorter = new TimersTableRowSorter(tableModel));
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 		table.setColumnSelectionAllowed(false);
-		table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 		tableModel.setTable(table);
 		tableModel.setColumnWidths(table);
 		tableModel.setDefaultCellEditorsAndRenderers();
@@ -75,11 +75,7 @@ class TimersDialog extends JDialog {
 		tableScrollPane.setPreferredSize(new Dimension(300, 600));
 		
 		table.getSelectionModel().addListSelectionListener(e->{
-			int rowV = table.getSelectedRow();
-			int rowM = table.convertRowIndexToModel(rowV);
-			ScrollPosition scrollPos = ScrollPosition.getVertical(textAreaScrollPane);
-			textArea.setText(TimersPanel.generateShortInfo(tableModel.getRow(rowM)));
-			if (scrollPos!=null) SwingUtilities.invokeLater(()->scrollPos.setVertical(textAreaScrollPane));
+			TimersPanel.showSelectedTimers(table, tableModel, textArea, textAreaScrollPane);
 		});
 		
 		new TimersTableContextMenu().addTo(table);
@@ -131,6 +127,7 @@ class TimersDialog extends JDialog {
 	private class TimersTableContextMenu extends ContextMenu {
 		private static final long serialVersionUID = -8581851712142869327L;
 		private Timer clickedTimer;
+		private Timer[] selectedTimers;
 		
 		TimersTableContextMenu() {
 			clickedTimer = null;
@@ -149,7 +146,10 @@ class TimersDialog extends JDialog {
 			
 			addSeparator();
 			
-			JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
+			JMenu menuClickedTimer;
+			add(menuClickedTimer = new JMenu("Clicked Timer"));
+			
+			menuClickedTimer.add(OpenWebifController.createMenuItem("Toggle", e->{
 				if (clickedTimer==null) return;
 				OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this, logWindow, response -> {
 					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
@@ -157,12 +157,31 @@ class TimersDialog extends JDialog {
 				});
 			}));
 			
-			JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->{
+			menuClickedTimer.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
 				OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this, logWindow, response -> {
 					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
 					tableModel.fireTableCellUpdate(clickedTimer, TimersTableModel.ColumnID.state);
 				});
+			}));
+			
+			JMenu menuSelectedTimers;
+			add(menuSelectedTimers = new JMenu("Selected Timers"));
+			
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Toggle", e->{
+//				if (clickedTimer==null) return;
+//				OpenWebifController.toggleTimer(clickedTimer, TimersDialog.this, logWindow, response -> {
+//					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
+//					tableModel.fireTableCellUpdate(clickedTimer, TimersTableModel.ColumnID.state);
+//				});
+			}));
+			
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
+//				if (clickedTimer==null) return;
+//				OpenWebifController.deleteTimer(clickedTimer, TimersDialog.this, logWindow, response -> {
+//					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
+//					tableModel.fireTableCellUpdate(clickedTimer, TimersTableModel.ColumnID.state);
+//				});
 			}));
 			
 			addSeparator();
@@ -177,16 +196,17 @@ class TimersDialog extends JDialog {
 				int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
 				clickedTimer = tableModel.getRow(rowM);
 				
+				int[] rowsV = table.getSelectedRows();
+				int[] rowsM = Tables.convertRowIndexesToModel(table,rowsV);
+				selectedTimers = Arrays.stream(rowsM).mapToObj(tableModel::getRow).filter(t->t!=null).toArray(Timer[]::new);
+				
+				menuClickedTimer  .setEnabled(clickedTimer!=null);
+				menuSelectedTimers.setEnabled(selectedTimers.length>0);
+				
 				miReloadTimers.setEnabled(updateData  !=null);
-				miToggleTimer .setEnabled(clickedTimer!=null);
-				miDeleteTimer .setEnabled(clickedTimer!=null);
-				if (clickedTimer!=null) {
-					miToggleTimer.setText(String.format("Toggle Timer \"%s: %s\"", clickedTimer.servicename, clickedTimer.name));
-					miDeleteTimer.setText(String.format("Delete Timer \"%s: %s\"", clickedTimer.servicename, clickedTimer.name));
-				} else {
-					miToggleTimer.setText("Toggle Timer");
-					miDeleteTimer.setText("Delete Timer");
-				}
+				String timerLabel = clickedTimer==null ? "" : String.format(" \"%s: %s\"", clickedTimer.servicename, clickedTimer.name);
+				menuClickedTimer  .setText("Clicked Timer"+timerLabel);
+				menuSelectedTimers.setText("Selected Timers (%d)".formatted(selectedTimers.length));
 			});
 		}
 	}

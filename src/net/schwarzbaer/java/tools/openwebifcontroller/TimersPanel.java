@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
@@ -13,7 +14,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
-import javax.swing.JMenuItem;
+import javax.swing.JMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
@@ -77,7 +78,7 @@ public class TimersPanel extends JSplitPane {
 		table.setRowSorter(tableRowSorter = new TimersTableRowSorter(tableModel));
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 		table.setColumnSelectionAllowed(false);
-		table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 		tableModel.setTable(table);
 		tableModel.setColumnWidths(table);
 		tableModel.setAllDefaultRenderers();
@@ -85,11 +86,7 @@ public class TimersPanel extends JSplitPane {
 		tableScrollPane.setPreferredSize(new Dimension(1000,500));
 		
 		table.getSelectionModel().addListSelectionListener(e->{
-			int rowV = table.getSelectedRow();
-			int rowM = table.convertRowIndexToModel(rowV);
-			ScrollPosition scrollPos = ScrollPosition.getVertical(textAreaScrollPane);
-			textArea.setText(generateShortInfo(tableModel.getRow(rowM)));
-			if (scrollPos!=null) SwingUtilities.invokeLater(()->scrollPos.setVertical(textAreaScrollPane));
+			showSelectedTimers(table, tableModel, textArea, textAreaScrollPane);
 		});
 		
 		new TableContextMenu();
@@ -98,13 +95,45 @@ public class TimersPanel extends JSplitPane {
 		setRightComponent(textAreaScrollPane);
 	}
 	
+	public static void showSelectedTimers(JTable table, Tables.SimpleGetValueTableModel<Timer,?> tableModel, ExtendedTextArea textArea, JScrollPane textAreaScrollPane)
+	{
+		String text;
+		if (table.getSelectedRowCount() == 1) {
+			int rowV = table.getSelectedRow();
+			int rowM = table.convertRowIndexToModel(rowV);
+			text = generateShortInfo(tableModel.getRow(rowM), true);
+		} else {
+			int[] rowsV = table.getSelectedRows();
+			int[] rowsM = Tables.convertRowIndexesToModel(table,rowsV);
+			if (rowsM.length > 20) {
+				text = "%d Timers selected".formatted(rowsM.length);
+			} else {
+				text = "Selected Timers: [%d]".formatted(rowsM.length);
+				for (int rowM : rowsM) {
+					Timer row = tableModel.getRow(rowM);
+					if (row!=null)
+						text += "\r\n    \"%s\" (%s) at %s".formatted(
+							row.name,
+							row.servicename,
+							formatDate(row.begin*1000,  true,  true, false,  true, false)
+						);
+				}
+			}
+		}
+		ScrollPosition scrollPos = ScrollPosition.getVertical(textAreaScrollPane);
+		textArea.setText(text);
+		if (scrollPos!=null) SwingUtilities.invokeLater(()->scrollPos.setVertical(textAreaScrollPane));
+	}
+	
 	private class TableContextMenu extends ContextMenu {
 		private static final long serialVersionUID = -1274113566143850520L;
 		
 		private Timer clickedTimer;
+		private Timer[] selectedTimers;
 
 		TableContextMenu() {
 			clickedTimer = null;
+			selectedTimers = null;
 			
 			addTo(table);
 			addTo(tableScrollPane);
@@ -119,7 +148,10 @@ public class TimersPanel extends JSplitPane {
 			
 			addSeparator();
 			
-			JMenuItem miToggleTimer = add(OpenWebifController.createMenuItem("Toggle Timer", e->{
+			JMenu menuClickedTimer;
+			add(menuClickedTimer = new JMenu("Clicked Timer"));
+			
+			menuClickedTimer.add(OpenWebifController.createMenuItem("Toggle", e->{
 				if (clickedTimer==null) return;
 				main.toggleTimer(clickedTimer, response -> {
 					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
@@ -128,7 +160,7 @@ public class TimersPanel extends JSplitPane {
 				});
 			}));
 			
-			JMenuItem miDeleteTimer = add(OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->{
+			menuClickedTimer.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
 				main.deleteTimer(clickedTimer, response -> {
 					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
@@ -137,10 +169,31 @@ public class TimersPanel extends JSplitPane {
 				});
 			}));
 			
-			JMenuItem miShowTimerDetails = add(OpenWebifController.createMenuItem("Show Details of Timer", e->{
+			menuClickedTimer.add(OpenWebifController.createMenuItem("Show Details", e->{
 				if (clickedTimer==null) return;
 				String text = generateDetailsOutput(clickedTimer);
 				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
+			}));
+			
+			JMenu menuSelectedTimers;
+			add(menuSelectedTimers = new JMenu("Selected Timers"));
+			
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Toggle", e->{
+//				if (clickedTimer==null) return;
+//				main.toggleTimer(clickedTimer, response -> {
+//					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
+//					tableModel.fireTableRowUpdate(clickedTimer);
+//					//table.repaint();
+//				});
+			}));
+			
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
+//				if (clickedTimer==null) return;
+//				main.deleteTimer(clickedTimer, response -> {
+//					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
+//					tableModel.fireTableRowUpdate(clickedTimer);
+//					//table.repaint();
+//				});
 			}));
 			
 			addSeparator();
@@ -159,14 +212,16 @@ public class TimersPanel extends JSplitPane {
 				int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
 				clickedTimer = tableModel.getRow(rowM);
 				
-				miToggleTimer     .setEnabled(clickedTimer!=null);
-				miDeleteTimer     .setEnabled(clickedTimer!=null);
-				miShowTimerDetails.setEnabled(clickedTimer!=null);
+				int[] rowsV = table.getSelectedRows();
+				int[] rowsM = Tables.convertRowIndexesToModel(table,rowsV);
+				selectedTimers = Arrays.stream(rowsM).mapToObj(tableModel::getRow).filter(t->t!=null).toArray(Timer[]::new);
+				
+				menuClickedTimer  .setEnabled(clickedTimer!=null);
+				menuSelectedTimers.setEnabled(selectedTimers.length>0);
 				
 				String timerLabel = clickedTimer==null ? "" : String.format(" \"%s: %s\"", clickedTimer.servicename, clickedTimer.name);
-				miToggleTimer     .setText("Toggle Timer"+timerLabel);
-				miDeleteTimer     .setText("Delete Timer"+timerLabel);
-				miShowTimerDetails.setText("Show Details of Timer"+timerLabel);
+				menuClickedTimer  .setText("Clicked Timer"+timerLabel);
+				menuSelectedTimers.setText("Selected Timers (%d)".formatted(selectedTimers.length));
 			});
 		}
 	}
@@ -584,15 +639,17 @@ public class TimersPanel extends JSplitPane {
 		out.add(indentLevel, "vpsplugin_time"     , timer.vpsplugin_time     );
 	}
 
-	public static String generateShortInfo(Timer timer)
+	public static String generateShortInfo(Timer timer, boolean withName)
 	{
-		return generateShortInfo("", timer);
+		return generateShortInfo("", timer, withName);
 	}
 
-	public static String generateShortInfo(String indent, Timer timer)
+	public static String generateShortInfo(String indent, Timer timer, boolean withName)
 	{
 		StringBuilder sb = new StringBuilder();
 		if (timer!=null) {
+			if (withName)
+				sb.append(String.format("%sName:%n%s%n%n", indent, timer.name));
 			sb.append(String.format("%sDescription:%n%s%n%n", indent, timer.description));
 			sb.append(String.format("%sExtended Description:%n%s%n%n", indent, timer.descriptionextended));
 			sb.append(String.format("%sLog Entries: %d%n", indent, timer.logentries.size()));

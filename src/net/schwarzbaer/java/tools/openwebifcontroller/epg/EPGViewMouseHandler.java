@@ -175,7 +175,7 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 					out.add(0, "Timer");
 					TimersPanel.generateDetailsOutput(out, 1, timer.timer);
 					text = out.generateOutput();
-					text += TimersPanel.generateShortInfo(ValueListOutput.DEFAULT_INDENT, timer.timer);
+					text += TimersPanel.generateShortInfo(ValueListOutput.DEFAULT_INDENT, timer.timer, false);
 				}
 				else
 				{

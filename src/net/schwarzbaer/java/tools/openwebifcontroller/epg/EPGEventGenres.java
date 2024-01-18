@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Vector;
@@ -16,11 +17,15 @@ import net.schwarzbaer.java.lib.openwebif.EPGevent;
 
 class EPGEventGenres
 {
+	private record EPGEventGenre( long id, String name, boolean isNew ) {
+		EPGEventGenre(EPGevent event) { this(event.genreid, event.genre, true); }
+	}
+	
 	private static final String FILE__EPG_EVENT_GENRES = "OpenWebifController - EPGEventGenres.data";
 	private static final EPGEventGenres instance = new EPGEventGenres();
 	static EPGEventGenres getInstance() { return instance; }
 	
-	private final HashMap<Long,HashSet<String>> genres;
+	private final HashMap<Long,HashSet<EPGEventGenre>> genres;
 	
 	EPGEventGenres()
 	{
@@ -32,13 +37,13 @@ class EPGEventGenres
 	{
 		if (events!=null)
 			for (EPGevent event : events)
-				getOrCreateNamesList(event.genreid).add(event.genre);
+				getOrCreateNamesList(event.genreid).add( new EPGEventGenre(event) );
 		return this;
 	}
 
-	private HashSet<String> getOrCreateNamesList(long genreID)
+	private HashSet<EPGEventGenre> getOrCreateNamesList(long genreID)
 	{
-		HashSet<String> genreNames = genres.get(genreID);
+		HashSet<EPGEventGenre> genreNames = genres.get(genreID);
 		if (genreNames==null) genres.put(genreID, genreNames = new HashSet<>());
 		return genreNames;
 	}
@@ -53,11 +58,13 @@ class EPGEventGenres
 		try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)))
 		{
 			String value, line;
-			HashSet<String> genreNames = null;
+			Long genreID = null;
+			HashSet<EPGEventGenre> genreNames = null;
 			while ( (line=in.readLine())!=null )
 			{
 				if (line.isBlank())
 				{
+					genreID = null;
 					genreNames = null;
 					continue;
 				}
@@ -65,18 +72,18 @@ class EPGEventGenres
 				if ( (value=getValue(line, "Genre: "))!=null )
 				{
 					genreNames = null;
-					long genreID;
 					try { genreID = Long.parseLong(value); }
 					catch (NumberFormatException ex) {
 						System.err.printf("NumberFormatException while parsing line \"%s\": %s%n", line, ex.getMessage());
 						// ex.printStackTrace();
+						genreID = null;
 						continue;
 					}
 					genreNames = getOrCreateNamesList(genreID);
 				}
 				
-				if ( (value=getValue(line, "Name = "))!=null && genreNames!=null)
-					genreNames.add(value);
+				if ( (value=getValue(line, "Name = "))!=null && genreNames!=null && genreID!=null)
+					genreNames.add( new EPGEventGenre(genreID, value, false) );
 			}
 		}
 		catch (FileNotFoundException ex) {}
@@ -111,12 +118,12 @@ class EPGEventGenres
 				{
 					out.printf("Genre: %d%n", genreID);
 					
-					HashSet<String> names = genres.get(genreID);
-					Vector<String> namesVec = new Vector<>( names );
-					namesVec.sort(null);
+					HashSet<EPGEventGenre> names = genres.get(genreID);
+					Vector<EPGEventGenre> namesVec = new Vector<>( names );
+					namesVec.sort(Comparator.<EPGEventGenre,String>comparing(name -> name.name));
 					
-					for (String name : namesVec)
-						out.printf("Name = %s%n", name);
+					for (EPGEventGenre name : namesVec)
+						out.printf("Name = %s%n", name.name);
 					
 					out.printf("%n");
 				}

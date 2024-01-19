@@ -153,20 +153,12 @@ public class TimersPanel extends JSplitPane {
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Toggle", e->{
 				if (clickedTimer==null) return;
-				main.toggleTimer(null, clickedTimer, response -> {
-					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
-					tableModel.fireTableRowUpdate(clickedTimer);
-					//table.repaint();
-				});
+				main.toggleTimer(null, clickedTimer, response -> handleToggleResponse(clickedTimer, response));
 			}));
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
-				main.deleteTimer(null, clickedTimer, response -> {
-					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
-					tableModel.fireTableRowUpdate(clickedTimer);
-					//table.repaint();
-				});
+				main.deleteTimer(null, clickedTimer, response -> handleDeleteResponse(clickedTimer, response));
 			}));
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Show Details", e->{
@@ -178,22 +170,26 @@ public class TimersPanel extends JSplitPane {
 			JMenu menuSelectedTimers;
 			add(menuSelectedTimers = new JMenu("Selected Timers"));
 			
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Activate", e->{
+				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Deactivated);
+				if (filteredTimers.length<1) return;
+				main.toggleTimer(null, filteredTimers, this::handleToggleResponse);
+			}));
+			
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Deactivate", e->{
+				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Waiting);
+				if (filteredTimers.length<1) return;
+				main.toggleTimer(null, filteredTimers, this::handleToggleResponse);
+			}));
+			
 			menuSelectedTimers.add(OpenWebifController.createMenuItem("Toggle", e->{
 				if (selectedTimers.length<1) return;
-				main.toggleTimer(null, selectedTimers, (timer, response) -> {
-					timerStateGuesser.updateStateAfterToggle(timer, response);
-					tableModel.fireTableRowUpdate(timer);
-					//table.repaint();
-				});
+				main.toggleTimer(null, selectedTimers, this::handleToggleResponse);
 			}));
 			
 			menuSelectedTimers.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (selectedTimers.length<1) return;
-				main.deleteTimer(null, selectedTimers, (timer, response) -> {
-					timerStateGuesser.updateStateAfterDelete(timer, response);
-					tableModel.fireTableRowUpdate(timer);
-					//table.repaint();
-				});
+				main.deleteTimer(null, selectedTimers, this::handleDeleteResponse);
 			}));
 			
 			addSeparator();
@@ -223,6 +219,28 @@ public class TimersPanel extends JSplitPane {
 				menuClickedTimer  .setText("Clicked Timer"+timerLabel);
 				menuSelectedTimers.setText("Selected Timers (%d)".formatted(selectedTimers.length));
 			});
+		}
+
+		private Timer[] filterSelectedTimers(TimerStateGuesser.ExtTimerState timerState)
+		{
+			return Arrays
+				.stream(selectedTimers)
+				.filter(t -> timerStateGuesser.getState(t) == timerState)
+				.toArray(Timer[]::new);
+		}
+
+		private void handleToggleResponse(Timer timer, MessageResponse response)
+		{
+			timerStateGuesser.updateStateAfterToggle(timer, response);
+			tableModel.fireTableRowUpdate(timer);
+			//table.repaint();
+		}
+
+		private void handleDeleteResponse(Timer timer, MessageResponse response)
+		{
+			timerStateGuesser.updateStateAfterDelete(timer, response);
+			tableModel.fireTableRowUpdate(timer);
+			//table.repaint();
 		}
 	}
 	

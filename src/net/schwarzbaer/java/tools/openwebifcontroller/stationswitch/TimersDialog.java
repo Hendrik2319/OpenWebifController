@@ -163,13 +163,13 @@ class TimersDialog extends JDialog {
 			JMenu menuSelectedTimers;
 			add(menuSelectedTimers = new JMenu("Selected Timers"));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Activate", e->{
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Activate", GrayCommandIcons.IconGroup.Play, e->{
 				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Deactivated);
 				if (filteredTimers.length<1) return;
 				OpenWebifController.toggleTimer(null, filteredTimers, TimersDialog.this, logWindow, this::handleToggleResponse);
 			}));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Deactivate", e->{
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Deactivate", GrayCommandIcons.IconGroup.Stop, e->{
 				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Waiting);
 				if (filteredTimers.length<1) return;
 				OpenWebifController.toggleTimer(null, filteredTimers, TimersDialog.this, logWindow, this::handleToggleResponse);

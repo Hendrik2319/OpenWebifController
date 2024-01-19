@@ -298,6 +298,9 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			epgView.showStatus(System.out);
 		}),c);
 		*/
+		set(c,x++,0,0,0); southPanel.add(OpenWebifController.createButton("Show EPG Event Genres", true, e->{
+			new EPGEventGenresView(this, "EPG Event Genres").showDialog();
+		}),c);
 		set(c,x++,0,0,0); southPanel.add(OpenWebifController.createButton("Jump to time", true, e->{
 			ZonedDateTime newValue = epgTimeDialog.showDialog(epgFocusTime);
 			if (newValue!=null)

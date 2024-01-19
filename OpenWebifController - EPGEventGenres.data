@@ -1,29 +1,22 @@
 Genre: 0
 Name = 
-Name = 
 
 Genre: 16
-Name = Film/Drama: Film/Drama (allgemein)
 Name = Film/Drama: Film/Drama (allgemein)
 
 Genre: 17
 Name = Film/Drama: Krimi/Thriller
-Name = Film/Drama: Krimi/Thriller
 
 Genre: 18
-Name = Film/Drama: Abenteuer/Western/Krieg
 Name = Film/Drama: Abenteuer/Western/Krieg
 
 Genre: 19
 Name = Film/Drama: Science Fiction/Fantasie/Horror
-Name = Film/Drama: Science Fiction/Fantasie/Horror
 
 Genre: 20
 Name = Film/Drama: Comedy
-Name = Film/Drama: Comedy
 
 Genre: 21
-Name = Film/Drama: Soap/Melodram/Folklore
 Name = Film/Drama: Soap/Melodram/Folklore
 
 Genre: 22
@@ -34,30 +27,23 @@ Name = Film/Drama: Ernsthafter/klassischer/religiöser/historischer Film/Drama
 
 Genre: 32
 Name = Nachrichten/Aktuelles: Nachrichten (allgemein)
-Name = Nachrichten/Aktuelles: Nachrichten (allgemein)
 
 Genre: 33
-Name = Nachrichten/Aktuelles: Nachrichten/Wetterbericht
 Name = Nachrichten/Aktuelles: Nachrichten/Wetterbericht
 
 Genre: 34
 Name = Nachrichten/Aktuelles: Nachrichtenmagazin
-Name = Nachrichten/Aktuelles: Nachrichtenmagazin
 
 Genre: 35
-Name = Nachrichten/Aktuelles: Dokumentation
 Name = Nachrichten/Aktuelles: Dokumentation
 
 Genre: 36
 Name = Nachrichten/Aktuelles: Diskussion/Interview/Debatte
-Name = Nachrichten/Aktuelles: Diskussion/Interview/Debatte
 
 Genre: 48
 Name = Show/Spielshow: Show/Spielshow (allgemein)
-Name = Show/Spielshow: Show/Spielshow (allgemein)
 
 Genre: 49
-Name = Show/Spielshow: Spielshow/Quiz/Wettbewerb
 Name = Show/Spielshow: Spielshow/Quiz/Wettbewerb
 
 Genre: 50
@@ -65,10 +51,8 @@ Name = Show/Spielshow: Variete
 
 Genre: 51
 Name = Show/Spielshow: Talkshow
-Name = Show/Spielshow: Talkshow
 
 Genre: 64
-Name = Sport: Sport (allgemein)
 Name = Sport: Sport (allgemein)
 
 Genre: 66
@@ -76,17 +60,14 @@ Name = Sport: Sport-Magazin
 
 Genre: 67
 Name = Sport: Fußball
-Name = Sport: Fußball
 
 Genre: 68
-Name = Sport: Tennis/Squash
 Name = Sport: Tennis/Squash
 
 Genre: 70
 Name = Sport: Leichtathletik
 
 Genre: 71
-Name = Sport: Motorsport
 Name = Sport: Motorsport
 
 Genre: 72
@@ -97,14 +78,11 @@ Name = Sport: Wintersport
 
 Genre: 80
 Name = Kinder/Jugend: Kinder/Jugendprogramm (allgemein)
-Name = Kinder/Jugend: Kinder/Jugendprogramm (allgemein)
 
 Genre: 82
 Name = Kinder/Jugend: Unterhaltung (6-14 Jahre)
-Name = Kinder/Jugend: Unterhaltung (6-14 Jahre)
 
 Genre: 83
-Name = Kinder/Jugend: Unterhaltung (10-16 Jahre)
 Name = Kinder/Jugend: Unterhaltung (10-16 Jahre)
 
 Genre: 84
@@ -112,14 +90,11 @@ Name = Kinder/Jugend: Information/Bildung/Schulprogramm
 
 Genre: 85
 Name = Kinder/Jugend: Zeichentrick/Puppen
-Name = Kinder/Jugend: Zeichentrick/Puppen
 
 Genre: 96
 Name = Musik/Ballett/Tanz: Musik/Ballett/Tanz (allgemein)
-Name = Musik/Ballett/Tanz: Musik/Ballett/Tanz (allgemein)
 
 Genre: 97
-Name = Musik/Ballett/Tanz: Rock/Pop
 Name = Musik/Ballett/Tanz: Rock/Pop
 
 Genre: 98
@@ -130,7 +105,6 @@ Name = Musik/Ballett/Tanz: Volksmusik/traditionelle Musik
 
 Genre: 100
 Name = Musik/Ballett/Tanz: Jazz
-Name = Musik/Ballett/Tanz: Jazz
 
 Genre: 101
 Name = Musik/Ballett/Tanz: Musical/Oper
@@ -140,10 +114,8 @@ Name = Musik/Ballett/Tanz: Ballett
 
 Genre: 112
 Name = Kunst/Kultur: Kunst/Kultur (ohne Musik, allgemein)
-Name = Kunst/Kultur: Kunst/Kultur (ohne Musik, allgemein)
 
 Genre: 115
-Name = Kunst/Kultur: Religion
 Name = Kunst/Kultur: Religion
 
 Genre: 116
@@ -151,10 +123,8 @@ Name = Kunst/Kultur: Beliebte Kultur/Traditionelle Kunst
 
 Genre: 117
 Name = Kunst/Kultur: Literatur
-Name = Kunst/Kultur: Literatur
 
 Genre: 118
-Name = Kunst/Kultur: Kino/Film
 Name = Kunst/Kultur: Kino/Film
 
 Genre: 121
@@ -165,14 +135,11 @@ Name = Kunst/Kultur: Kunst-/Kulturmagazin
 
 Genre: 128
 Name = Sozial/Politik/Wirtschaft: Sozial/Politik/Wirtschaft (allgemein)
-Name = Sozial/Politik/Wirtschaft: Sozial/Politik/Wirtschaft (allgemein)
 
 Genre: 129
 Name = Sozial/Politik/Wirtschaft: Magazine/Berichte/Dokumentationen
-Name = Sozial/Politik/Wirtschaft: Magazine/Berichte/Dokumentationen
 
 Genre: 130
-Name = Sozial/Politik/Wirtschaft: Wirtschaft/Soziales
 Name = Sozial/Politik/Wirtschaft: Wirtschaft/Soziales
 
 Genre: 131
@@ -180,10 +147,8 @@ Name = Sozial/Politik/Wirtschaft: Bemerkenswerte Menschen
 
 Genre: 144
 Name = Bildung/Wissenschaft/Sachverhalt: Bildung/Wissenschaft/Sachthemen (allgemein)
-Name = Bildung/Wissenschaft/Sachverhalt: Bildung/Wissenschaft/Sachthemen (allgemein)
 
 Genre: 145
-Name = Bildung/Wissenschaft/Sachverhalt: Natur/Tiere/Umwelt
 Name = Bildung/Wissenschaft/Sachverhalt: Natur/Tiere/Umwelt
 
 Genre: 146
@@ -197,21 +162,17 @@ Name = Freizeit Hobbys: Tourismus/Reise
 
 Genre: 162
 Name = Freizeit Hobbys: Handwerk
-Name = Freizeit Hobbys: Handwerk
 
 Genre: 164
 Name = Freizeit Hobbys: Fitness & Gesundheit
 
 Genre: 165
 Name = Freizeit Hobbys: Kochen
-Name = Freizeit Hobbys: Kochen
 
 Genre: 166
 Name = Freizeit Hobbys: Werbung/Verkauf
-Name = Freizeit Hobbys: Werbung/Verkauf
 
 Genre: 167
-Name = Freizeit Hobbys: Gartenarbeit
 Name = Freizeit Hobbys: Gartenarbeit
 
 Genre: 175
@@ -219,13 +180,10 @@ Name = Freizeit Hobbys: Benutzerdefiniert
 
 Genre: 178
 Name = Andere: unveröffentlicht
-Name = Andere: unveröffentlicht
 
 Genre: 179
 Name = Andere: Live-Übertragung
-Name = Andere: Live-Übertragung
 
 Genre: 181
-Name = Andere:
 Name = Andere:
 

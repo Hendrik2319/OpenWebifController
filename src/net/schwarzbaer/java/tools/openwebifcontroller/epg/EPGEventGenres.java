@@ -8,17 +8,39 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.Vector;
 
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 
 class EPGEventGenres
 {
-	private record EPGEventGenre( long id, String name, boolean isNew ) {
+	private static final Comparator<EPGEventGenre> COMPARATOR = Comparator.<EPGEventGenre,String>comparing(name -> name.name);
+
+	record EPGEventGenre( long id, String name, boolean isNew ) {
 		EPGEventGenre(EPGevent event) { this(event.genreid, event.genre, true); }
+
+		@Override
+		public int hashCode()
+		{
+			return Objects.hash(id, name);
+		}
+
+		@Override
+		public boolean equals(Object obj)
+		{
+			if (this == obj) return true;
+			if (obj == null) return false;
+			if (getClass() != obj.getClass()) return false;
+			EPGEventGenre other = (EPGEventGenre) obj;
+			return id == other.id && Objects.equals(name, other.name);
+		}
+		
 	}
 	
 	private static final String FILE__EPG_EVENT_GENRES = "OpenWebifController - EPGEventGenres.data";
@@ -33,6 +55,23 @@ class EPGEventGenres
 		readFromFile();
 	}
 	
+	List<EPGEventGenre> getEPGEventGenresSorted()
+	{
+		ArrayList<Long> ids = new ArrayList<>( genres.keySet() );
+		ids.sort(null);
+		
+		ArrayList<EPGEventGenre> list = new ArrayList<>();
+		ids.forEach( id -> {
+			HashSet<EPGEventGenre> names = genres.get(id);
+			ArrayList<EPGEventGenre> sortedNames = new ArrayList<>( names );
+			sortedNames.sort(COMPARATOR);
+			
+			sortedNames.forEach( list::add );
+		});
+		
+		return list;
+	}
+
 	EPGEventGenres scanGenres(Vector<EPGevent> events)
 	{
 		if (events!=null)
@@ -120,7 +159,7 @@ class EPGEventGenres
 					
 					HashSet<EPGEventGenre> names = genres.get(genreID);
 					Vector<EPGEventGenre> namesVec = new Vector<>( names );
-					namesVec.sort(Comparator.<EPGEventGenre,String>comparing(name -> name.name));
+					namesVec.sort(COMPARATOR);
 					
 					for (EPGEventGenre name : namesVec)
 						out.printf("Name = %s%n", name.name);

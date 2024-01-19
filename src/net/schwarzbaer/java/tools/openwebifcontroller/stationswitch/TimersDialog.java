@@ -8,6 +8,7 @@ import java.awt.Window;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Vector;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -27,6 +28,7 @@ import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.LogWindow;
@@ -146,42 +148,51 @@ class TimersDialog extends JDialog {
 			
 			addSeparator();
 			
+			BiConsumer<Timer, MessageResponse> handleToggleResponse = (timer, response) -> {
+				timerStateGuesser.updateStateAfterToggle(timer, response);
+				tableModel.fireTableCellUpdate(timer, TimersTableModel.ColumnID.state);
+			};
+			BiConsumer<Timer, MessageResponse> handleDeleteResponse = (timer, response) -> {
+				timerStateGuesser.updateStateAfterDelete(timer, response);
+				tableModel.fireTableCellUpdate(timer, TimersTableModel.ColumnID.state);
+			};
+			
 			JMenu menuClickedTimer;
 			add(menuClickedTimer = new JMenu("Clicked Timer"));
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Toggle", e->{
 				if (clickedTimer==null) return;
-				OpenWebifController.toggleTimer(null, clickedTimer, TimersDialog.this, logWindow, response -> {
-					timerStateGuesser.updateStateAfterToggle(clickedTimer, response);
-					tableModel.fireTableCellUpdate(clickedTimer, TimersTableModel.ColumnID.state);
-				});
+				OpenWebifController.toggleTimer(null, clickedTimer, TimersDialog.this, logWindow, response -> handleToggleResponse.accept(clickedTimer, response));
 			}));
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
-				OpenWebifController.deleteTimer(null, clickedTimer, TimersDialog.this, logWindow, response -> {
-					timerStateGuesser.updateStateAfterDelete(clickedTimer, response);
-					tableModel.fireTableCellUpdate(clickedTimer, TimersTableModel.ColumnID.state);
-				});
+				OpenWebifController.deleteTimer(null, clickedTimer, TimersDialog.this, logWindow, response -> handleDeleteResponse.accept(clickedTimer, response));
 			}));
 			
 			JMenu menuSelectedTimers;
 			add(menuSelectedTimers = new JMenu("Selected Timers"));
 			
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Activate", e->{
+				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Deactivated);
+				if (filteredTimers.length<1) return;
+				OpenWebifController.toggleTimer(null, filteredTimers, TimersDialog.this, logWindow, handleToggleResponse);
+			}));
+			
+			menuSelectedTimers.add(OpenWebifController.createMenuItem("Deactivate", e->{
+				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Waiting);
+				if (filteredTimers.length<1) return;
+				OpenWebifController.toggleTimer(null, filteredTimers, TimersDialog.this, logWindow, handleToggleResponse);
+			}));
+			
 			menuSelectedTimers.add(OpenWebifController.createMenuItem("Toggle", e->{
 				if (selectedTimers.length<1) return;
-				OpenWebifController.toggleTimer(null, selectedTimers, TimersDialog.this, logWindow, (timer, response) -> {
-					timerStateGuesser.updateStateAfterToggle(timer, response);
-					tableModel.fireTableCellUpdate(timer, TimersTableModel.ColumnID.state);
-				});
+				OpenWebifController.toggleTimer(null, selectedTimers, TimersDialog.this, logWindow, handleToggleResponse);
 			}));
 			
 			menuSelectedTimers.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (selectedTimers.length<1) return;
-				OpenWebifController.deleteTimer(null, selectedTimers, TimersDialog.this, logWindow, (timer, response) -> {
-					timerStateGuesser.updateStateAfterDelete(timer, response);
-					tableModel.fireTableCellUpdate(timer, TimersTableModel.ColumnID.state);
-				});
+				OpenWebifController.deleteTimer(null, selectedTimers, TimersDialog.this, logWindow, handleDeleteResponse);
 			}));
 			
 			addSeparator();
@@ -208,6 +219,15 @@ class TimersDialog extends JDialog {
 				menuClickedTimer  .setText("Clicked Timer"+timerLabel);
 				menuSelectedTimers.setText("Selected Timers (%d)".formatted(selectedTimers.length));
 			});
+		}
+
+		private Timer[] filterSelectedTimers(TimerStateGuesser.ExtTimerState timerState)
+		{
+			Timer[] filteredTimers = Arrays
+				.stream(selectedTimers)
+				.filter(t -> timerStateGuesser.getState(t) == timerState)
+				.toArray(Timer[]::new);
+			return filteredTimers;
 		}
 	}
 

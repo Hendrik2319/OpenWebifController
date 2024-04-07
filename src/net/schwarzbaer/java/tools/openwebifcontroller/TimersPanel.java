@@ -135,7 +135,7 @@ public class TimersPanel extends JSplitPane {
 			clickedTimer = null;
 			selectedTimers = null;
 			
-			addTo(table);
+			addTo(table, () -> ContextMenu.computeSurrogateMousePos(table, tableScrollPane, tableModel.getColumn(TimersTableModel.ColumnID.name)));
 			addTo(tableScrollPane);
 			
 			add(OpenWebifController.createMenuItem("Reload Timers", GrayCommandIcons.IconGroup.Reload, e->{

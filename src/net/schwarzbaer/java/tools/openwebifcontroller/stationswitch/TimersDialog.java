@@ -79,7 +79,7 @@ class TimersDialog extends JDialog {
 			TimersPanel.showSelectedTimers(table, tableModel, textArea, textAreaScrollPane);
 		});
 		
-		new TimersTableContextMenu().addTo(table);
+		new TimersTableContextMenu().addTo(table, () -> ContextMenu.computeSurrogateMousePos(table, tableScrollPane, tableModel.getColumn(TimersTableModel.ColumnID.name)));
 		
 		JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true);
 		splitPane.setLeftComponent(tableScrollPane);

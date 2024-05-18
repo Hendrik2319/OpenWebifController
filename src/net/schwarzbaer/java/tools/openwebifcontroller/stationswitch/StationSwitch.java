@@ -130,7 +130,7 @@ public class StationSwitch {
 		volumeControl = new VolumeControl(controlPanelCommands,false,true,true);
 		powerControl.addUpdateTask(baseURL -> volumeControl.initialize(baseURL,null));
 		
-		JButton btnShowMainController = asSubWindow ? null : OpenWebifController.createButton("Ctrl", true, e->OpenWebifController.start(true));
+		JButton btnShowMainController = asSubWindow ? null : OpenWebifController.createButton("MainCtrl", true, e->OpenWebifController.start(true));
 		JButton btnShowLogWindow = OpenWebifController.createButton("Log", true, e->logWindow.showDialog(LogWindow.Position.RIGHT_OF_PARENT));
 		JButton btnShowEPG = OpenWebifController.createButton("EPG", true, e->{
 			String baseURL = OpenWebifController.getBaseURL(true, mainWindow);

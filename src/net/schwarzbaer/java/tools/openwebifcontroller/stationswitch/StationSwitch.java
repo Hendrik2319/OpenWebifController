@@ -130,6 +130,7 @@ public class StationSwitch {
 		volumeControl = new VolumeControl(controlPanelCommands,false,true,true);
 		powerControl.addUpdateTask(baseURL -> volumeControl.initialize(baseURL,null));
 		
+		JButton btnShowMainController = asSubWindow ? null : OpenWebifController.createButton("Ctrl", true, e->OpenWebifController.start(true));
 		JButton btnShowLogWindow = OpenWebifController.createButton("Log", true, e->logWindow.showDialog(LogWindow.Position.RIGHT_OF_PARENT));
 		JButton btnShowEPG = OpenWebifController.createButton("EPG", true, e->{
 			String baseURL = OpenWebifController.getBaseURL(true, mainWindow);
@@ -238,7 +239,7 @@ public class StationSwitch {
 		labBouquet.setEnabled(false);
 		cmbbxBouquet.setEnabled(false);
 		
-		JPanel contentPane = buildGUI(btnShowLogWindow, btnShowEPG, scrollPaneActiveTimers, labStation);
+		JPanel contentPane = buildGUI(scrollPaneActiveTimers, labStation, btnShowEPG, btnShowLogWindow, btnShowMainController);
 		mainWindow.startGUI(contentPane);
 	}
 	
@@ -330,7 +331,7 @@ public class StationSwitch {
 			}).start();
 	}
 
-	private JPanel buildGUI(JButton btnShowLogWindow, JButton btnShowEPG, JScrollPane scrollPaneActiveTimers, JLabel labStation)
+	private JPanel buildGUI(JScrollPane scrollPaneActiveTimers, JLabel labStation, JButton... buttons)
 	{
 		GridBagConstraints c;
 		JPanel controllerPanel = new JPanel(new GridBagLayout());
@@ -340,9 +341,9 @@ public class StationSwitch {
 		controllerPanel.add(powerControl ,c);
 		controllerPanel.add(volumeControl,c);
 		c.weightx = 0;
-		controllerPanel.add(btnShowEPG,c);
-		controllerPanel.add(btnShowLogWindow,c);
-		
+		for (JButton button : buttons)
+			if (button!=null)
+				controllerPanel.add(button,c);
 		
 		JPanel timerPanel = new JPanel(new GridBagLayout());
 		c = new GridBagConstraints();

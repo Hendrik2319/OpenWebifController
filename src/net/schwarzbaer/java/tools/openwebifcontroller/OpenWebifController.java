@@ -181,12 +181,17 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			
 		}
 		
+		start(false);
+	}
+	
+	public static void start(boolean asSubWindow)
+	{
 //		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 //		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
 		LookAndFeelSwitch<AppSettings.ValueKey> lookAndFeelSwitch = new LookAndFeelSwitch<>(settings, AppSettings.ValueKey.LookAndFeel);
 		lookAndFeelSwitch.setInitialLookAndFeel();
 		
-		new OpenWebifController(lookAndFeelSwitch)
+		new OpenWebifController(lookAndFeelSwitch, asSubWindow)
 			.initialize();
 	}
 	
@@ -291,7 +296,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	private final RemoteControlPanel remoteControl;
 	private final LogWindow logWindow;
 
-	OpenWebifController(LookAndFeelSwitch<AppSettings.ValueKey> lookAndFeelSwitch) {
+	OpenWebifController(LookAndFeelSwitch<AppSettings.ValueKey> lookAndFeelSwitch, boolean asSubWindow) {
 		systemInfo = null;
 		boxSettings = null;
 		
@@ -300,7 +305,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		exeFileChooser.setMultiSelectionEnabled(false);
 		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
 		
-		mainWindow = createMainWindow("OpenWebif Controller",false);
+		mainWindow = createMainWindow("OpenWebif Controller",asSubWindow);
 		
 		logWindow = new LogWindow(mainWindow, "Response Log");
 		
@@ -350,11 +355,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		fillUpdatesMenu(updatesMenu);
 		
 		JMenu extrasMenu = menuBar.add(createMenu("Tools"));
-		extrasMenu.add(createMenuItem("Station Switch", e->{
-			String baseURL = getBaseURL();
-			if (baseURL==null) return;
-			StationSwitch.start(baseURL,true);
-		}));
+		if (!asSubWindow)
+			extrasMenu.add(createMenuItem("Station Switch", e->{
+				String baseURL = getBaseURL();
+				if (baseURL==null) return;
+				StationSwitch.start(baseURL,true);
+			}));
 		extrasMenu.add(createMenuItem("Remote Control Tool", e->{
 			new RemoteControlTool(true);
 		}));

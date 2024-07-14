@@ -12,6 +12,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Vector;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -200,15 +202,22 @@ class MoviesPanel extends JSplitPane {
 		private static final long serialVersionUID = -1424675027095694095L;
 		
 		private MovieList.Movie clickedMovie;
+		private int clickedMovieRowM;
 
 		TableContextMenu()
 		{
 			clickedMovie = null;
+			clickedMovieRowM = -1;
 			
 			JMenuItem miOpenVideoPlayer = add(OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image , e->showMovie(clickedMovie)));
 			JMenuItem miOpenBrowser     = add(OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image , e->showMovieInBrowser(clickedMovie)));
 			JMenuItem miZapToMovie      = add(OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play  , e->zapToMovie(clickedMovie)));
-			JMenuItem miDeleteMovie     = add(OpenWebifController.createMenuItem("Delete"              , GrayCommandIcons.IconGroup.Delete, e->deleteMovie(clickedMovie)));
+			JMenuItem miDeleteMovie     = add(OpenWebifController.createMenuItem("Delete"              , GrayCommandIcons.IconGroup.Delete, e->{
+				deleteMovie(clickedMovie, ()->{
+					movieTableModel.deletedMovies.add(clickedMovie);
+					movieTableModel.fireTableRowUpdate(clickedMovieRowM);
+				});
+			}));
 			
 			addSeparator();
 			
@@ -235,6 +244,8 @@ class MoviesPanel extends JSplitPane {
 				clickedMovie = null;
 				int rowV = movieTable.rowAtPoint(new Point(x,y));
 				int rowM = movieTable.convertRowIndexToModel(rowV);
+				clickedMovieRowM = rowM;
+				
 				if (movieTableModel!=null)
 					clickedMovie = movieTableModel.getRow(rowM);
 				
@@ -286,7 +297,7 @@ class MoviesPanel extends JSplitPane {
 		});
 	}
 	
-	private void deleteMovie(MovieList.Movie movie) {
+	private void deleteMovie(MovieList.Movie movie, Runnable wasDeleted) {
 		if (movie==null) return;
 		
 		String baseURL = main.getBaseURL();
@@ -297,6 +308,8 @@ class MoviesPanel extends JSplitPane {
 				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
 			});
 			main.showMessageResponse(response, "Delete Movie");
+			if (response.result && wasDeleted!=null)
+				wasDeleted.run();
 		});
 	}
 
@@ -578,15 +591,17 @@ class MoviesPanel extends JSplitPane {
 
 	static class MovieTableModel extends Tables.SimpleGetValueTableModel<MovieList.Movie, MovieTableModel.ColumnID> {
 		
+		private static final Color COLOR_DELETED = new Color(0xC0C0C0);
+		
 		// Column Widths: [280, 50, 109, 450, 59, 108]
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<MovieList.Movie>, SwingConstants {
 			Name    ("Name"    ,  String.class, 280, null, MovieTableModel::getRowName),
 			Progress("Progress",    Long.class,  60, null, m->m.lastseen           ),
 			Length  ("Length"  , Integer.class,  50, null, m->m.length_s     , m->m.lengthStr),
+			Size    ("Size"    ,    Long.class,  60, null, m->m.filesize     , m->m.filesize_readable),
 			Time    ("Time"    ,    Long.class, 110, null, m->m.recordingtime, m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false)),
 			Station ("Station" ,  String.class, 110, null, m->m.servicename        ),
 			File    ("File"    ,  String.class, 450, null, m->m.filename_stripped  ),
-			Size    ("Size"    ,    Long.class,  60, null, m->m.filesize     , m->m.filesize_readable),
 			;
 		
 			final SimplifiedColumnConfig cfg;
@@ -620,11 +635,13 @@ class MoviesPanel extends JSplitPane {
 		}
 	
 		private boolean showDescriptionInNameColumn;
+		private final Set<MovieList.Movie> deletedMovies;
 
 		private MovieTableModel(Vector<MovieList.Movie> movies)
 		{
 			super(ColumnID.values(), movies);
 			showDescriptionInNameColumn = getShowDescriptionInNameColumn();
+			deletedMovies = new HashSet<>();
 		}
 	
 		private static String getRowName(MovieTableModel model, MovieList.Movie movie)
@@ -665,6 +682,11 @@ class MoviesPanel extends JSplitPane {
 			return super.getValueAt(rowIndex, columnIndex, columnID, row);
 		}
 
+		@Override
+		protected void fireTableRowUpdate(int rowIndex) {
+			super.fireTableRowUpdate(rowIndex);
+		}
+
 		private void setCellRenderers()
 		{
 			CustomCellRenderer customCellRenderer = new CustomCellRenderer();
@@ -674,15 +696,15 @@ class MoviesPanel extends JSplitPane {
 				{
 					if (columnID==ColumnID.Progress)
 						column.setCellRenderer(scaleCellRenderer);
-					else if (columnID.getDisplayStr!=null)
+					else //if (columnID.getDisplayStr!=null)
 						column.setCellRenderer(customCellRenderer);
 				}
 			});
 		}
 		
-		private static class ScaleCellRenderer implements TableCellRenderer {
+		private class ScaleCellRenderer implements TableCellRenderer {
 			
-			private final Tables.GraphicRendererComponent<Long> rendComp;
+			private final ScaleRC rendComp;
 
 			ScaleCellRenderer() {
 				rendComp = new ScaleRC();
@@ -691,18 +713,26 @@ class MoviesPanel extends JSplitPane {
 
 			@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV)
 			{
+				int rowM = table.convertRowIndexToModel(rowV);
+				MovieList.Movie movie = getRow(rowM);
+				rendComp.wasDeleted = deletedMovies.contains(movie);
+				
 				rendComp.configureAsTableCellRendererComponent(table, value, isSelected, hasFocus);
 				return rendComp;
 			}
 			
 			private static class ScaleRC extends Tables.GraphicRendererComponent<Long>
 			{
+				private static final Color COLOR_COMPLETED = new Color(0x00CD00);
+				private static final Color COLOR_PLAYING   = new Color(0xFFCD00);
+
 				private static final long serialVersionUID = 5308892166500614939L;
 				
 				private Long value = null;
 				private boolean isSelected = false;
 				private JTable table = null;
 				private JList<?> list = null;
+				private boolean wasDeleted = false;
 				
 				ScaleRC() { super(Long.class); }
 				
@@ -721,19 +751,28 @@ class MoviesPanel extends JSplitPane {
 					
 					Color color = null;
 					if (value < 30)
-					{
-						if (table!=null) color = isSelected ? table.getSelectionForeground() : table.getForeground();
-						if (list !=null) color = isSelected ? list .getSelectionForeground() : list .getForeground();
-					}
+						color = isSelected ? getTableOrListSelectionForeground() : wasDeleted ? COLOR_DELETED : getTableOrListForeground();
 					else if (value < 90)
-						color = new Color(0xFFCD00);
+						color = !wasDeleted ? COLOR_PLAYING   : isSelected ? getTableOrListSelectionForeground() : COLOR_DELETED;
 					else
-						color = new Color(0x00CD00);
+						color = !wasDeleted ? COLOR_COMPLETED : isSelected ? getTableOrListSelectionForeground() : COLOR_DELETED;
 					
 					int scaleWidth = (width-2)*Math.min(value.intValue(), 100) / 100;
 					g.setColor(color);
 					g.drawRect(x  , y  , width-1   , height-1);
 					g.fillRect(x+1, y+1, scaleWidth, height-2);
+				}
+
+				private Color getTableOrListSelectionForeground() {
+					if (table!=null) return table.getSelectionForeground();
+					if (list !=null) return list .getSelectionForeground();
+					return Color.BLACK;
+				}
+
+				private Color getTableOrListForeground() {
+					if (table!=null) return table.getForeground();
+					if (list !=null) return list .getForeground();
+					return Color.BLACK;
 				}
 			}
 		}
@@ -746,16 +785,22 @@ class MoviesPanel extends JSplitPane {
 				
 				int columnM = table.convertColumnIndexToModel(columnV);
 				ColumnID columnID = getColumnID(columnM);
+				int rowM = table.convertRowIndexToModel(rowV);
+				MovieList.Movie movie = getRow(rowM);
 				
 				if (columnID!=null)
 				{
-					if (columnID.getDisplayStr!=null) {
-						int rowM = table.convertRowIndexToModel(rowV);
-						MovieList.Movie movie = getRow(rowM);
-						if (movie!=null) setText(columnID.getDisplayStr.apply(movie));
-					}
+					if (columnID.getDisplayStr!=null && movie!=null)
+						setText(columnID.getDisplayStr.apply(movie));
 					setHorizontalAlignment(columnID.horizontalAlignment);
 				}
+				
+				if (isSelected)
+					setForeground(table.getSelectionForeground());
+				else if (deletedMovies.contains(movie))
+					setForeground(COLOR_DELETED);
+				else
+					setForeground(table.getForeground());
 				
 				return comp;
 			}

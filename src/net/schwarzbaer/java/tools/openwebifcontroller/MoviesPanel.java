@@ -45,11 +45,13 @@ import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
+import net.schwarzbaer.java.lib.gui.Tables.GetValueTableModelOutputter.OutputType;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.MovieList.Movie;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
@@ -228,6 +230,11 @@ class MoviesPanel extends JSplitPane {
 			}));
 			
 			JMenuItem miReloadTable = add(OpenWebifController.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
+			
+			add( OpenWebifController.createMenuItem("Copy table content to clipboard (tab separated)", GrayCommandIcons.IconGroup.Copy, e->{
+				ClipboardTools.copyToClipBoard(movieTableModel.getTableContentAsString(OutputType.TabSeparated, true, true));
+			}) );
+			
 			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 				TableColumnModel columnModel = movieTable.getColumnModel();
 				if (columnModel==null) return;

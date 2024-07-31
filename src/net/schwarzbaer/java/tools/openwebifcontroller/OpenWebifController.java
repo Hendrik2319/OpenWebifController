@@ -109,7 +109,19 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	public static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();
 
 	public static void main(String[] args) {
-		if (args.length>0) {
+		System.out.println("OpenWebifController");
+		System.out.println("by Hendrik Scholtz");
+		System.out.println();
+		
+		if (args.length==0) {
+			System.out.println("Usage");
+			System.out.println("  -b, --baseurl [BaseURL]    Sets base URL of STB");
+			System.out.println("  -on|-off                   Turns STB ON or OFF (=StandBy)");
+			System.out.println("  -mute                      Turns volume off");
+			System.out.println("  --reboot                   Restarts STB (Linux & GUI)");
+			System.out.println("  --stationswitch            Start StationSwitch");
+			
+		} else {
 			if (args[0].equals("-start") && args.length>1) {
 				String[] parameters = Arrays.copyOfRange(args, 1, args.length);
 				System.out.printf("start something:%n");
@@ -120,63 +132,52 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 				
 				return;
 			}
-			if (args.length==0) {
-				System.out.println("OpenWebifController");
-				System.out.println("by Hendrik Scholtz");
-				System.out.println();
-				System.out.println("Usage");
-				System.out.println("  -b, --baseurl [BaseURL]    Sets base URL of STB");
-				System.out.println("  -on|-off                   Turns STB ON or OFF (=StandBy)");
-				System.out.println("  -mute                      Turns volume off");
-				System.out.println("  --reboot                   Restarts STB (Linux & GUI)");
-				System.out.println("  --stationswitch            Start StationSwitch");
 				
-			} else {
-				String baseURL = null;
-				boolean turnOn = false;
-				boolean turnOff = false;
-				boolean reboot = false;
-				boolean mute = false;
-				boolean stationswitch = false;
-				for (int i=0; i<args.length; i++) {
-					String str = args[i];
-					if ( (str.equalsIgnoreCase("--baseurl") || str.equalsIgnoreCase("-b")) && i+1 < args.length) {
-						baseURL = args[i+1];
-						i++;
-						
-					} else if (str.equalsIgnoreCase("-mute")) {
-						mute = true;
-						
-					} else if (str.equalsIgnoreCase("-on")) {
-						turnOn = true;
-						
-					} else if (str.equalsIgnoreCase("-off")) {
-						turnOff = true;
-						
-					} else if (str.equalsIgnoreCase("--reboot")) {
-						reboot = true;
-						
-					} else if (str.equalsIgnoreCase("--stationswitch")) {
-						stationswitch = true;
-					}
+			String baseURL = null;
+			boolean turnOn = false;
+			boolean turnOff = false;
+			boolean reboot = false;
+			boolean mute = false;
+			boolean stationswitch = false;
+			
+			for (int i=0; i<args.length; i++) {
+				String str = args[i];
+				if ( (str.equalsIgnoreCase("--baseurl") || str.equalsIgnoreCase("-b")) && i+1 < args.length) {
+					baseURL = args[i+1];
+					i++;
+					
+				} else if (str.equalsIgnoreCase("-mute")) {
+					mute = true;
+					
+				} else if (str.equalsIgnoreCase("-on")) {
+					turnOn = true;
+					
+				} else if (str.equalsIgnoreCase("-off")) {
+					turnOff = true;
+					
+				} else if (str.equalsIgnoreCase("--reboot")) {
+					reboot = true;
+					
+				} else if (str.equalsIgnoreCase("--stationswitch")) {
+					stationswitch = true;
 				}
-				
-				if (turnOn || turnOff || reboot || mute || stationswitch) {
-					if (baseURL==null) baseURL = getBaseURL_DontAskUser();
-					if (stationswitch) {
-						StationSwitch.start(baseURL,false);
-						return;
-					}
-					if (baseURL==null) {
-						System.err.println("Can't execute task: No Base URL defined.");
-					} else {
-						if      (turnOff) PowerControl.setState(baseURL, Power.Commands.Standby, System.out);
-						else if (turnOn ) PowerControl.setState(baseURL, Power.Commands.Wakeup , System.out);
-						else if (reboot ) PowerControl.setState(baseURL, Power.Commands.Reboot , System.out);
-						else if (mute   ) VolumeControl.setVolMute(baseURL, System.out);
-					}
+			}
+			
+			if (turnOn || turnOff || reboot || mute || stationswitch) {
+				if (baseURL==null) baseURL = getBaseURL_DontAskUser();
+				if (stationswitch) {
+					StationSwitch.start(baseURL,false);
 					return;
 				}
+				if (baseURL==null) {
+					System.err.println("Can't execute task: No Base URL defined.");
+				} else {
+					if      (turnOff) PowerControl.setState(baseURL, Power.Commands.Standby, System.out);
+					else if (turnOn ) PowerControl.setState(baseURL, Power.Commands.Wakeup , System.out);
+					else if (reboot ) PowerControl.setState(baseURL, Power.Commands.Reboot , System.out);
+					else if (mute   ) VolumeControl.setVolMute(baseURL, System.out);
+				}
+				return;
 			}
 			
 		}

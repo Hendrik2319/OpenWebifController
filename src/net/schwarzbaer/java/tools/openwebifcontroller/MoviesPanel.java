@@ -49,7 +49,6 @@ import net.schwarzbaer.java.lib.gui.Tables.GetValueTableModelOutputter.OutputTyp
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
-import net.schwarzbaer.java.lib.openwebif.MovieList.Movie;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
@@ -613,7 +612,7 @@ class MoviesPanel extends JSplitPane {
 		
 			final SimplifiedColumnConfig cfg;
 			final Function<MovieList.Movie, ?> getValue;
-			final BiFunction<MovieTableModel, Movie, ?> getValue2;
+			final BiFunction<MovieTableModel, MovieList.Movie, ?> getValue2;
 			final Function<MovieList.Movie, String> getDisplayStr;
 			final int horizontalAlignment;
 			
@@ -638,7 +637,7 @@ class MoviesPanel extends JSplitPane {
 			}
 			
 			@Override public SimplifiedColumnConfig getColumnConfig() { return cfg; }
-			@Override public Function<Movie,?> getGetValue() { return getValue; }
+			@Override public Function<MovieList.Movie,?> getGetValue() { return getValue; }
 		}
 	
 		private boolean showDescriptionInNameColumn;
@@ -682,7 +681,7 @@ class MoviesPanel extends JSplitPane {
 		
 
 		@Override
-		protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, Movie row)
+		protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, MovieList.Movie row)
 		{
 			if (columnID.getValue2!=null)
 				return columnID.getValue2.apply(this, row);

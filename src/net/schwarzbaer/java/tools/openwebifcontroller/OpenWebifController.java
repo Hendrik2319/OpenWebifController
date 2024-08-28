@@ -208,6 +208,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			SplitPaneDivider_MoviesPanel,
 			SplitPaneDivider_BouquetsNStations_CenterPanel,
 			SplitPaneDivider_BouquetsNStations_ValuePanel,
+			SplitPaneDivider_BouquetsNStations_SingleStationEPGPanel,
 			LookAndFeel,
 		}
 
@@ -290,9 +291,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	private final VolumeControl volumeControl;
 	private final PowerControl powerControl;
 	private final MessageControl messageControl;
-	private final EPG epg;
-	public SystemInfo systemInfo;
-	public HashMap<String, BoxSettings.BoxSettingsValue> boxSettings;
+	public  final EPG epg;
+	public        SystemInfo systemInfo;
+	public        HashMap<String, BoxSettings.BoxSettingsValue> boxSettings;
 	private final SystemInfoPanel systemInfoPanel;
 	private final RemoteControlPanel remoteControl;
 	private final LogWindow logWindow;

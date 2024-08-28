@@ -26,6 +26,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -48,6 +49,7 @@ import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings;
+import net.schwarzbaer.java.tools.openwebifcontroller.epg.SingleStationEPGPanel;
 
 public class BouquetsNStations extends JPanel {
 	private static final long serialVersionUID = 1873358104402086477L;
@@ -57,6 +59,7 @@ public class BouquetsNStations extends JPanel {
 	private final JTree bsTree;
 	private final StatusOut statusLine;
 	private final ValuePanel valuePanel;
+	private final SingleStationEPGPanel singleStationEPGPanel;
 	private final FileChooser m3uFileChooser;
 	private final FileChooser txtFileChooser;
 	private final OpenWebifController.Updater periodicUpdater10s;
@@ -95,12 +98,17 @@ public class BouquetsNStations extends JPanel {
 		JScrollPane treeScrollPane = new JScrollPane(bsTree);
 		treeScrollPane.setPreferredSize(new Dimension(300,500));
 		
-		valuePanel = new ValuePanel(this.main::getBaseURL);
-		
 		statusLine = new StatusOut();
 		PICON_LOADER.setStatusOutput(statusLine);
 		
-		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true, treeScrollPane, valuePanel.panel);
+		valuePanel = new ValuePanel(this.main::getBaseURL);
+		singleStationEPGPanel = new SingleStationEPGPanel(main.epg, this.main::getBaseURL, statusLine::showMessage);
+		
+		JTabbedPane rightPanel = new JTabbedPane();
+		rightPanel.addTab("Station", valuePanel.panel);
+		rightPanel.addTab("EPG", singleStationEPGPanel);
+		
+		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true, treeScrollPane, rightPanel);
 		add(centerPanel,BorderLayout.CENTER);
 		add(statusLine.comp,BorderLayout.SOUTH);
 		
@@ -138,8 +146,9 @@ public class BouquetsNStations extends JPanel {
 		
 		OpenWebifController.settings.registerSplitPaneDividers(
 				new SplitPaneDividersDefinition<>(this.main.mainWindow, AppSettings.ValueKey.class)
-				.add(centerPanel     , AppSettings.ValueKey.SplitPaneDivider_BouquetsNStations_CenterPanel)
-				.add(valuePanel.panel, AppSettings.ValueKey.SplitPaneDivider_BouquetsNStations_ValuePanel)
+				.add(centerPanel          , AppSettings.ValueKey.SplitPaneDivider_BouquetsNStations_CenterPanel          )
+				.add(valuePanel.panel     , AppSettings.ValueKey.SplitPaneDivider_BouquetsNStations_ValuePanel           )
+				.add(singleStationEPGPanel, AppSettings.ValueKey.SplitPaneDivider_BouquetsNStations_SingleStationEPGPanel)
 		);
 		
 		if (shouldPeriodicUpdaterRun())

@@ -1,7 +1,9 @@
 package net.schwarzbaer.java.tools.openwebifcontroller.epg;
 
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Vector;
 import java.util.function.BiFunction;
@@ -16,6 +18,7 @@ import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.table.DefaultTableCellRenderer;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.Tables;
@@ -24,6 +27,7 @@ import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
+import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
 public class SingleStationEPGPanel extends JSplitPane
@@ -80,7 +84,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		});
 		
 		dataAcquisition = new DataAcquisition(
-				epgTableModel, epg, getBaseURL, setStatusOutput,
+				epgTableModel, epg, getBaseURL, setStatusOutput, 4*60*60,
 				str -> SwingUtilities.invokeLater(()->epgOutput.setText(str))
 		);
 	}
@@ -99,14 +103,16 @@ public class SingleStationEPGPanel extends JSplitPane
 		private final EPGTableModel epgTableModel;
 		private SubService currentStation = null;
 		private Thread thread = null;
+		private final long leadTime_s;
 		
-		DataAcquisition(EPGTableModel epgTableModel, EPG epg, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, Consumer<String> setTextboxOutput)
+		DataAcquisition(EPGTableModel epgTableModel, EPG epg, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, long leadTime_s, Consumer<String> setTextboxOutput)
 		{
 			this.epgTableModel = Objects.requireNonNull(epgTableModel);
 			this.epg = Objects.requireNonNull(epg);
 			this.getBaseURL = Objects.requireNonNull(getBaseURL);
 			this.setStatusOutput = Objects.requireNonNull(setStatusOutput);
 			this.setTextboxOutput = Objects.requireNonNull(setTextboxOutput);
+			this.leadTime_s = leadTime_s;
 		}
 
 		public void readEPGforService(SubService station)
@@ -127,17 +133,12 @@ public class SingleStationEPGPanel extends JSplitPane
 		private void threadLoop(SubService station)
 		{
 			String baseURL = getBaseURL.get();
-			SubService nextStation = station;
 			
 			boolean loopActive = true;
 			while (loopActive) {
-				setValues(new Vector<>(), String.format("Loading EPG of Station \"%s\" ...", nextStation.name), nextStation);
+				setValues(new Vector<>(), String.format("Loading EPG of Station \"%s\" ...", station.name), station);
 				
-				final SubService station_ = nextStation;
-				Vector<EPGevent> events = epg.readEPGforService(baseURL, station_.service.stationID, null, null, taskTitle->{
-					setStatusOutput.accept(String.format("EPG of Station \"%s\": %s", station_.name, taskTitle));
-				});
-				EPGEventGenres.getInstance().scanGenres(events).writeToFile();
+				Vector<EPGevent> events = readEPGforService(baseURL, station);
 				
 				synchronized (this)
 				{
@@ -146,16 +147,26 @@ public class SingleStationEPGPanel extends JSplitPane
 						thread = null;
 						loopActive = false;
 					}
-					else if (currentStation.servicereference.toUpperCase().equals(nextStation.servicereference.toUpperCase()))
+					else if (currentStation.servicereference.toUpperCase().equals(station.servicereference.toUpperCase()))
 					{
 						setValues(events, "", null);
 						thread = null;
 						loopActive = false;
 					}
 					else
-						nextStation = currentStation;
+						station = currentStation;
 				}
 			}
+		}
+
+		private Vector<EPGevent> readEPGforService(String baseURL, SubService station)
+		{
+			long beginTime_UnixTS = System.currentTimeMillis()/1000 - leadTime_s;
+			Vector<EPGevent> events = epg.readEPGforService(baseURL, station.service.stationID, beginTime_UnixTS, null, taskTitle->{
+				setStatusOutput.accept(String.format("EPG of Station \"%s\": %s", station.name, taskTitle));
+			});
+			EPGEventGenres.getInstance().scanGenres(events).writeToFile();
+			return events;
 		}
 
 		private synchronized void setValues(Vector<EPGevent> data, String text, SubService station)
@@ -202,10 +213,18 @@ public class SingleStationEPGPanel extends JSplitPane
 	@SuppressWarnings("unused")
 	static class EPGTableModel extends Tables.SimpleGetValueTableModel<EPGevent, EPGTableModel.ColumnID> {
 		
+		private static String formatDate(long millis, boolean withTextDay, boolean withDate, boolean dateIsLong, boolean withTime, boolean withTimeZone) {
+			return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
+		}
+		
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<EPGevent>, SwingConstants
 		{
-			ID   ("ID"  ,   Long.class,  45, null, ev -> ev.id   ),
-			Name ("Name", String.class, 200, null, ev -> ev.title),
+			ID       ("ID"       , Long  .class,  45, CENTER, ev -> ev.id   ),
+			Name     ("Name"     , String.class, 200,   null, ev -> ev.title),
+			Begin    ("Begin"    , Long  .class, 170,   null, ev -> ev.begin_timestamp                , ev -> formatDate((ev.begin_timestamp                )*1000,  true,  true, false,  true, false)),
+			End      ("End"      , Long  .class,  60,   null, ev -> ev.begin_timestamp+ev.duration_sec, ev -> formatDate((ev.begin_timestamp+ev.duration_sec)*1000, false, false, false,  true, false)),
+			Duration ("Duration" , Long  .class,  60,   null, ev -> ev.duration_sec                   , ev -> DateTimeFormatter.getDurationStr(ev.duration_sec)),
+			Duratio_ ("Genre"    , Long  .class, 350,   LEFT, ev -> ev.genreid                        , ev -> " [%03d] %s".formatted(ev.genreid, ev.genre)),
 			;
 			
 			final SimplifiedColumnConfig cfg;
@@ -245,8 +264,31 @@ public class SingleStationEPGPanel extends JSplitPane
 
 		void setCellRenderers()
 		{
-			// TODO Auto-generated method stub
+			CustomCellRenderer renderer = new CustomCellRenderer();
+			setDefaultRenderers(clazz -> renderer);
 		}
 		
+		private class CustomCellRenderer extends DefaultTableCellRenderer
+		{
+			private static final long serialVersionUID = 8998686057581622646L;
+
+			@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV) {
+				Component comp = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, rowV, columnV);
+				
+				int columnM = table.convertColumnIndexToModel(columnV);
+				ColumnID columnID = getColumnID(columnM);
+				int rowM = table.convertRowIndexToModel(rowV);
+				EPGevent event = getRow(rowM);
+				
+				if (columnID!=null)
+				{
+					if (columnID.getDisplayStr!=null && event!=null)
+						setText(columnID.getDisplayStr.apply(event));
+					setHorizontalAlignment(columnID.horizontalAlignment);
+				}
+				
+				return comp;
+			}
+		}
 	}
 }

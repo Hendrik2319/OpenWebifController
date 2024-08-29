@@ -29,14 +29,14 @@ class PiconLoader {
 			//System.out.println("PiconLoader.start");
 			while (performTask());
 			//System.out.println("PiconLoader.end");
-			if (statusOut!=null) statusOut.clear();;
+			//if (statusOut!=null) statusOut.clear();;
 		});
 		taskThread.start();
 	}
 
 	private synchronized void updateStatus() {
 		String msg = String.format("Picon Loader : %d pending tasks, %d tree nodes to update, %d picons cached", tasks.size(), solvedTasks.size(), piconCache.size());
-		if (statusOut!=null) statusOut.showMessage(msg);
+		if (statusOut!=null) statusOut.showMessage(msg, 2000);
 	}
 
 	private boolean performTask() {

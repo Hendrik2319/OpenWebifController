@@ -311,17 +311,17 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		
 		logWindow = new LogWindow(mainWindow, "Response Log");
 		
-		movies = new MoviesPanel(this);
-		bouquetsNStations = new BouquetsNStations(this);
-		timers = new TimersPanel(this);
-		screenShot = new ScreenShot(this, remoteControl = new RemoteControlPanel(this));
-		systemInfoPanel = new SystemInfoPanel();
-		
 		epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
 				return dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
 			}
 		});
+		
+		movies = new MoviesPanel(this);
+		bouquetsNStations = new BouquetsNStations(this);
+		timers = new TimersPanel(this);
+		screenShot = new ScreenShot(this, remoteControl = new RemoteControlPanel(this));
+		systemInfoPanel = new SystemInfoPanel();
 		
 		JTabbedPane tabPanel = new JTabbedPane();
 		tabPanel.addTab("System", systemInfoPanel);

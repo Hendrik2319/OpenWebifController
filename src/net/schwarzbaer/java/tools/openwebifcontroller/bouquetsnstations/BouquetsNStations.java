@@ -42,6 +42,7 @@ import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
@@ -102,7 +103,7 @@ public class BouquetsNStations extends JPanel {
 		PICON_LOADER.setStatusOutput(statusLine);
 		
 		valuePanel = new ValuePanel(this.main::getBaseURL);
-		singleStationEPGPanel = new SingleStationEPGPanel(main.epg, this.main::getBaseURL, statusLine::showMessage);
+		singleStationEPGPanel = new SingleStationEPGPanel(main.epg, this.main::getBaseURL, str -> statusLine.showMessage(str, 2000));
 		
 		JTabbedPane rightPanel = new JTabbedPane();
 		rightPanel.addTab("Station", valuePanel.panel);
@@ -117,14 +118,13 @@ public class BouquetsNStations extends JPanel {
 		
 		periodicUpdater10s = new OpenWebifController.Updater(10, () -> {
 			if (updatePlayableStatesPeriodically) {
-				statusLine.showMessage("Update 'Playable' States");
+				statusLine.showMessage("Update 'Playable' States", 2000);
 				updatePlayableStates();
 			}
 			if (updateCurrentStationPeriodically) {
-				statusLine.showMessage("Update 'Current Station'");
+				statusLine.showMessage("Update 'Current Station'", 2000);
 				updateCurrentStation();
 			}
-			statusLine.clear();
 		});
 		
 		new TreeContextMenu().addTo(bsTree);
@@ -134,7 +134,10 @@ public class BouquetsNStations extends JPanel {
 			TreePath[] selectedTreePaths = bsTree.getSelectionPaths();
 			
 			if (selectedTreePaths.length==1)
+			{
 				valuePanel.showValues(selectedTreePaths[0]);
+				singleStationEPGPanel.setStation(getStation(selectedTreePaths[0]));
+			}
 			
 			selectedStationNodes.clear();
 			for (TreePath path:selectedTreePaths) {
@@ -155,6 +158,16 @@ public class BouquetsNStations extends JPanel {
 			periodicUpdater10s.start();
 	}
 	
+	private SubService getStation(TreePath treePath)
+	{
+		Object obj = treePath.getLastPathComponent();
+		if (obj instanceof BSTreeNode.StationNode stationNode)
+			if (!stationNode.isMarker())
+				return stationNode.subservice;
+		
+		return null;
+	}
+
 	private class TreeContextMenu extends ContextMenu {
 		private static final long serialVersionUID = -5273880699058313222L;
 		
@@ -545,18 +558,73 @@ public class BouquetsNStations extends JPanel {
 	static class StatusOut {
 		
 		private final JLabel comp;
+		private ShortShownText clearer;
 		
 		StatusOut() {
 			comp = new JLabel(); 
 			comp.setBorder(BorderFactory.createEtchedBorder());
+			clearer = new ShortShownText(
+					str -> SwingUtilities.invokeLater(()->comp.setText(str)),
+					()  -> SwingUtilities.invokeLater(()->comp.setText(" "))
+			);
 		}
 		
-		public void showMessage(String msg) {
-			SwingUtilities.invokeLater(()->comp.setText(msg));
+		public void showMessage(String msg, int duration_ms) {
+			clearer.setText(msg, duration_ms);
 		}
-		public void clear() {
-			SwingUtilities.invokeLater(()->comp.setText(" "));
+	}
+	
+	static class ShortShownText
+	{
+		private final Consumer<String> setText;
+		private final Runnable clearText;
+		private Long clearTime = null;
+		private Thread thread = null;
+
+		ShortShownText(Consumer<String> setText, Runnable clearText)
+		{
+			this.setText = setText;
+			this.clearText = clearText;
 		}
+		
+		void setText(String text, int duration_ms)
+		{
+			setText.accept(text);
+			startThread(duration_ms);
+		}
+
+		private synchronized void startThread(int duration_ms) {
+			clearTime = System.currentTimeMillis()+duration_ms;
+			
+			if (thread==null) {
+				thread = new Thread(this::waitToClearText);
+				thread.start();
+			}
+		}
+		
+		private synchronized void waitToClearText() {
+			if (clearTime==null) return;
+			
+			long currentTime = System.currentTimeMillis();
+			while (clearTime!=null && currentTime < clearTime)
+			{
+				try {
+					wait(clearTime-currentTime);
+				} catch (InterruptedException ex) {
+					System.err.printf("InterruptedException in ShortShownText.waitToClearText: %s%n", ex.getMessage());
+					// ex.printStackTrace();
+				}
+				currentTime = System.currentTimeMillis();
+			}
+			
+			if (clearTime!=null)
+			{
+				clearText.run();
+				clearTime = null;
+				thread = null;
+			}
+		}
+
 	}
 
 	static class BSTreeCellRenderer extends DefaultTreeCellRenderer {

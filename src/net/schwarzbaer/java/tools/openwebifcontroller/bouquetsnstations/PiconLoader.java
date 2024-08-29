@@ -29,7 +29,7 @@ class PiconLoader {
 			//System.out.println("PiconLoader.start");
 			while (performTask());
 			//System.out.println("PiconLoader.end");
-			//if (statusOut!=null) statusOut.clear();;
+			if (statusOut!=null) statusOut.showMessage(" ", 100);
 		});
 		taskThread.start();
 	}

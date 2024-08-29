@@ -30,20 +30,14 @@ public class SingleStationEPGPanel extends JSplitPane
 {
 	private static final long serialVersionUID = 4349270717898712489L;
 	
-	private final EPG epg;
-	private final Supplier<String> getBaseURL;
-	private final Consumer<String> setStatusOutput;
-	
 	private final JTable epgTable;
 	private final EPGTableModel epgTableModel;
 	private final JTextArea epgOutput;
+	private final DataAcquisition dataAcquisition;
 
 	public SingleStationEPGPanel(EPG epg, Supplier<String> getBaseURL, Consumer<String> setStatusOutput)
 	{
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
-		this.epg = Objects.requireNonNull(epg);
-		this.getBaseURL = Objects.requireNonNull(getBaseURL);
-		this.setStatusOutput = Objects.requireNonNull(setStatusOutput);
 		
 		epgTable = new JTable(epgTableModel = new EPGTableModel());
 		epgTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
@@ -54,64 +48,125 @@ public class SingleStationEPGPanel extends JSplitPane
 		epgTableModel.setColumnWidths(epgTable);
 		epgTableModel.setCellRenderers();
 		
-		epgTable.getSelectionModel().addListSelectionListener(e -> {
-			int rowV = epgTable.getSelectedRow();
-			int rowM = epgTable.convertRowIndexToModel(rowV);
-			showValues(epgTableModel.getRow(rowM), null);
-		});
-		
 		new EPGTableContextMenu();
 		
 		JScrollPane tableScrollPane = new JScrollPane(epgTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
 		epgOutput = new JTextArea();
+		epgOutput.setLineWrap(true);
+		epgOutput.setWrapStyleWord(true);
 		
 		JScrollPane textAreaScrollPane = new JScrollPane(epgOutput);
 		textAreaScrollPane.setPreferredSize(new Dimension(600,500));
 		
 		setLeftComponent(tableScrollPane);
 		setRightComponent(textAreaScrollPane);
+		
+		epgTable.getSelectionModel().addListSelectionListener(e -> {
+			int rowV = epgTable.getSelectedRow();
+			int rowM = rowV<0 ? -1 : epgTable.convertRowIndexToModel(rowV);
+			EPGevent event = rowM<0 ? null : epgTableModel.getRow(rowM);
+			
+			if (event == null)
+			{
+				epgOutput.setText(null);
+				return;
+			}
+			
+			ValueListOutput out = new ValueListOutput();
+			OpenWebifController.generateOutput(out, 0, event);
+			epgOutput.setText(out.generateOutput());
+		});
+		
+		dataAcquisition = new DataAcquisition(
+				epgTableModel, epg, getBaseURL, setStatusOutput,
+				str -> SwingUtilities.invokeLater(()->epgOutput.setText(str))
+		);
 	}
 	
 	public void setStation(SubService station)
 	{
-		Vector<EPGevent> events;
-		if (station==null || station.isMarker())
+		dataAcquisition.readEPGforService(station);
+	}
+	
+	static class DataAcquisition
+	{
+		private final EPG epg;
+		private final Supplier<String> getBaseURL;
+		private final Consumer<String> setStatusOutput;
+		private final Consumer<String> setTextboxOutput;
+		private final EPGTableModel epgTableModel;
+		private SubService currentStation = null;
+		private Thread thread = null;
+		
+		DataAcquisition(EPGTableModel epgTableModel, EPG epg, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, Consumer<String> setTextboxOutput)
 		{
-			events = new Vector<>();
+			this.epgTableModel = Objects.requireNonNull(epgTableModel);
+			this.epg = Objects.requireNonNull(epg);
+			this.getBaseURL = Objects.requireNonNull(getBaseURL);
+			this.setStatusOutput = Objects.requireNonNull(setStatusOutput);
+			this.setTextboxOutput = Objects.requireNonNull(setTextboxOutput);
 		}
-		else
+
+		public void readEPGforService(SubService station)
+		{
+			if (station==null || station.isMarker())
+				setValues(new Vector<>(), "", null);
+			
+			else
+				synchronized (this)
+				{
+					if (thread!=null)
+						currentStation = station;
+					else
+						(thread = new Thread(()->threadLoop(station))).start();
+				}
+		}
+
+		private void threadLoop(SubService station)
 		{
 			String baseURL = getBaseURL.get();
+			SubService nextStation = station;
 			
-			epgTableModel.setData(new Vector<>());
-			showValues(null, String.format("Loading EPG of Station \"%s\" ...", station.name));
-			
-			// TODO: move to separate thread (Skippable Task)
-			events = epg.readEPGforService(baseURL, station.service.stationID, null, null, taskTitle->{
-				SwingUtilities.invokeLater(()->{
-					setStatusOutput.accept(String.format("EPG of Station \"%s\": %s", station.name, taskTitle));
+			boolean loopActive = true;
+			while (loopActive) {
+				setValues(new Vector<>(), String.format("Loading EPG of Station \"%s\" ...", nextStation.name), nextStation);
+				
+				final SubService station_ = nextStation;
+				Vector<EPGevent> events = epg.readEPGforService(baseURL, station_.service.stationID, null, null, taskTitle->{
+					setStatusOutput.accept(String.format("EPG of Station \"%s\": %s", station_.name, taskTitle));
 				});
-			});
-			EPGEventGenres.getInstance().scanGenres(events).writeToFile();
+				EPGEventGenres.getInstance().scanGenres(events).writeToFile();
+				
+				synchronized (this)
+				{
+					if (currentStation==null)
+					{
+						thread = null;
+						loopActive = false;
+					}
+					else if (currentStation.servicereference.toUpperCase().equals(nextStation.servicereference.toUpperCase()))
+					{
+						setValues(events, "", null);
+						thread = null;
+						loopActive = false;
+					}
+					else
+						nextStation = currentStation;
+				}
+			}
 		}
-		epgTableModel.setData(events);
-		showValues(null,null);
-	}
-	
-	private void showValues(EPGevent event, String plainText)
-	{
-		if (event!=null)
+
+		private synchronized void setValues(Vector<EPGevent> data, String text, SubService station)
 		{
-			ValueListOutput out = new ValueListOutput();
-			OpenWebifController.generateOutput(out, 0, event);
-			epgOutput.setText(out.generateOutput());
+			epgTableModel.setData(data);
+			setTextboxOutput.accept(text);
+			currentStation = station;
 		}
-		else
-			epgOutput.setText(plainText);
 	}
 	
+	@SuppressWarnings("unused")
 	private class EPGTableContextMenu extends ContextMenu
 	{
 		private static final long serialVersionUID = 2824217721324395677L;
@@ -144,6 +199,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		}
 	}
 
+	@SuppressWarnings("unused")
 	static class EPGTableModel extends Tables.SimpleGetValueTableModel<EPGevent, EPGTableModel.ColumnID> {
 		
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<EPGevent>, SwingConstants

@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import javax.swing.JMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
@@ -21,12 +22,14 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
+import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
@@ -39,7 +42,7 @@ public class SingleStationEPGPanel extends JSplitPane
 	private final JTextArea epgOutput;
 	private final DataAcquisition dataAcquisition;
 
-	public SingleStationEPGPanel(EPG epg, Supplier<String> getBaseURL, Consumer<String> setStatusOutput)
+	public SingleStationEPGPanel(EPG epg, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, EPGDialog.TimerCommands timerCommands)
 	{
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
 		
@@ -52,7 +55,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		epgTableModel.setColumnWidths(epgTable);
 		epgTableModel.setCellRenderers();
 		
-		new EPGTableContextMenu();
+		new EPGTableContextMenu(getBaseURL, timerCommands);
 		
 		JScrollPane tableScrollPane = new JScrollPane(epgTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
@@ -180,16 +183,31 @@ public class SingleStationEPGPanel extends JSplitPane
 	private class EPGTableContextMenu extends ContextMenu
 	{
 		private static final long serialVersionUID = 2824217721324395677L;
-		
-		@SuppressWarnings("unused")
-		private EPGevent clickedEvent;
-		@SuppressWarnings("unused")
-		private EPGevent selectedEvent;
 
-		EPGTableContextMenu()
+		private final EPGDialog.TimerCommands timerCommands;
+		private final Supplier<String> getBaseURL;
+		private final JMenuItem miAddRecordTimer;
+		private final JMenuItem miAddSwitchTimer;
+		private final JMenuItem miAddRecordNSwitchTimer;
+	//	private final JMenuItem miToggleTimer;
+	//	private final JMenuItem miDeleteTimer;
+		
+		private EPGevent clickedEvent;
+	//	private EPGevent selectedEvent;
+
+
+		EPGTableContextMenu(Supplier<String> getBaseURL, EPGDialog.TimerCommands timerCommands)
 		{
+			this.getBaseURL = Objects.requireNonNull(getBaseURL);
+			this.timerCommands = Objects.requireNonNull(timerCommands);
 			clickedEvent = null;
-			selectedEvent = null;
+		//	selectedEvent = null;
+			
+			add(miAddRecordTimer        = OpenWebifController.createMenuItem("Add Record Timer"         , GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Record       )));
+			add(miAddSwitchTimer        = OpenWebifController.createMenuItem("Add Switch Timer"         , GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Switch       )));
+			add(miAddRecordNSwitchTimer = OpenWebifController.createMenuItem("Add Record'N'Switch Timer", GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.RecordNSwitch)));
+		//	add(miToggleTimer           = OpenWebifController.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
+		//	add(miDeleteTimer           = OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
 			
 			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
 				System.out.printf("Column Widths: %s%n", EPGTableModel.getColumnWidthsAsString(epgTable));
@@ -200,15 +218,33 @@ public class SingleStationEPGPanel extends JSplitPane
 				int rowM = rowV<0 ? -1 : epgTable.convertRowIndexToModel(rowV);
 				clickedEvent = epgTableModel.getRow(rowM);
 				
-				int selRowV = epgTable.getSelectedRow();
-				int selRowM = selRowV<0 ? -1 : epgTable.convertRowIndexToModel(selRowV);
-				selectedEvent = epgTableModel.getRow(selRowM);
+			//	int selRowV = epgTable.getSelectedRow();
+			//	int selRowM = selRowV<0 ? -1 : epgTable.convertRowIndexToModel(selRowV);
+			//	selectedEvent = epgTableModel.getRow(selRowM);
 				
-				// ...
+				boolean isEventOK =
+						clickedEvent!=null &&
+						clickedEvent.sref!=null &&
+						clickedEvent.id!=null;
+				
+				miAddRecordTimer       .setEnabled(isEventOK /*&& timer==null*/);
+				miAddSwitchTimer       .setEnabled(isEventOK /*&& timer==null*/);
+				miAddRecordNSwitchTimer.setEnabled(isEventOK /*&& timer==null*/);
+			//	miToggleTimer          .setEnabled(isEventOK /*&& timer!=null*/);
+			//	miDeleteTimer          .setEnabled(isEventOK /*&& timer!=null*/);
+				miAddRecordTimer       .setText(!isEventOK  ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", clickedEvent.title));
+				miAddSwitchTimer       .setText(!isEventOK  ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", clickedEvent.title));
+				miAddRecordNSwitchTimer.setText(!isEventOK  ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", clickedEvent.title));
+			//	miToggleTimer          .setText(timer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", timer.name));
+			//	miDeleteTimer          .setText(timer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", timer.name));
 			});
 			
 			addTo(epgTable);
 		}
+		
+		private void addTimer(Timers.Timer.Type type) { timerCommands.addTimer   (getBaseURL.get(), clickedEvent.sref, clickedEvent.id.intValue(), type); }
+	//	private void deleteTimer()                    { externCommands.deleteTimer(baseURL, timer.timer); }
+	//	private void toggleTimer()                    { externCommands.toggleTimer(baseURL, timer.timer); }
 	}
 
 	static class EPGTableModel extends Tables.SimpleGetValueTableModel<EPGevent, EPGTableModel.ColumnID> {

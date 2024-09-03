@@ -103,7 +103,7 @@ public class BouquetsNStations extends JPanel {
 		PICON_LOADER.setStatusOutput(statusLine);
 		
 		valuePanel = new ValuePanel(this.main::getBaseURL);
-		singleStationEPGPanel = new SingleStationEPGPanel(main.epg, this.main::getBaseURL, str -> statusLine.showMessage(str, 2000));
+		singleStationEPGPanel = new SingleStationEPGPanel(main.epg, this.main::getBaseURL, str -> statusLine.showMessage(str, 2000), main);
 		
 		JTabbedPane rightPanel = new JTabbedPane();
 		rightPanel.addTab("Station", valuePanel.panel);

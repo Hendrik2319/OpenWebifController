@@ -177,12 +177,13 @@ public class SingleStationEPGPanel extends JSplitPane
 		}
 	}
 	
-	@SuppressWarnings("unused")
 	private class EPGTableContextMenu extends ContextMenu
 	{
 		private static final long serialVersionUID = 2824217721324395677L;
 		
+		@SuppressWarnings("unused")
 		private EPGevent clickedEvent;
+		@SuppressWarnings("unused")
 		private EPGevent selectedEvent;
 
 		EPGTableContextMenu()
@@ -210,7 +211,6 @@ public class SingleStationEPGPanel extends JSplitPane
 		}
 	}
 
-	@SuppressWarnings("unused")
 	static class EPGTableModel extends Tables.SimpleGetValueTableModel<EPGevent, EPGTableModel.ColumnID> {
 		
 		private static String formatDate(long millis, boolean withTextDay, boolean withDate, boolean dateIsLong, boolean withTime, boolean withTimeZone) {
@@ -219,36 +219,52 @@ public class SingleStationEPGPanel extends JSplitPane
 		
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<EPGevent>, SwingConstants
 		{
-			ID       ("ID"       , Long  .class,  45, CENTER, ev -> ev.id   ),
-			Name     ("Name"     , String.class, 200,   null, ev -> ev.title),
-			Begin    ("Begin"    , Long  .class, 170,   null, ev -> ev.begin_timestamp                , ev -> formatDate((ev.begin_timestamp                )*1000,  true,  true, false,  true, false)),
-			End      ("End"      , Long  .class,  60,   null, ev -> ev.begin_timestamp+ev.duration_sec, ev -> formatDate((ev.begin_timestamp+ev.duration_sec)*1000, false, false, false,  true, false)),
-			Duration ("Duration" , Long  .class,  60,   null, ev -> ev.duration_sec                   , ev -> DateTimeFormatter.getDurationStr(ev.duration_sec)),
-			Duratio_ ("Genre"    , Long  .class, 350,   LEFT, ev -> ev.genreid                        , ev -> " [%03d] %s".formatted(ev.genreid, ev.genre)),
+			// Column Widths: [45, 200, 170, 60, 60, 350, 250, 250, 60, 53, 48, 110, 85, 89, 74, 72, 53, 105, 71, 300, 230] in ModelOrder
+			ID           ("ID"               , Long   .class,  45, CENTER, ev -> ev.id           ),
+			Name         ("Name"             , String .class, 200,   null, ev -> ev.title        ),
+			Begin        ("Begin"            , Long   .class, 170,   null, ev -> ev.begin_timestamp                , ev -> formatDate((ev.begin_timestamp                )*1000,  true,  true, false,  true, false)),
+			End          ("End"              , Long   .class,  60,   null, ev -> ev.begin_timestamp+ev.duration_sec, ev -> formatDate((ev.begin_timestamp+ev.duration_sec)*1000, false, false, false,  true, false)),
+			Duration     ("Duration"         , Long   .class,  60,   null, ev -> ev.duration_sec                   , ev -> DateTimeFormatter.getDurationStr(ev.duration_sec)),
+			Genre        ("Genre"            , Long   .class, 350,   LEFT, ev -> ev.genreid                        , ev -> " [%03d] %s".formatted(ev.genreid, ev.genre)),
+			ShortDesc    ("Short Description", String .class, 250,   null, ev -> ev.shortdesc    ),
+			LongDesc     ("Long Description" , String .class, 250,   null, ev -> ev.longdesc     ),
+			Str_Date     ("<date>"           , String .class,  60,   null, ev -> ev.date         ),
+			Str_Begin    ("<begin>"          , String .class,  60,   null, ev -> ev.begin        ),
+			Str_End      ("<end>"            , String .class,  60,   null, ev -> ev.end          ),
+			Now          ("<now_timestamp>"  , Long   .class, 110,   null, ev -> ev.now_timestamp, ev -> formatDate((ev.now_timestamp)*1000, false, true, false, true, false)),
+			IsUpToDate   ("<isUpToDate>"     , Boolean.class,  85,   null, ev -> ev.isUpToDate   ),
+			Duration_min ("<duration_min>"   , Long   .class,  90,   null, ev -> ev.duration_min ),
+			Remaining    ("<remaining>"      , Long   .class,  75,   null, ev -> ev.remaining    ),
+			Progress     ("<progress>"       , Long   .class,  75,   null, ev -> ev.progress     ),
+			TLeft        ("<tleft>"          , Long   .class,  55,   null, ev -> ev.tleft        ),
+			Station      ("<station_name>"   , String .class, 105,   null, ev -> ev.station_name ),
+			Provider     ("<provider>"       , String .class,  70,   null, ev -> ev.provider     ),
+			Picon        ("<picon>"          , String .class, 300,   null, ev -> ev.picon        ),
+			SRef         ("<sref>"           , String .class, 230,   null, ev -> ev.sref         ),
 			;
 			
 			final SimplifiedColumnConfig cfg;
 			final Function<EPGevent, ?> getValue;
-			final BiFunction<EPGTableModel, EPGevent, ?> getValue2;
+			final BiFunction<EPGTableModel, EPGevent, ?> getValueM;
 			final Function<EPGevent, String> getDisplayStr;
 			final int horizontalAlignment;
 			
 			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<EPGevent,T> getValue) {
 				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null, null);
 			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<EPGTableModel,EPGevent,T> getValue2) {
-				this(name, columnClass, prefWidth, horizontalAlignment, null, getValue2, null);
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<EPGTableModel,EPGevent,T> getValueM) {
+				this(name, columnClass, prefWidth, horizontalAlignment, null, getValueM, null);
 			}
 			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<EPGevent,T> getValue, Function<EPGevent,String> getDisplayStr) {
 				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null, getDisplayStr);
 			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<EPGTableModel,EPGevent,T> getValue2, Function<EPGevent,String> getDisplayStr) {
-				this(name, columnClass, prefWidth, horizontalAlignment, null, getValue2, getDisplayStr);
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<EPGTableModel,EPGevent,T> getValueM, Function<EPGevent,String> getDisplayStr) {
+				this(name, columnClass, prefWidth, horizontalAlignment, null, getValueM, getDisplayStr);
 			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<EPGevent,T> getValue, BiFunction<EPGTableModel,EPGevent,T> getValue2, Function<EPGevent,String> getDisplayStr) {
+			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<EPGevent,T> getValue, BiFunction<EPGTableModel,EPGevent,T> getValueM, Function<EPGevent,String> getDisplayStr) {
 				this.horizontalAlignment = Tables.UseFulColumnDefMethods.getHorizontalAlignment(horizontalAlignment, columnClass);
 				this.getValue = getValue;
-				this.getValue2 = getValue2;
+				this.getValueM = getValueM;
 				this.getDisplayStr = getDisplayStr;
 				cfg = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
 			}
@@ -260,6 +276,14 @@ public class SingleStationEPGPanel extends JSplitPane
 		EPGTableModel()
 		{
 			super( ColumnID.values() );
+		}
+		
+		@Override protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, EPGevent row)
+		{
+			if (columnID!=null && columnID.getValueM!=null)
+				return columnID.getValueM.apply(this, row);
+			
+			return super.getValueAt(rowIndex, columnIndex, columnID, row);
 		}
 
 		void setCellRenderers()

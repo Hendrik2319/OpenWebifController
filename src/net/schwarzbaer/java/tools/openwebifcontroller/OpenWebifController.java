@@ -753,7 +753,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		out.add(level, "Genre"     , "[%d] \"%s\"", event.genreid, event.genre);
 		out.add(level, "ID"        , event.id);
 		if (event.date!=null && event.begin!=null && event.end  !=null)
-			out.add(level, "Time", "%s, %s - %s", event.date, event.begin, event.end  );
+			out.add(level, "Time", "\"%s\", \"%s\" - \"%s\"", event.date, event.begin, event.end  );
 		else {
 			if (event.date !=null) out.add(level, "Date" , event.date );
 			if (event.begin!=null) out.add(level, "Begin", event.begin);

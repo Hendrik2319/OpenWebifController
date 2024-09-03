@@ -32,6 +32,7 @@ import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
 
 public class SingleStationEPGPanel extends JSplitPane
 {
@@ -42,7 +43,7 @@ public class SingleStationEPGPanel extends JSplitPane
 	private final JTextArea epgOutput;
 	private final DataAcquisition dataAcquisition;
 
-	public SingleStationEPGPanel(EPG epg, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, EPGDialog.TimerCommands timerCommands)
+	public SingleStationEPGPanel(EPG epg, TimerDataUpdateNotifier timerNotifier, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, EPGDialog.TimerCommands timerCommands)
 	{
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
 		

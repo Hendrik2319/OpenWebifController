@@ -14,6 +14,7 @@ import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Vector;
 import java.util.function.Consumer;
 
@@ -50,6 +51,7 @@ import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.SingleStationEPGPanel;
 
 public class BouquetsNStations extends JPanel {
@@ -73,7 +75,7 @@ public class BouquetsNStations extends JPanel {
 	private CurrentStation currentStationData;
 	private final Vector<BSTreeNode.StationNode> selectedStationNodes;
 
-	public BouquetsNStations(OpenWebifController main) {
+	public BouquetsNStations(OpenWebifController main, TimerDataUpdateNotifier timerDataUpdateNotifier) {
 		super(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
@@ -103,7 +105,13 @@ public class BouquetsNStations extends JPanel {
 		PICON_LOADER.setStatusOutput(statusLine);
 		
 		valuePanel = new ValuePanel(this.main::getBaseURL);
-		singleStationEPGPanel = new SingleStationEPGPanel(main.epg, this.main::getBaseURL, str -> statusLine.showMessage(str, 2000), main);
+		singleStationEPGPanel = new SingleStationEPGPanel(
+				this.main.epg,
+				Objects.requireNonNull( timerDataUpdateNotifier ),
+				this.main::getBaseURL,
+				str -> statusLine.showMessage(str, 2000),
+				this.main
+		);
 		
 		JTabbedPane rightPanel = new JTabbedPane();
 		rightPanel.addTab("Station", valuePanel.panel);

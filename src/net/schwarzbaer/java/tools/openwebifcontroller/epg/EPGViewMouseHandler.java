@@ -15,7 +15,7 @@ import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
-import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimerTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.EventContextMenu;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.StationContextMenu;
 
@@ -173,9 +173,9 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 					out.add(0, "EPG Event");
 					OpenWebifController.generateOutput(out, 1, hoveredEvent.event);
 					out.add(0, "Timer");
-					TimersPanel.generateDetailsOutput(out, 1, timer.timer);
+					TimerTools.generateDetailsOutput(out, 1, timer.timer);
 					text = out.generateOutput();
-					text += TimersPanel.generateShortInfo(ValueListOutput.DEFAULT_INDENT, timer.timer, false);
+					text += TimerTools.generateShortInfo(ValueListOutput.DEFAULT_INDENT, timer.timer, false);
 				}
 				else
 				{

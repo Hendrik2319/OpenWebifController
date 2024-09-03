@@ -619,11 +619,11 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	}
 
 	public static <E> JComboBox<E> createComboBox(E[] items, E initialValue, Consumer<E> setValue) {
-		return confirureComboBox(new JComboBox<E>(items), initialValue, setValue);
+		return confirureComboBox(new JComboBox<>(items), initialValue, setValue);
 	}
 
 	public static <E> JComboBox<E> createComboBox(Vector<E> items, E initialValue, Consumer<E> setValue) {
-		return confirureComboBox(new JComboBox<E>(items), initialValue, setValue);
+		return confirureComboBox(new JComboBox<>(items), initialValue, setValue);
 	}
 	
 	public static <E> JComboBox<E> confirureComboBox(JComboBox<E> comp, E initialValue, Consumer<E> setValue) {

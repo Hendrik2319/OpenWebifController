@@ -33,6 +33,7 @@ import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.LogWindow;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimerTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerStateGuesser;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimersTableRowSorter;
@@ -256,11 +257,11 @@ class TimersDialog extends JDialog {
 			else
 				valueStr = value==null ? null : value.toString();
 			
-			if (value instanceof Timer.Type)
-				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((Timer.Type) value);
+			if (value instanceof Timer.Type type)
+				bgCol = ()->TimerTools.getBgColor(type);
 				
-			if (value instanceof TimerStateGuesser.ExtTimerState)
-				bgCol = ()->TimersPanel.TimersTableCellRenderer.getBgColor((TimerStateGuesser.ExtTimerState) value);
+			if (value instanceof TimerStateGuesser.ExtTimerState state)
+				bgCol = ()->TimerTools.getBgColor(state);
 			
 			
 			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);

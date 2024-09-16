@@ -265,7 +265,7 @@ class TimersDialog extends JDialog {
 			
 			
 			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
-			if (columnID.horizontalAlignment!=null)
+			if (columnID!=null && columnID.horizontalAlignment!=null)
 				rendererComp.setHorizontalAlignment(columnID.horizontalAlignment);
 			else if (columnID!=null && Number.class.isAssignableFrom(columnID.cfg.columnClass))
 				rendererComp.setHorizontalAlignment(SwingConstants.RIGHT);

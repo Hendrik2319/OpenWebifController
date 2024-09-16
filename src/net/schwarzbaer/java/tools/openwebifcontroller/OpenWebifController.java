@@ -597,6 +597,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		Color defaultBackground = comp.getBackground();
 		ASSERT(setValue!=null);
 		ASSERT(convert !=null);
+		@SuppressWarnings("null")
 		Runnable setValueTask = ()->{
 			String str = comp.getText();
 			ValueType value = convert.apply(str);

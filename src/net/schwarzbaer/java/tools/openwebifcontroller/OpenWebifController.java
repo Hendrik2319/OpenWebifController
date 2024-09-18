@@ -384,29 +384,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		//}));
 		
 		SwitchablePanel epgControlPanel = new SwitchablePanel(new BorderLayout(), "EPG");
-		epgControlPanel.add2Panel(createButton("Show EPG", true, e->{
-			if (!timers.hasData() && !bouquetsNStations.hasData())
-			{
-				if (!askUserIfDataShouldBeInitialized(mainWindow, "Timer", "Bouquet")) return;
-				getBaseURLAndRunWithProgressDialog("Init Timers", timers::readData);
-				getBaseURLAndRunWithProgressDialog("Init Bouquets 'n' Stations", bouquetsNStations ::readData);
-			}
-			else if (!timers.hasData())
-			{
-				if (!askUserIfDataShouldBeInitialized(mainWindow, "Timer")) return;
-				getBaseURLAndRunWithProgressDialog("Init Timers", timers::readData);
-			}
-			else if (!bouquetsNStations.hasData())
-			{
-				if (!askUserIfDataShouldBeInitialized(mainWindow, "Bouquet")) return;
-				getBaseURLAndRunWithProgressDialog("Init Bouquets 'n' Stations", bouquetsNStations ::readData);
-			}
-			
-			Bouquet bouquet = bouquetsNStations.showBouquetSelector(mainWindow);
-			if (bouquet==null) return;
-			
-			openEPGDialog(bouquet);
-		}), BorderLayout.CENTER);
+		epgControlPanel.add2Panel(createButton("Show EPG", true, e->openEPGDialog()), BorderLayout.CENTER);
 		
 		JPanel toolBar = new JPanel(new GridBagLayout());
 		GridBagConstraints c = new GridBagConstraints();
@@ -979,10 +957,36 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		return hasVideoPlayer() && hasJavaVM();
 	}
 
-	public void openEPGDialog(Bouquet bouquet) {
+	public void openEPGDialog()
+	{
+		openEPGDialog(null);
+	}
+
+	public void openEPGDialog(Bouquet bouquet)
+	{
 		String baseURL = getBaseURL();
 		if (baseURL==null) return;
-		if (!timers.hasData()) return;
+		
+		if (!timers.hasData() && !bouquetsNStations.hasData())
+		{
+			if (!askUserIfDataShouldBeInitialized(mainWindow, "Timer", "Bouquet")) return;
+			getBaseURLAndRunWithProgressDialog("Init Timers", timers::readData);
+			getBaseURLAndRunWithProgressDialog("Init Bouquets 'n' Stations", bouquetsNStations ::readData);
+		}
+		else if (!timers.hasData())
+		{
+			if (!askUserIfDataShouldBeInitialized(mainWindow, "Timer")) return;
+			getBaseURLAndRunWithProgressDialog("Init Timers", timers::readData);
+		}
+		else if (!bouquetsNStations.hasData())
+		{
+			if (!askUserIfDataShouldBeInitialized(mainWindow, "Bouquet")) return;
+			getBaseURLAndRunWithProgressDialog("Init Bouquets 'n' Stations", bouquetsNStations ::readData);
+		}
+		
+		if (bouquet==null) bouquet = bouquetsNStations.showBouquetSelector(mainWindow);
+		if (bouquet==null) return;
+		
 		EPGDialog.showDialog(
 				mainWindow, baseURL, epg, bouquet,
 				timers.timerDataUpdateNotifier, bouquetsNStations.bouquetsNStationsUpdateNotifier,

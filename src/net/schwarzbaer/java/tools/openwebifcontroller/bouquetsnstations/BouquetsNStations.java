@@ -74,12 +74,14 @@ public class BouquetsNStations extends JPanel {
 	private boolean updateCurrentStationPeriodically;
 	private CurrentStation currentStationData;
 	private final Vector<BSTreeNode.StationNode> selectedStationNodes;
+	private StationID transponderListBaseStation;
 
 	public BouquetsNStations(OpenWebifController main, TimerDataUpdateNotifier timerDataUpdateNotifier) {
 		super(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
 		this.main = main;
+		transponderListBaseStation = null;
 		
 		bouquetsNStationsUpdateNotifier = new BouquetsNStationsUpdateNotifier() {
 			@Override public StationID getCurrentStation() {
@@ -166,6 +168,16 @@ public class BouquetsNStations extends JPanel {
 			periodicUpdater10s.start();
 	}
 	
+	private boolean isSameTransponder(StationID stationID)
+	{
+		if (transponderListBaseStation == null) return false;
+		if (stationID == null) return false;
+		return Objects.equals(
+				transponderListBaseStation.getNumber(4),
+				stationID                 .getNumber(4)
+		);
+	}
+
 	private SubService getStation(TreePath treePath)
 	{
 		Object obj = treePath.getLastPathComponent();
@@ -295,6 +307,15 @@ public class BouquetsNStations extends JPanel {
 			JMenuItem miSwitchToStation = add(OpenWebifController.createMenuItem("Switch To Station",                                   e->main. zapToStation(clickedStationNode.getStationID())));
 			JMenuItem miStreamStation   = add(OpenWebifController.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->main.streamStation(clickedStationNode.getStationID())));
 			
+			JMenuItem miShowSameTransponder = add(OpenWebifController.createMenuItem("Show Same Transponder", e->{
+				if (isSameTransponder(clickedStationNode.getStationID()))
+					transponderListBaseStation = null;
+				else
+					transponderListBaseStation = clickedStationNode.getStationID();
+				bsTree.repaint();
+			}));
+			
+			
 			addContextMenuInvokeListener((comp, x, y) -> {
 				TreePath clickedTreePath = bsTree.getPathForLocation(x,y);
 				clickedRootNode    = null;
@@ -307,9 +328,10 @@ public class BouquetsNStations extends JPanel {
 					if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
 				}
 				
-				miLoadPicons     .setEnabled(clickedBouquetNode!=null || (clickedStationNode!=null && !clickedStationNode.subservice.isMarker()));
-				miSwitchToStation.setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
-				miStreamStation  .setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
+				miLoadPicons         .setEnabled(clickedBouquetNode!=null || (clickedStationNode!=null && !clickedStationNode.subservice.isMarker()));
+				miSwitchToStation    .setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
+				miStreamStation      .setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
+				miShowSameTransponder.setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
 				miLoadPicons.setText(
 						clickedBouquetNode!=null ?
 								String.format("Load Picons of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
@@ -319,6 +341,13 @@ public class BouquetsNStations extends JPanel {
 				);
 				miSwitchToStation.setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
 				miStreamStation  .setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
+				miShowSameTransponder.setText(
+						clickedStationNode==null || clickedStationNode.subservice.isMarker()
+							? "Mark Stations on Same Transponder"
+							: isSameTransponder(clickedStationNode.getStationID())
+								? "Clear Same Transponder Markers"
+								: String.format("Mark Stations on Same Transponder as \"%s\"", clickedStationNode.subservice.name)
+				);
 				
 				miShowEPGforBouquet.setEnabled(clickedBouquetNode!=null);
 				miShowEPGforBouquet.setText(
@@ -635,24 +664,26 @@ public class BouquetsNStations extends JPanel {
 
 	}
 
-	static class BSTreeCellRenderer extends DefaultTreeCellRenderer {
+	class BSTreeCellRenderer extends DefaultTreeCellRenderer {
 		private static final long serialVersionUID = 8843157059053309466L;
-		static final Color TEXTCOLOR_DEFAULT          = Color.BLACK;
-		static final Color TEXTCOLOR_CURRENTLY_PLAYED = new Color(0x0080ff);
-		static final Color TEXTCOLOR_STATE_UNDEFINED  = new Color(0x800080);
-		static final Color TEXTCOLOR_IS_PLAYABLE      = new Color(0x008000);
-		static final Color TEXTCOLOR_IS_NOT_PLAYABLE  = Color.BLACK;
-
+		static final Color TEXTCOLOR_DEFAULT             = Color.BLACK;
+		static final Color TEXTCOLOR_CURRENTLY_PLAYED    = new Color(0x0080ff);
+		static final Color TEXTCOLOR_STATE_UNDEFINED     = new Color(0x800080);
+		static final Color TEXTCOLOR_IS_PLAYABLE         = new Color(0xFF9D00);
+		static final Color TEXTCOLOR_IS_SAME_TRANSPONDER = new Color(0x84C700);
+		static final Color TEXTCOLOR_IS_NOT_PLAYABLE     = Color.BLACK;
+		
 		@Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean isSelected, boolean isExpanded, boolean isLeaf, int row, boolean hasFocus) {
 			Component comp = super.getTreeCellRendererComponent(tree, value, isSelected, isExpanded, isLeaf, row, hasFocus);
 			
-			if (value instanceof BSTreeNode) {
-				BSTreeNode<?,?> treeNode = (BSTreeNode<?,?>) value;
+			if (value instanceof BSTreeNode<?,?> treeNode)
 				setIcon(treeNode.icon);
-			}
-			if (value instanceof BSTreeNode.StationNode) {
-				BSTreeNode.StationNode stationNode = (BSTreeNode.StationNode) value;
-				if (stationNode.isMarker()) {
+			
+			if (value instanceof BSTreeNode.StationNode stationNode) {
+				if (isSameTransponder( stationNode.getStationID() )) {
+					if (!isSelected) setForeground(TEXTCOLOR_IS_SAME_TRANSPONDER);
+					
+				} else if (stationNode.isMarker()) {
 					if (!isSelected) setForeground(TEXTCOLOR_DEFAULT);
 					
 				} else if (stationNode.isCurrentlyPlayed) {
@@ -671,5 +702,4 @@ public class BouquetsNStations extends JPanel {
 		}
 		
 	}
-	
 }

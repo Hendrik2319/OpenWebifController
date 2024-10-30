@@ -740,7 +740,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		}
 		out.add(level, "Begin"     , "%s", event.begin_timestamp==null ? "<null>" : dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
 		if (event.isUpToDate)
-			out.add(level, "Now"       , "%s", dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
+		{
+			if (event.now_timestamp==0)
+				out.add(level, "Now", "%s", event.now_timestamp);
+			else
+				out.add(level, "Now", "%s", dateTimeFormatter.getTimeStr(event.now_timestamp*1000, true, true, false, true, false) );
+		}
 		if (event.duration_sec==null)
 			out.add(level, "Duration"  , "%s", "<null>");
 		else

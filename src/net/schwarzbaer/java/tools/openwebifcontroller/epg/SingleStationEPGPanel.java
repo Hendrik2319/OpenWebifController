@@ -5,9 +5,11 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.Vector;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -25,8 +27,8 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.TableCellRenderer;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
-import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
+import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
@@ -209,30 +211,19 @@ public class SingleStationEPGPanel extends JSplitPane
 			}
 		}
 		
-		/*
-		private Vector<EPGevent> readEPGforService(String baseURL, SubService station)
+		private synchronized void setValues(Vector<EPGevent> data, DataAcquisitionTask<?> dataSourceTask, String text, DataAcquisitionTask<?> nextTask)
 		{
-			long beginTime_UnixTS = System.currentTimeMillis()/1000 - leadTime_s;
-			Vector<EPGevent> events = epg.readEPGforService(baseURL, station.service.stationID, beginTime_UnixTS, null, taskTitle->{
-				setStatusOutput.accept(String.format("EPG of Station \"%s\": %s", station.name, taskTitle));
-			});
-			EPGEventGenres.getInstance().scanGenres(events).writeToFile();
-			return events;
-		}
-		*/
-		
-		private synchronized void setValues(Vector<EPGevent> data, DataAcquisitionTask<?> dataTask, String text, DataAcquisitionTask<?> nextTask)
-		{
-			epgTableModel.setData(data, getStation(dataTask));
+			epgTableModel.setData(data);
+			if (dataSourceTask!=null)
+			{
+				EPGTableModel.ColumnID[] columnIDArray = dataSourceTask.getSpecialEPGTableColumnIDArray();
+				if (columnIDArray==null)
+					columnIDArray = EPGTableModel.getDefaultColumnIDArray();
+				
+				epgTableModel.changeColumns(columnIDArray);
+			}
 			setTextboxOutput.accept(text);
 			currentTask = nextTask;
-		}
-
-		private SubService getStation(DataAcquisitionTask<?> task) // TODO: temporary
-		{
-			if (task instanceof DataAcquisitionTask.StationTask stationTask)
-				return stationTask.source;
-			return null;
 		}
 	}
 	
@@ -279,6 +270,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		
 		boolean isOk() { return true; }
 		abstract Vector<EPGevent> readEPG(EPG epg, String baseURL);
+		EPGTableModel.ColumnID[] getSpecialEPGTableColumnIDArray() { return null; }
 		
 		
 		static class StationTask extends DataAcquisitionTask<SubService>
@@ -315,6 +307,12 @@ public class SingleStationEPGPanel extends JSplitPane
 		
 		static class BouquetTask extends DataAcquisitionTask<Bouquet>
 		{
+			private static EPGTableModel.ColumnID[] specialColumnOrder =
+					new Tables.ArrayReorderer<>(EPGTableModel.getDefaultColumnIDArray())
+						.moveToFirst(EPGTableModel.ColumnID.Station)
+						.moveAfter  (EPGTableModel.ColumnID.CompProgress, EPGTableModel.ColumnID.Duration)
+						.toArray    (EPGTableModel.ColumnID[]::new);
+					
 			BouquetTask(Bouquet bouquet, Consumer<String> setStatusOutput)
 			{
 				super(
@@ -324,6 +322,12 @@ public class SingleStationEPGPanel extends JSplitPane
 						b -> b.servicereference,
 						setStatusOutput
 				);
+			}
+
+			@Override
+			EPGTableModel.ColumnID[] getSpecialEPGTableColumnIDArray()
+			{
+				return specialColumnOrder;
 			}
 
 			@Override
@@ -412,6 +416,19 @@ public class SingleStationEPGPanel extends JSplitPane
 			return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
 		}
 		
+		private static boolean areEqual(ColumnID[] array1, ColumnID[] array2)
+		{
+			if (array1==null && array2==null) return true;
+			if (array1==null || array2==null) return false;
+			if (array1.length!=array2.length) return false;
+			
+			for (int i=0; i<array1.length; i++)
+				if (array1[i] != array2[i])
+					return false;
+			
+			return true;
+		}
+
 		private static String getBeginDisplayStr(EPGevent ev)
 		{
 			if (ev.begin_timestamp==null) return "";
@@ -454,8 +471,9 @@ public class SingleStationEPGPanel extends JSplitPane
 			Duration_min ("<duration_min>"   , Long      .class,  90,   null,    ev  -> ev.duration_min ),
 			Remaining    ("<remaining>"      , Long      .class,  75,   null,    ev  -> ev.remaining    ),
 			Progress     ("<progress>"       , Long      .class,  75,   null,    ev  -> ev.progress     ),
+			CompProgress ("Progress"         , Double    .class,  75,   null,    ev  -> ev.computedProgress, ev -> ev.computedProgress==null ? "" : String.format(Locale.ENGLISH, "%1.1f %%", ev.computedProgress*100 )),
 			TLeft        ("<tleft>"          , Long      .class,  55,   null,    ev  -> ev.tleft        ),
-			Station      ("<station_name>"   , String    .class, 105,   null,    ev  -> ev.station_name ),
+			Station      ("Station"          , String    .class, 105,   null,    ev  -> ev.station_name ),
 			Provider     ("<provider>"       , String    .class,  70,   null,    ev  -> ev.provider     ),
 			Picon        ("<picon>"          , String    .class, 300,   null,    ev  -> ev.picon        ),
 			SRef         ("<sref>"           , String    .class, 230,   null,    ev  -> ev.sref         ),
@@ -498,52 +516,51 @@ public class SingleStationEPGPanel extends JSplitPane
 		}
 
 		private Timers timers;
-		private SubService station;
-		private Map<Long,Timer> stationTimers;
+		private final TimersMap timersMap;
 		
 		EPGTableModel(TimerDataUpdateNotifier timerNotifier)
 		{
-			super( ColumnID.values() );
+			super( getDefaultColumnIDArray() );
 			
-			station = null;
-			stationTimers = null;
+			timersMap = new TimersMap();
 			timers = timerNotifier.getTimers();
 			timerNotifier.addListener(timers -> {
 				this.timers = timers;
-				updateStationTimers();
+				timersMap.updateData(this.timers, dataVec);
 				fireTableUpdate();
 			});
 		}
 		
-		public void setData(Vector<EPGevent> data, SubService station)
+		public static ColumnID[] getDefaultColumnIDArray()
 		{
-			this.station = station;
-			setData(data);
-			updateStationTimers();
+			return ColumnID.values();
 		}
 
-		private void updateStationTimers()
+		public void changeColumns(ColumnID[] newColumns)
 		{
-			if (timers==null || station==null || station.servicereference==null)
+			if (newColumns!=null && !areEqual(columns, newColumns))
 			{
-				stationTimers = null;
-				//System.out.printf("EPGTableModel.stationTimers = null%n");
-			}
-			else
-			{
-				Vector<Timer> stationTimers = timers.getStationTimers(station.servicereference);
-				this.stationTimers = new HashMap<>();
-				for (Timer timer : stationTimers)
-					this.stationTimers.put(timer.eit, timer);
-				//System.out.printf("EPGTableModel.stationTimers = %d timers%n", this.stationTimers.size());
+				columns = newColumns;
+				fireTableStructureUpdate();
+				setColumnWidths(table);
 			}
 		}
-		
+
+		@Override
+		public void setData(Vector<EPGevent> data)
+		{
+			super.setData(data);
+			timersMap.updateData(this.timers, dataVec);
+		}
+		@Override
+		public void setData(EPGevent[] data)
+		{
+			throw new UnsupportedOperationException();
+		}
+
 		public Timer getEventTimer(EPGevent event)
 		{
-			if (stationTimers==null) return null;
-			if (event==null || event.id==null) return null;
-			return stationTimers.get(event.id);
+			return timersMap.getEventTimer(event);
 		}
 
 		@Override protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, EPGevent row)
@@ -600,6 +617,48 @@ public class SingleStationEPGPanel extends JSplitPane
 				rendComp.setHorizontalAlignment(horizontalAlignment);
 				
 				return rendComp;
+			}
+		}
+		
+		private static class TimersMap
+		{
+			private final Map<String,Map<Long,Timer>> map;
+			
+			TimersMap()
+			{
+				map = new HashMap<>();
+			}
+			
+			void updateData(Timers timers, Vector<EPGevent> events)
+			{
+				Set<Timers.EventID> eventIDs = new HashSet<>();
+				if (events!=null)
+					for (EPGevent ev : events)
+						{
+							if (ev.sref==null || ev.id==null) continue;
+							eventIDs.add(new Timers.EventID(ev.sref, ev.id));
+						}
+				
+				map.clear();
+				
+				if (timers!=null)
+				{
+					Vector<Timer> timersArr = timers.getTimers(eventIDs);
+					for (Timer timer : timersArr)
+						map
+							.computeIfAbsent(timer.serviceref.toLowerCase(), sref->new HashMap<>())
+							.put(timer.eit, timer);
+				}
+			}
+			
+			Timer getEventTimer(EPGevent event)
+			{
+				if (event==null || event.sref==null || event.id==null) return null;
+				
+				Map<Long, Timer> map2 = map.get(event.sref.toLowerCase());
+				if (map2==null) return null;
+				
+				return map2.get(event.id);
 			}
 		}
 	}

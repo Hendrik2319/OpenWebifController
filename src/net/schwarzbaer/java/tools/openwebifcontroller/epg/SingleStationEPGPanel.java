@@ -30,6 +30,7 @@ import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
@@ -122,9 +123,14 @@ public class SingleStationEPGPanel extends JSplitPane
 		if (scrollPos!=null) SwingUtilities.invokeLater(()->scrollPos.setVertical(epgOutputScrollPane));
 	}
 	
-	public void setStation(SubService station)
+	public void setEventSource(SubService station)
 	{
-		dataAcquisition.readEPGforService(station);
+		dataAcquisition.readEPGforService( station );
+	}
+	
+	public void setEventSource(Bouquet bouquet)
+	{
+		dataAcquisition.readEPGforBouquet( bouquet );
 	}
 	
 	static class DataAcquisition
@@ -134,7 +140,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		private final Consumer<String> setStatusOutput;
 		private final Consumer<String> setTextboxOutput;
 		private final EPGTableModel epgTableModel;
-		private SubService currentStation = null;
+		private DataAcquisitionTask currentTask = null;
 		private Thread thread = null;
 		private final long leadTime_s;
 		
@@ -150,48 +156,59 @@ public class SingleStationEPGPanel extends JSplitPane
 
 		public void readEPGforService(SubService station)
 		{
-			if (station==null || station.isMarker())
+			addTask( station==null ? null : new DataAcquisitionTask.StationTask(station, setStatusOutput, leadTime_s));
+		}
+
+		public void readEPGforBouquet(Bouquet bouquet)
+		{
+			setValues(new Vector<>(), null, "", null);
+		}
+
+		public void addTask(DataAcquisitionTask task)
+		{
+			if (task==null || !task.isOk())
 				setValues(new Vector<>(), null, "", null);
 			
 			else
 				synchronized (this)
 				{
 					if (thread!=null)
-						currentStation = station;
+						currentTask = task;
 					else
-						(thread = new Thread(()->threadLoop(station))).start();
+						(thread = new Thread(()->threadLoop(task))).start();
 				}
 		}
 
-		private void threadLoop(SubService station)
+		private void threadLoop(DataAcquisitionTask task)
 		{
 			String baseURL = getBaseURL.get();
 			
 			boolean loopActive = true;
 			while (loopActive) {
-				setValues(new Vector<>(), null, String.format("Loading EPG of Station \"%s\" ...", station.name), station);
+				setValues(new Vector<>(), null, task.getLoadingText(), task);
 				
-				Vector<EPGevent> events = readEPGforService(baseURL, station);
+				Vector<EPGevent> events = task.readEPG(epg, baseURL);
 				
 				synchronized (this)
 				{
-					if (currentStation==null)
+					if (currentTask==null)
 					{
 						thread = null;
 						loopActive = false;
 					}
-					else if (currentStation.servicereference.toUpperCase().equals(station.servicereference.toUpperCase()))
+					else if (currentTask.isEqualTask(task))
 					{
-						setValues(events, station, "", null);
+						setValues(events, task, "", null);
 						thread = null;
 						loopActive = false;
 					}
 					else
-						station = currentStation;
+						task = currentTask;
 				}
 			}
 		}
-
+		
+		/*
 		private Vector<EPGevent> readEPGforService(String baseURL, SubService station)
 		{
 			long beginTime_UnixTS = System.currentTimeMillis()/1000 - leadTime_s;
@@ -201,12 +218,74 @@ public class SingleStationEPGPanel extends JSplitPane
 			EPGEventGenres.getInstance().scanGenres(events).writeToFile();
 			return events;
 		}
-
-		private synchronized void setValues(Vector<EPGevent> data, SubService dataStation, String text, SubService nextStation)
+		*/
+		
+		private synchronized void setValues(Vector<EPGevent> data, DataAcquisitionTask dataTask, String text, DataAcquisitionTask nextTask)
 		{
-			epgTableModel.setData(data, dataStation);
+			epgTableModel.setData(data, getStation(dataTask));
 			setTextboxOutput.accept(text);
-			currentStation = nextStation;
+			currentTask = nextTask;
+		}
+
+		private SubService getStation(DataAcquisitionTask task) // TODO: temporary
+		{
+			if (task instanceof DataAcquisitionTask.StationTask stationTask)
+				return stationTask.station;
+			return null;
+		}
+	}
+	
+	private static abstract class DataAcquisitionTask
+	{
+		abstract boolean isOk();
+		abstract String getLoadingText();
+		abstract boolean isEqualTask(DataAcquisitionTask other);
+		abstract Vector<EPGevent> readEPG(EPG epg, String baseURL);
+		
+		static class StationTask extends DataAcquisitionTask
+		{
+			private final SubService station;
+			private final Consumer<String> setStatusOutput;
+			private final long leadTime_s;
+
+			StationTask(SubService station, Consumer<String> setStatusOutput, long leadTime_s)
+			{
+				this.station = Objects.requireNonNull(station);
+				this.setStatusOutput = Objects.requireNonNull(setStatusOutput);
+				this.leadTime_s = leadTime_s;
+			}
+			
+			@Override
+			boolean isOk()
+			{
+				return !station.isMarker();
+			}
+
+			@Override
+			String getLoadingText()
+			{
+				return String.format("Loading EPG of Station \"%s\" ...", station.name);
+			}
+
+			@Override
+			Vector<EPGevent> readEPG(EPG epg, String baseURL)
+			{
+				long beginTime_UnixTS = System.currentTimeMillis()/1000 - leadTime_s;
+				Vector<EPGevent> events = epg.readEPGforService(baseURL, station.service.stationID, beginTime_UnixTS, null, taskTitle->{
+					setStatusOutput.accept(String.format("EPG of Station \"%s\": %s", station.name, taskTitle));
+				});
+				EPGEventGenres.getInstance().scanGenres(events).writeToFile();
+				return events;
+			}
+
+			@Override
+			boolean isEqualTask(DataAcquisitionTask other)
+			{
+				if (other instanceof StationTask otherTask)
+					return this.station.servicereference.toUpperCase().equals(otherTask.station.servicereference.toUpperCase());
+				return false;
+			}
+			
 		}
 	}
 	

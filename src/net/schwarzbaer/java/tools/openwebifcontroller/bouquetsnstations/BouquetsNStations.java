@@ -43,7 +43,6 @@ import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
-import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
@@ -146,7 +145,7 @@ public class BouquetsNStations extends JPanel {
 			if (selectedTreePaths.length==1)
 			{
 				valuePanel.showValues(selectedTreePaths[0]);
-				singleStationEPGPanel.setStation(getStation(selectedTreePaths[0]));
+				updateEPGPanel(selectedTreePaths[0]);
 			}
 			
 			selectedStationNodes.clear();
@@ -177,15 +176,19 @@ public class BouquetsNStations extends JPanel {
 				stationID                 .getNumber(4)
 		);
 	}
-
-	private SubService getStation(TreePath treePath)
+	
+	private void updateEPGPanel(TreePath treePath)
 	{
 		Object obj = treePath.getLastPathComponent();
-		if (obj instanceof BSTreeNode.StationNode stationNode)
-			if (!stationNode.isMarker())
-				return stationNode.subservice;
 		
-		return null;
+		if (obj instanceof BSTreeNode.StationNode stationNode)
+		{
+			if (!stationNode.isMarker())
+				singleStationEPGPanel.setEventSource( stationNode.subservice );
+			
+		}
+		else if (obj instanceof BSTreeNode.BouquetNode bouquetNode)
+			singleStationEPGPanel.setEventSource( bouquetNode.bouquet );
 	}
 
 	private class TreeContextMenu extends ContextMenu {

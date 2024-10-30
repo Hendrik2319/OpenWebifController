@@ -140,7 +140,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		private final Consumer<String> setStatusOutput;
 		private final Consumer<String> setTextboxOutput;
 		private final EPGTableModel epgTableModel;
-		private DataAcquisitionTask currentTask = null;
+		private DataAcquisitionTask<?> currentTask = null;
 		private Thread thread = null;
 		private final long leadTime_s;
 		
@@ -161,10 +161,10 @@ public class SingleStationEPGPanel extends JSplitPane
 
 		public void readEPGforBouquet(Bouquet bouquet)
 		{
-			setValues(new Vector<>(), null, "", null);
+			addTask( bouquet==null ? null : new DataAcquisitionTask.BouquetTask(bouquet, setStatusOutput));
 		}
 
-		public void addTask(DataAcquisitionTask task)
+		public void addTask(DataAcquisitionTask<?> task)
 		{
 			if (task==null || !task.isOk())
 				setValues(new Vector<>(), null, "", null);
@@ -179,7 +179,7 @@ public class SingleStationEPGPanel extends JSplitPane
 				}
 		}
 
-		private void threadLoop(DataAcquisitionTask task)
+		private void threadLoop(DataAcquisitionTask<?> task)
 		{
 			String baseURL = getBaseURL.get();
 			
@@ -188,6 +188,7 @@ public class SingleStationEPGPanel extends JSplitPane
 				setValues(new Vector<>(), null, task.getLoadingText(), task);
 				
 				Vector<EPGevent> events = task.readEPG(epg, baseURL);
+				EPGEventGenres.getInstance().scanGenres(events).writeToFile();
 				
 				synchronized (this)
 				{
@@ -220,70 +221,115 @@ public class SingleStationEPGPanel extends JSplitPane
 		}
 		*/
 		
-		private synchronized void setValues(Vector<EPGevent> data, DataAcquisitionTask dataTask, String text, DataAcquisitionTask nextTask)
+		private synchronized void setValues(Vector<EPGevent> data, DataAcquisitionTask<?> dataTask, String text, DataAcquisitionTask<?> nextTask)
 		{
 			epgTableModel.setData(data, getStation(dataTask));
 			setTextboxOutput.accept(text);
 			currentTask = nextTask;
 		}
 
-		private SubService getStation(DataAcquisitionTask task) // TODO: temporary
+		private SubService getStation(DataAcquisitionTask<?> task) // TODO: temporary
 		{
 			if (task instanceof DataAcquisitionTask.StationTask stationTask)
-				return stationTask.station;
+				return stationTask.source;
 			return null;
 		}
 	}
 	
-	private static abstract class DataAcquisitionTask
+	private static abstract class DataAcquisitionTask<SourceType>
 	{
-		abstract boolean isOk();
-		abstract String getLoadingText();
-		abstract boolean isEqualTask(DataAcquisitionTask other);
+		protected final SourceType source;
+		private   final Class<SourceType> sourceClass;
+		private   final String sourceLabel;
+		protected final Consumer<String> setStatusOutput;
+		private   final Function<SourceType, String> getSRef;
+		
+		protected DataAcquisitionTask(SourceType source, Class<SourceType> sourceClass, String sourceLabel, Function<SourceType,String> getSRef, Consumer<String> setStatusOutput)
+		{
+			this.source          = Objects.requireNonNull(source         );
+			this.sourceClass     = Objects.requireNonNull(sourceClass    );
+			this.sourceLabel     = Objects.requireNonNull(sourceLabel    );
+			this.getSRef         = Objects.requireNonNull(getSRef        );
+			this.setStatusOutput = Objects.requireNonNull(setStatusOutput);
+		}
+		
+		String getLoadingText()
+		{
+			return String.format("Loading EPG of %s ...", sourceLabel);
+		}
+		
+		boolean isEqualTask(DataAcquisitionTask<?> other)
+		{
+			Object otherSource_ = other.source;
+			if (!sourceClass.isInstance(otherSource_))
+				return false;
+			
+			SourceType otherSource = sourceClass.cast(otherSource_);
+			
+			String thisSRef = getSRef.apply(source);
+			String otherSRef = getSRef.apply(otherSource);
+			
+			return thisSRef.toUpperCase().equals(otherSRef.toUpperCase());
+		}
+		
+		protected void setDefaultProgressOutput(String taskTitle)
+		{
+			setStatusOutput.accept(String.format("EPG of %s: %s", sourceLabel, taskTitle));
+		}
+		
+		boolean isOk() { return true; }
 		abstract Vector<EPGevent> readEPG(EPG epg, String baseURL);
 		
-		static class StationTask extends DataAcquisitionTask
+		
+		static class StationTask extends DataAcquisitionTask<SubService>
 		{
-			private final SubService station;
-			private final Consumer<String> setStatusOutput;
 			private final long leadTime_s;
 
 			StationTask(SubService station, Consumer<String> setStatusOutput, long leadTime_s)
 			{
-				this.station = Objects.requireNonNull(station);
-				this.setStatusOutput = Objects.requireNonNull(setStatusOutput);
+				super(
+						station,
+						SubService.class,
+						String.format("Station \"%s\"", station.name),
+						st -> st.servicereference,
+						setStatusOutput
+				);
 				this.leadTime_s = leadTime_s;
 			}
 			
 			@Override
 			boolean isOk()
 			{
-				return !station.isMarker();
-			}
-
-			@Override
-			String getLoadingText()
-			{
-				return String.format("Loading EPG of Station \"%s\" ...", station.name);
+				return !source.isMarker();
 			}
 
 			@Override
 			Vector<EPGevent> readEPG(EPG epg, String baseURL)
 			{
 				long beginTime_UnixTS = System.currentTimeMillis()/1000 - leadTime_s;
-				Vector<EPGevent> events = epg.readEPGforService(baseURL, station.service.stationID, beginTime_UnixTS, null, taskTitle->{
-					setStatusOutput.accept(String.format("EPG of Station \"%s\": %s", station.name, taskTitle));
-				});
-				EPGEventGenres.getInstance().scanGenres(events).writeToFile();
-				return events;
+				return epg.readEPGforService(baseURL, source.service.stationID, beginTime_UnixTS, null, this::setDefaultProgressOutput);
+			}
+			
+		}
+		
+		
+		static class BouquetTask extends DataAcquisitionTask<Bouquet>
+		{
+			BouquetTask(Bouquet bouquet, Consumer<String> setStatusOutput)
+			{
+				super(
+						bouquet,
+						Bouquet.class,
+						String.format("Bouquet \"%s\"", bouquet.name),
+						b -> b.servicereference,
+						setStatusOutput
+				);
 			}
 
 			@Override
-			boolean isEqualTask(DataAcquisitionTask other)
+			Vector<EPGevent> readEPG(EPG epg, String baseURL)
 			{
-				if (other instanceof StationTask otherTask)
-					return this.station.servicereference.toUpperCase().equals(otherTask.station.servicereference.toUpperCase());
-				return false;
+				return epg.readEPGNowNextForBouquet(baseURL, source, this::setDefaultProgressOutput);
 			}
 			
 		}
@@ -345,9 +391,9 @@ public class SingleStationEPGPanel extends JSplitPane
 				miAddRecordNSwitchTimer.setEnabled(isEventOK && clickedEventTimer==null);
 				miToggleTimer          .setEnabled(isEventOK && clickedEventTimer!=null);
 				miDeleteTimer          .setEnabled(isEventOK && clickedEventTimer!=null);
-				miAddRecordTimer       .setText(!isEventOK              ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", clickedEvent.title));
-				miAddSwitchTimer       .setText(!isEventOK              ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", clickedEvent.title));
-				miAddRecordNSwitchTimer.setText(!isEventOK              ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", clickedEvent.title));
+				miAddRecordTimer       .setText(!isEventOK || clickedEvent.title==null ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", clickedEvent.title));
+				miAddSwitchTimer       .setText(!isEventOK || clickedEvent.title==null ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", clickedEvent.title));
+				miAddRecordNSwitchTimer.setText(!isEventOK || clickedEvent.title==null ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", clickedEvent.title));
 				miToggleTimer          .setText(clickedEventTimer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", clickedEventTimer.name));
 				miDeleteTimer          .setText(clickedEventTimer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", clickedEventTimer.name));
 			});
@@ -366,22 +412,44 @@ public class SingleStationEPGPanel extends JSplitPane
 			return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
 		}
 		
+		private static String getBeginDisplayStr(EPGevent ev)
+		{
+			if (ev.begin_timestamp==null) return "";
+			long millis = ev.begin_timestamp*1000;
+			return formatDate(millis,  true,  true, false,  true, false);
+		}
+		
+		private static String getEndDisplayStr(EPGevent ev)
+		{
+			if (ev.begin_timestamp==null) return "";
+			long duration_sec = ev.duration_sec==null ? 0 : ev.duration_sec;
+			long millis = (ev.begin_timestamp+duration_sec)*1000;
+			return formatDate(millis, false, false, false,  true, false);
+		}
+		
+		private static Long getEnd(EPGevent ev)
+		{
+			if (ev.begin_timestamp==null) return null;
+			long duration_sec = ev.duration_sec==null ? 0 : ev.duration_sec;
+			return ev.begin_timestamp+duration_sec;
+		}
+		
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<EPGevent>, SwingConstants
 		{
 			// Column Widths: [45, 200, 170, 60, 60, 90, 350, 250, 250, 60, 60, 60, 110, 85, 90, 75, 75, 55, 105, 70, 300, 230] in ModelOrder
 			ID           ("ID"               , Long      .class,  45, CENTER,    ev  -> ev.id           ),
 			Name         ("Name"             , String    .class, 200,   null,    ev  -> ev.title        ),
-			Begin        ("Begin"            , Long      .class, 170,   null,    ev  -> ev.begin_timestamp                , ev -> formatDate((ev.begin_timestamp                )*1000,  true,  true, false,  true, false)),
-			End          ("End"              , Long      .class,  60,   null,    ev  -> ev.begin_timestamp+ev.duration_sec, ev -> formatDate((ev.begin_timestamp+ev.duration_sec)*1000, false, false, false,  true, false)),
-			Duration     ("Duration"         , Long      .class,  60,   null,    ev  -> ev.duration_sec                   , ev -> DateTimeFormatter.getDurationStr(ev.duration_sec)),
+			Begin        ("Begin"            , Long      .class, 170,   null,    ev  -> ev.begin_timestamp, EPGTableModel::getBeginDisplayStr),
+			End          ("End"              , Long      .class,  60,   null,    EPGTableModel::getEnd    , EPGTableModel::getEndDisplayStr),
+			Duration     ("Duration"         , Long      .class,  60,   null,    ev  -> ev.duration_sec   , ev -> ev.duration_sec==null ? "" : DateTimeFormatter.getDurationStr(ev.duration_sec)),
 			Timer        ("Timer"            , Timer.Type.class,  90, CENTER, (m,ev) -> getTimerType(m,ev) ),
-			Genre        ("Genre"            , Long      .class, 350,   LEFT,    ev  -> ev.genreid                        , ev -> " [%03d] %s".formatted(ev.genreid, ev.genre)),
+			Genre        ("Genre"            , Long      .class, 350,   LEFT,    ev  -> ev.genreid        , ev -> " [%03d] %s".formatted(ev.genreid, ev.genre)),
 			ShortDesc    ("Short Description", String    .class, 250,   null,    ev  -> ev.shortdesc    ),
 			LongDesc     ("Long Description" , String    .class, 250,   null,    ev  -> ev.longdesc     ),
 			Str_Date     ("<date>"           , String    .class,  60,   null,    ev  -> ev.date         ),
 			Str_Begin    ("<begin>"          , String    .class,  60,   null,    ev  -> ev.begin        ),
 			Str_End      ("<end>"            , String    .class,  60,   null,    ev  -> ev.end          ),
-			Now          ("<now_timestamp>"  , Long      .class, 110,   null,    ev  -> ev.now_timestamp, ev -> formatDate((ev.now_timestamp)*1000, false, true, false, true, false)),
+			Now          ("<now_timestamp>"  , Long      .class, 110,   null,    ev  -> ev.now_timestamp  , ev -> formatDate((ev.now_timestamp)*1000, false, true, false, true, false)),
 			IsUpToDate   ("<isUpToDate>"     , Boolean   .class,  85, CENTER,    ev  -> ev.isUpToDate   ),
 			Duration_min ("<duration_min>"   , Long      .class,  90,   null,    ev  -> ev.duration_min ),
 			Remaining    ("<remaining>"      , Long      .class,  75,   null,    ev  -> ev.remaining    ),

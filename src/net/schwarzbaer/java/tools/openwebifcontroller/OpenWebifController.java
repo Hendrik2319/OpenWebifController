@@ -738,10 +738,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			if (event.begin!=null) out.add(level, "Begin", event.begin);
 			if (event.end  !=null) out.add(level, "End"  , event.end  );
 		}
-		out.add(level, "Begin"     , "%s", dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
+		out.add(level, "Begin"     , "%s", event.begin_timestamp==null ? "<null>" : dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
 		if (event.isUpToDate)
 			out.add(level, "Now"       , "%s", dateTimeFormatter.getTimeStr(event.now_timestamp  *1000, true, true, false, true, false) );
-		out.add(level, "Duration"  , "%s (%d s)", DateTimeFormatter.getDurationStr(event.duration_sec), event.duration_sec);
+		if (event.duration_sec==null)
+			out.add(level, "Duration"  , "%s", "<null>");
+		else
+			out.add(level, "Duration"  , "%s (%d s)", DateTimeFormatter.getDurationStr(event.duration_sec), event.duration_sec);
 		if (event.duration_min!=null                    ) out.add(level, "Duration" , "%s (%d min)", DateTimeFormatter.getDurationStr(event.duration_min*60), event.duration_min);
 		if (event.remaining   !=null && event.isUpToDate) out.add(level, "Remaining", "%s", DateTimeFormatter.getDurationStr(event.remaining));
 		if (event.tleft       !=null && event.isUpToDate) {

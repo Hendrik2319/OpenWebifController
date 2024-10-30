@@ -90,8 +90,10 @@ public abstract class ToolTip {
 		
 		String begin = event.event.begin;
 		String end   = event.event.end;
-		if (begin==null) begin = OpenWebifController.dateTimeFormatter.getTimeStr( event.event.begin_timestamp                          *1000, false, false, false, true, false);
-		if (end  ==null) end   = OpenWebifController.dateTimeFormatter.getTimeStr((event.event.begin_timestamp+event.event.duration_sec)*1000, false, false, false, true, false);
+		if (begin==null && event.event.begin_timestamp!=null)
+			begin = OpenWebifController.dateTimeFormatter.getTimeStr( event.event.begin_timestamp                          *1000, false, false, false, true, false);
+		if (end  ==null && event.event.begin_timestamp!=null && event.event.duration_sec!=null)
+			end   = OpenWebifController.dateTimeFormatter.getTimeStr((event.event.begin_timestamp+event.event.duration_sec)*1000, false, false, false, true, false);
 		String timeRange = String.format("%s - %s", begin, end);
 		String title     = event.event.title;
 		String shortdesc = event.event.shortdesc;

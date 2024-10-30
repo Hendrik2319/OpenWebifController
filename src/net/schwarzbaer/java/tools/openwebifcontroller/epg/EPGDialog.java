@@ -523,9 +523,9 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			miAddRecordNSwitchTimer.setEnabled(isEventOK && timer==null);
 			miToggleTimer          .setEnabled(isEventOK && timer!=null);
 			miDeleteTimer          .setEnabled(isEventOK && timer!=null);
-			miAddRecordTimer       .setText(!isEventOK  ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", this.event.title));
-			miAddSwitchTimer       .setText(!isEventOK  ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", this.event.title));
-			miAddRecordNSwitchTimer.setText(!isEventOK  ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", this.event.title));
+			miAddRecordTimer       .setText(!isEventOK || this.event.title==null ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", this.event.title));
+			miAddSwitchTimer       .setText(!isEventOK || this.event.title==null ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", this.event.title));
+			miAddRecordNSwitchTimer.setText(!isEventOK || this.event.title==null ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", this.event.title));
 			miToggleTimer          .setText(timer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", timer.name));
 			miDeleteTimer          .setText(timer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", timer.name));
 		}

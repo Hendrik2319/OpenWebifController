@@ -280,8 +280,10 @@ class EPGView extends Canvas {
 		if (events==null || events.isEmpty()) return null;
 		Vector<EPGViewEvent> result = new Vector<>(events.size());
 		for (EPGevent event:events) {
+			if (event.begin_timestamp==null) continue;
+			long duration_sec = event.duration_sec==null ? 0 : event.duration_sec;
 			int begin_s_based = (int) (event.begin_timestamp - baseTimeOffset_s);
-			int   end_s_based = (int) (begin_s_based + event.duration_sec);
+			int   end_s_based = (int) (begin_s_based + duration_sec);
 			result.add(new EPGViewEvent(event.title, begin_s_based, end_s_based, event));
 		}
 		return result;
@@ -560,10 +562,13 @@ class EPGView extends Canvas {
 				}
 			}
 			
-			g2.setColor(COLOR_EVENT_TEXT);
-			int textX = xBegin+1+eventTextOffsetX;
-			if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
-			g2.drawString(event.title, textX, rowY+rowTextOffsetY);
+			if (event.title!=null)
+			{
+				g2.setColor(COLOR_EVENT_TEXT);
+				int textX = xBegin+1+eventTextOffsetX;
+				if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
+				g2.drawString(event.title, textX, rowY+rowTextOffsetY);
+			}
 		}
 	}
 

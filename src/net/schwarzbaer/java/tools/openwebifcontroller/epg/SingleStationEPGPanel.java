@@ -3,6 +3,7 @@ package net.schwarzbaer.java.tools.openwebifcontroller.epg;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Graphics;
 import java.awt.Point;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,6 +17,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -52,6 +54,7 @@ public class SingleStationEPGPanel extends JSplitPane
 	private final JTextArea epgOutput;
 	private final JScrollPane epgOutputScrollPane;
 	private final DataAcquisition dataAcquisition;
+	private final Tables.SimplifiedRowSorter epgTableRowSorter;
 
 	public SingleStationEPGPanel(EPG epg, TimerDataUpdateNotifier timerNotifier, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, EPGDialog.TimerCommands timerCommands)
 	{
@@ -61,7 +64,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		epgTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 		epgTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		
-		epgTable.setRowSorter( new Tables.SimplifiedRowSorter(epgTableModel) );
+		epgTable.setRowSorter( epgTableRowSorter = new Tables.SimplifiedRowSorter(epgTableModel) );
 		epgTableModel.setTable(epgTable);
 		epgTableModel.setColumnWidths(epgTable);
 		epgTableModel.setCellRenderers();
@@ -375,6 +378,11 @@ public class SingleStationEPGPanel extends JSplitPane
 				System.out.printf("Column Widths: %s%n", EPGTableModel.getColumnWidthsAsString(epgTable));
 			}));
 			
+			add(OpenWebifController.createMenuItem("Reset Row Order", e->{
+				epgTableRowSorter.resetSortOrder();
+				epgTable.repaint();
+			}));
+			
 			addContextMenuInvokeListener((comp, x, y) -> {
 				int rowV = epgTable.rowAtPoint(new Point(x,y));
 				int rowM = rowV<0 ? -1 : epgTable.convertRowIndexToModel(rowV);
@@ -579,11 +587,13 @@ public class SingleStationEPGPanel extends JSplitPane
 		
 		private class CustomCellRenderer implements TableCellRenderer
 		{
-			private Tables.LabelRendererComponent rendComp;
+			private final Tables.LabelRendererComponent label;
+			private final ProgressScaleRC progressScale;
 			
 			CustomCellRenderer()
 			{
-				rendComp = new Tables.LabelRendererComponent();
+				label = new Tables.LabelRendererComponent();
+				progressScale = new ProgressScaleRC();
 			}
 
 			@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV) {
@@ -594,16 +604,7 @@ public class SingleStationEPGPanel extends JSplitPane
 				EPGevent event = getRow(rowM);
 				Timer timer = getEventTimer(event);
 				
-				String valueStr = value==null ? null : value.toString();
 				Supplier<Color> getCustomBackground = null;
-				int horizontalAlignment = SwingConstants.LEFT;
-				
-				if (columnID!=null)
-				{
-					if (columnID.getDisplayStr!=null && event!=null)
-						valueStr = columnID.getDisplayStr.apply(event);
-					horizontalAlignment = columnID.horizontalAlignment;
-				}
 				
 				if (timer!=null)
 				{
@@ -613,10 +614,70 @@ public class SingleStationEPGPanel extends JSplitPane
 					getCustomBackground = ()->bgColor;
 				}
 				
-				rendComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, getCustomBackground, null);
-				rendComp.setHorizontalAlignment(horizontalAlignment);
+				if (columnID==ColumnID.CompProgress)
+				{
+					progressScale.configureAsTableCellRendererComponent(table, value, isSelected, hasFocus, getCustomBackground, null);
+					return progressScale;
+				}
 				
-				return rendComp;
+				int horizontalAlignment = SwingConstants.LEFT;
+				String valueStr = value==null ? null : value.toString();
+				
+				if (columnID!=null)
+				{
+					if (columnID.getDisplayStr!=null && event!=null)
+						valueStr = columnID.getDisplayStr.apply(event);
+					horizontalAlignment = columnID.horizontalAlignment;
+				}
+				
+				label.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, getCustomBackground, null);
+				label.setHorizontalAlignment(horizontalAlignment);
+				
+				return label;
+			}
+		}
+		
+		private static class ProgressScaleRC extends Tables.GraphicRendererComponent<Double>
+		{
+			private static final long serialVersionUID = -271394399399751152L;
+			
+			private Double value = null;
+			private boolean isSelected = false;
+			private JTable table = null;
+			private JList<?> list = null;
+			
+			ProgressScaleRC() { super(Double.class); }
+			
+			@Override protected void setValue(Double value, JTable table, JList<?> list, Integer listIndex, boolean isSelected, boolean hasFocus)
+			{
+				this.value = value;
+				this.table = table;
+				this.list = list;
+				this.isSelected = isSelected;
+			}
+
+			@Override protected void paintContent(Graphics g, int x, int y, int width, int height)
+			{
+				if (value==null)
+					return;
+				
+				int scaleWidth = (int) ((width-2) * Math.min(Math.max(0, value), 1));
+				
+				g.setColor(isSelected ? getTableOrListSelectionForeground() : getTableOrListForeground());
+				g.drawRect(x  , y  , width-1   , height-1);
+				g.fillRect(x+1, y+1, scaleWidth, height-2);
+			}
+
+			private Color getTableOrListSelectionForeground() {
+				if (table!=null) return table.getSelectionForeground();
+				if (list !=null) return list .getSelectionForeground();
+				return Color.BLACK;
+			}
+
+			private Color getTableOrListForeground() {
+				if (table!=null) return table.getForeground();
+				if (list !=null) return list .getForeground();
+				return Color.BLACK;
 			}
 		}
 		

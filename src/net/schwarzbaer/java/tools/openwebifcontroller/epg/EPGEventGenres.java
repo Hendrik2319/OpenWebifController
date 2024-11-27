@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.Vector;
 
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
 class EPGEventGenres
 {
@@ -43,7 +44,6 @@ class EPGEventGenres
 		
 	}
 	
-	private static final String FILE__EPG_EVENT_GENRES = "OpenWebifController - EPGEventGenres.data";
 	private static final EPGEventGenres instance = new EPGEventGenres();
 	static EPGEventGenres getInstance() { return instance; }
 	
@@ -89,7 +89,7 @@ class EPGEventGenres
 
 	void readFromFile()
 	{
-		File file = new File(FILE__EPG_EVENT_GENRES);
+		File file = new File(OpenWebifController.FILE__EPG_EVENT_GENRES);
 		System.out.printf("Read EPGEvent Genres from file \"%s\" ...%n", file.getAbsolutePath());
 		
 		genres.clear();
@@ -144,7 +144,7 @@ class EPGEventGenres
 	
 	void writeToFile()
 	{
-		File file = new File(FILE__EPG_EVENT_GENRES);
+		File file = new File(OpenWebifController.FILE__EPG_EVENT_GENRES);
 		System.out.printf("Write EPGEvent Genres to file \"%s\" ...%n", file.getAbsolutePath());
 		
 		try (PrintWriter out = new PrintWriter(file, StandardCharsets.UTF_8))

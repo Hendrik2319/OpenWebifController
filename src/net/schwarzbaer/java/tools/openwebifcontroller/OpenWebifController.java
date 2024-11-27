@@ -105,6 +105,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		private static IconSource.CachedIcons<LedIcons> IS = IconSource.createCachedIcons(16, 16, "/images/LedIcons.png", LedIcons.values());
 	}
 	
+	public static final String FILE__EPG_EVENT_GENRES    = "OpenWebifController - EPGEventGenres.data";
+	public static final String FILE__ALREADY_SEEN_TIMERS = "OpenWebifController - AlreadySeenTimers.data";
+	
 	public static AppSettings settings = new AppSettings();
 	public static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();
 

@@ -165,6 +165,12 @@ public class TimersPanel extends JSplitPane {
 				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
 			}));
 			
+			AlreadySeenTimers.MenuControl alreadySeenTimersMenu1Control = AlreadySeenTimers
+					.getInstance()
+					.createMenu(menuClickedTimer, ()->clickedTimer, null, () -> {
+						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
+					});
+			
 			JMenu menuSelectedTimers;
 			add(menuSelectedTimers = new JMenu("Selected Timers"));
 			
@@ -189,6 +195,12 @@ public class TimersPanel extends JSplitPane {
 				if (selectedTimers.length<1) return;
 				main.deleteTimer(null, selectedTimers, this::handleDeleteResponse);
 			}));
+			
+			AlreadySeenTimers.MenuControl alreadySeenTimersMenu2Control = AlreadySeenTimers
+					.getInstance()
+					.createMenu(menuSelectedTimers, null, ()->selectedTimers, () -> {
+						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
+					});
 			
 			addSeparator();
 			
@@ -216,6 +228,9 @@ public class TimersPanel extends JSplitPane {
 				String timerLabel = clickedTimer==null ? "" : String.format(" \"%s: %s\"", clickedTimer.servicename, clickedTimer.name);
 				menuClickedTimer  .setText("Clicked Timer"+timerLabel);
 				menuSelectedTimers.setText("Selected Timers (%d)".formatted(selectedTimers.length));
+				
+				alreadySeenTimersMenu1Control.updateBeforeShowingMenu();
+				alreadySeenTimersMenu2Control.updateBeforeShowingMenu();
 			});
 		}
 
@@ -452,16 +467,16 @@ public class TimersPanel extends JSplitPane {
 				Supplier<Color> bgCol = ()->timer==null ? null : TimerTools.getBgColor(tableModel.timerStateGuesser.getState(timer));
 				Supplier<Color> fgCol = null;
 				if (columnID.config.columnClass==Boolean.class) {
-					if (value instanceof Boolean) {
+					if (value instanceof Boolean boolVal) {
 						rendererComp = chkbxRenderer;
-						chkbxRenderer.configureAsTableCellRendererComponent(table, ((Boolean) value).booleanValue(), null, isSelected, hasFocus, fgCol, bgCol);
+						chkbxRenderer.configureAsTableCellRendererComponent(table, boolVal.booleanValue(), null, isSelected, hasFocus, fgCol, bgCol);
 						chkbxRenderer.setHorizontalAlignment(SwingConstants.CENTER);
 					} else
 						labRenderer.configureAsTableCellRendererComponent(table, null, "", isSelected, hasFocus, bgCol, fgCol);
 					
 				} else {
-					if (columnID.config.columnClass==Timer.Type.class && value instanceof Timer.Type)
-						bgCol = ()->TimerTools.getBgColor((Timer.Type) value);
+					if (columnID.config.columnClass==Timer.Type.class && value instanceof Timer.Type timerType)
+						bgCol = ()->TimerTools.getBgColor(timerType);
 					
 					String valueStr = columnID.toString!=null ? columnID.toString.apply(value) : value!=null ? value.toString() : null;
 					labRenderer.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
@@ -484,6 +499,7 @@ public class TimersPanel extends JSplitPane {
 			duration           ("Duration"             , Double     .class,  60, null  , t->t.duration           , DateTimeFormatter::getDurationStr),
 			name               ("Name"                 , String     .class, 220, null  , t->t.name               ),
 			servicename        ("Station"              , String     .class, 110, null  , t->t.servicename        ),
+			seen               ("Seen"                 , Boolean    .class,  50, null  , AlreadySeenTimers.getInstance()::isMarkedAsAlreadySeen),
 			serviceref         ("Service Reference"    , String     .class, 180, null  , t->t.serviceref         ),
 			isAutoTimer        ("is AutoTimer"         , Long       .class,  70, CENTER, t->t.isAutoTimer        ),
 			tags               ("Tags"                 , String     .class, 190, null  , t->t.tags               ),

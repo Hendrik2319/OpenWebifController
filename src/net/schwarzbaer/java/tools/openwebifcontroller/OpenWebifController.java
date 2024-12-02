@@ -12,6 +12,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Vector;
@@ -105,8 +106,48 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		private static IconSource.CachedIcons<LedIcons> IS = IconSource.createCachedIcons(16, 16, "/images/LedIcons.png", LedIcons.values());
 	}
 	
-	public static final String FILE__EPG_EVENT_GENRES    = "OpenWebifController - EPGEventGenres.data";
-	public static final String FILE__ALREADY_SEEN_TIMERS = "OpenWebifController - AlreadySeenTimers.data";
+	public static final String FILE__EPG_EVENT_GENRES = "OpenWebifController - EPGEventGenres.data";
+	
+	public enum LocalDataFile {
+		AlreadySeenTimers("AlreadySeenTimers.data"),
+		;
+		private final String filename;
+		private LocalDataFile(String filename) { this.filename = filename; }
+		
+		public File getFileForRead()
+		{
+			return new File("local data",filename);
+		}
+		
+		public File getFileForWrite()
+		{
+			final File folder = new File("local data");
+			final File file = new File(folder,filename);
+			if (!folder.isDirectory())
+			{
+				if (folder.isFile())
+				{
+					System.err.printf("Can't write to file \"%s\".%nThere is a file \"%s\" that prevents the folder \"local data\" from being created.%n", file.getAbsolutePath(), folder.getAbsolutePath());
+					return null;
+				}
+				if (folder.exists())
+				{
+					System.err.printf("Can't write to file \"%s\".%nThere is something that prevents the folder \"local data\" from being created.%n", file.getAbsolutePath());
+					return null;
+				}
+				try
+				{
+					Files.createDirectory(folder.toPath());
+				}
+				catch (IOException ex)
+				{
+					System.err.printf("Can't create folder \"%s\": IOException: %s%n", folder.getAbsolutePath(), ex.getMessage());
+					return null;
+				}
+			}
+			return file;
+		}
+	}
 	
 	public static AppSettings settings = new AppSettings();
 	public static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();

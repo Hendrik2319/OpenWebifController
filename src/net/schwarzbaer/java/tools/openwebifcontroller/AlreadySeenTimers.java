@@ -119,7 +119,12 @@ public class AlreadySeenTimers
 
 	void readFromFile()
 	{
-		File file = new File(OpenWebifController.FILE__ALREADY_SEEN_TIMERS);
+		File file = OpenWebifController.LocalDataFile.AlreadySeenTimers.getFileForRead();
+		if (file==null)
+		{
+			System.err.printf("Can't read Already Seen Timers from file.%n");
+			return;
+		}
 		System.out.printf("Read Already Seen Timers from file \"%s\" ...%n", file.getAbsolutePath());
 		
 		alreadySeenTimers.clear();
@@ -202,7 +207,12 @@ public class AlreadySeenTimers
 	
 	void writeToFile()
 	{
-		File file = new File(OpenWebifController.FILE__ALREADY_SEEN_TIMERS);
+		File file = OpenWebifController.LocalDataFile.AlreadySeenTimers.getFileForWrite();
+		if (file==null)
+		{
+			System.err.printf("Can't write Already Seen Timers to file.%n");
+			return;
+		}
 		System.out.printf("Write Already Seen Timers to file \"%s\" ...%n", file.getAbsolutePath());
 		
 		Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());

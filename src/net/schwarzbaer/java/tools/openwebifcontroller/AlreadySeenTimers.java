@@ -156,7 +156,7 @@ public class AlreadySeenTimers
 				if ( tcs == null)
 				{
 					if ((value=getValue(line, "title = "))!=null)
-						tcs = new MutableTCS( value );
+						tcs = new MutableTCS( decode( value ) );
 				}
 				else
 				{
@@ -169,7 +169,7 @@ public class AlreadySeenTimers
 					}
 					
 					if ( (value=getValue(line, "station = "))!=null && stationData == null)
-						stationData = new MutableStationData( value );
+						stationData = new MutableStationData( decode( value ) );
 					
 					if ( (value=getValue(line, "desc = "))!=null)
 					{
@@ -226,7 +226,7 @@ public class AlreadySeenTimers
 				if (title!=null)
 				{
 					out.printf("[TimerCriteriaSet]%n");
-					out.printf("title = %s%n", title);
+					out.printf("title = %s%n", encode(title));
 					
 					TimerCriteriaSet tcs = alreadySeenTimers.get(title);
 					if (tcs.descriptions != null)
@@ -246,7 +246,7 @@ public class AlreadySeenTimers
 						{
 							StationData stationData = tcs.stations.get(station);
 							out.printf("%n[Station]%n");
-							out.printf("station = %s%n", station);
+							out.printf("station = %s%n", encode(station));
 							
 							if (stationData.descriptions != null)
 							{

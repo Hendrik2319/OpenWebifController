@@ -165,9 +165,9 @@ public class TimersPanel extends JSplitPane {
 				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
 			}));
 			
-			AlreadySeenTimers.MenuControl alreadySeenTimersMenu1Control = AlreadySeenTimers
+			AlreadySeenEvents.MenuControl alreadySeenTimersMenu1Control = AlreadySeenEvents
 					.getInstance()
-					.createMenu(menuClickedTimer, ()->clickedTimer, null, () -> {
+					.createMenuForTimers(menuClickedTimer, ()->clickedTimer, null, () -> {
 						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
 					});
 			
@@ -196,9 +196,9 @@ public class TimersPanel extends JSplitPane {
 				main.deleteTimer(null, selectedTimers, this::handleDeleteResponse);
 			}));
 			
-			AlreadySeenTimers.MenuControl alreadySeenTimersMenu2Control = AlreadySeenTimers
+			AlreadySeenEvents.MenuControl alreadySeenTimersMenu2Control = AlreadySeenEvents
 					.getInstance()
-					.createMenu(menuSelectedTimers, null, ()->selectedTimers, () -> {
+					.createMenuForTimers(menuSelectedTimers, null, ()->selectedTimers, () -> {
 						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
 					});
 			
@@ -499,7 +499,7 @@ public class TimersPanel extends JSplitPane {
 			duration           ("Duration"             , Double     .class,  60, null  , t->t.duration           , DateTimeFormatter::getDurationStr),
 			name               ("Name"                 , String     .class, 220, null  , t->t.name               ),
 			servicename        ("Station"              , String     .class, 110, null  , t->t.servicename        ),
-			seen               ("Seen"                 , Boolean    .class,  50, null  , AlreadySeenTimers.getInstance()::isMarkedAsAlreadySeen),
+			seen               ("Seen"                 , Boolean    .class,  50, null  , AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen),
 			serviceref         ("Service Reference"    , String     .class, 180, null  , t->t.serviceref         ),
 			isAutoTimer        ("is AutoTimer"         , Long       .class,  70, CENTER, t->t.isAutoTimer        ),
 			tags               ("Tags"                 , String     .class, 190, null  , t->t.tags               ),

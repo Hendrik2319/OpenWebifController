@@ -109,7 +109,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	public static final String FILE__EPG_EVENT_GENRES = "OpenWebifController - EPGEventGenres.data";
 	
 	public enum LocalDataFile {
-		AlreadySeenTimers("AlreadySeenTimers.data"),
+		AlreadySeenEvents("AlreadySeenEvents.data"),
 		;
 		private final String filename;
 		private LocalDataFile(String filename) { this.filename = filename; }

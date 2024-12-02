@@ -17,9 +17,11 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
 import javax.swing.JList;
+import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -29,7 +31,6 @@ import javax.swing.JTree;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
@@ -96,7 +97,7 @@ class MoviesPanel extends JSplitPane {
 		
 		movieTable = new JTable(movieTableModel);
 		movieTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-		movieTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		movieTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 		JScrollPane tableScrollPane = new JScrollPane(movieTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
@@ -148,9 +149,8 @@ class MoviesPanel extends JSplitPane {
 		});
 		
 		movieTable.getSelectionModel().addListSelectionListener(e -> {
-			int rowV = movieTable.getSelectedRow();
-			int rowM = movieTable.convertRowIndexToModel(rowV);
-			showValues(movieTableModel.getRow(rowM));
+			int[] rowsM = getSelectedRowsM();
+			showValues(rowsM.length == 1 ? movieTableModel.getRow(rowsM[0]) : null);
 		});
 		
 		movieTable.addMouseListener(new MouseAdapter() {
@@ -167,6 +167,18 @@ class MoviesPanel extends JSplitPane {
 			}
 		});
 		
+	}
+
+	private int[] getSelectedRowsM()
+	{
+		int[] rowsV = movieTable.getSelectedRows();
+		int rowCount = movieTable.getRowCount();	
+		int[] rowsM = Arrays
+				.stream(rowsV)
+				.filter(i -> i>=0 && i<rowCount)
+				.map(movieTable::convertRowIndexToModel)
+				.toArray();
+		return rowsM;
 	}
 
 	private class TreeContextMenu extends ContextMenu
@@ -205,10 +217,15 @@ class MoviesPanel extends JSplitPane {
 		private MovieList.Movie clickedMovie;
 		private int clickedMovieRowM;
 
+		private MovieList.Movie[] selectedMovies;
+		private int[] selectedMovieRowsM;
+
 		TableContextMenu()
 		{
 			clickedMovie = null;
 			clickedMovieRowM = -1;
+			selectedMovies = null;
+			selectedMovieRowsM = null;
 			
 			JMenuItem miOpenVideoPlayer = add(OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image , e->showMovie(clickedMovie)));
 			JMenuItem miOpenBrowser     = add(OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image , e->showMovieInBrowser(clickedMovie)));
@@ -220,7 +237,19 @@ class MoviesPanel extends JSplitPane {
 				});
 			}));
 			
+			JMenu clickedMovieMenu = new JMenu("Clicked Movie");
+			add(clickedMovieMenu);
+			AlreadySeenEvents.getInstance().createMenuForMovies(clickedMovieMenu, ()->clickedMovie, null, ()->{
+				movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
+			});
+			
 			addSeparator();
+			
+			JMenu selectedMovieMenu = new JMenu("Selected Movie");
+			add(selectedMovieMenu);
+			AlreadySeenEvents.getInstance().createMenuForMovies(selectedMovieMenu, null, ()->selectedMovies, ()->{
+				movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
+			});
 			
 			boolean showDescriptionInNameColumn = MovieTableModel.getShowDescriptionInNameColumn();
 			add(OpenWebifController.createCheckBoxMenuItem("Show description in name column", showDescriptionInNameColumn, b->{
@@ -247,13 +276,21 @@ class MoviesPanel extends JSplitPane {
 			}));
 			
 			addContextMenuInvokeListener((comp, x, y) -> {
-				clickedMovie = null;
 				int rowV = movieTable.rowAtPoint(new Point(x,y));
 				int rowM = movieTable.convertRowIndexToModel(rowV);
 				clickedMovieRowM = rowM;
+				selectedMovieRowsM = getSelectedRowsM();
 				
+				clickedMovie = null;
+				selectedMovies = null;
 				if (movieTableModel!=null)
+				{
 					clickedMovie = movieTableModel.getRow(rowM);
+					selectedMovies = Arrays
+							.stream(selectedMovieRowsM)
+							.mapToObj(movieTableModel::getRow)
+							.toArray(MovieList.Movie[]::new);
+				}
 				
 				String rowName = MovieTableModel.getRowName(movieTableModel, clickedMovie);
 				if (rowName!=null && rowName.length() > 60)
@@ -268,6 +305,11 @@ class MoviesPanel extends JSplitPane {
 				miOpenBrowser    .setText(clickedMovie==null ? "Show in Browser"      : String.format("Show \"%s\" in Browser"     , rowName));
 				miZapToMovie     .setText(clickedMovie==null ? "Start Playing in STB" : String.format("Start Playing \"%s\" in STB", rowName));
 				miDeleteMovie    .setText(clickedMovie==null ? "Delete"               : String.format("Delete \"%s\""              , rowName));
+				
+				clickedMovieMenu .setText(clickedMovie==null ? "Clicked Movie"        : String.format("Clicked Movie \"%s\""       , rowName));
+				
+				int n = selectedMovies==null ? 0 : selectedMovies.length;
+				selectedMovieMenu.setText(n == 1 ? "Selected Movie (1)" : "Selected Movies (%d)".formatted(n));
 			});
 		}
 	}
@@ -606,6 +648,7 @@ class MoviesPanel extends JSplitPane {
 			Length  ("Length"  , Integer.class,  50, null, m->m.length_s     , m->m.lengthStr),
 			Size    ("Size"    ,    Long.class,  60, null, m->m.filesize     , m->m.filesize_readable),
 			Time    ("Time"    ,    Long.class, 110, null, m->m.recordingtime, m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false)),
+			Seen    ("Seen"    , Boolean.class,  50, null, AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen),
 			Station ("Station" ,  String.class, 110, null, m->m.servicename        ),
 			File    ("File"    ,  String.class, 450, null, m->m.filename_stripped  ),
 			;
@@ -783,32 +826,52 @@ class MoviesPanel extends JSplitPane {
 			}
 		}
 		
-		private class CustomCellRenderer extends DefaultTableCellRenderer {
-			private static final long serialVersionUID = -6595078558558524809L;
+		private class CustomCellRenderer implements TableCellRenderer {
+			
+			private Tables.LabelRendererComponent label;
+			private Tables.CheckBoxRendererComponent checkbox;
 
-			@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV) {
-				Component comp = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, rowV, columnV);
-				
+			CustomCellRenderer()
+			{
+				label = new Tables.LabelRendererComponent();
+				checkbox = new Tables.CheckBoxRendererComponent();
+				checkbox.setHorizontalAlignment(SwingConstants.CENTER);
+			}
+
+			@Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int rowV, int columnV)
+			{
 				int columnM = table.convertColumnIndexToModel(columnV);
 				ColumnID columnID = getColumnID(columnM);
 				int rowM = table.convertRowIndexToModel(rowV);
 				MovieList.Movie movie = getRow(rowM);
 				
+				Supplier<Color> getCustomBackground = null;
+				Supplier<Color> getCustomForeground = null;
+				
+				if (!isSelected && deletedMovies.contains(movie))
+					getCustomForeground = ()->COLOR_DELETED;
+				
+				Component rendComp = label;
+				String valueStr = value == null ? "" : value.toString();
+				
 				if (columnID!=null)
 				{
-					if (columnID.getDisplayStr!=null && movie!=null)
-						setText(columnID.getDisplayStr.apply(movie));
-					setHorizontalAlignment(columnID.horizontalAlignment);
+					if (columnID.getColumnConfig().columnClass == Boolean.class && value instanceof Boolean boolVal) {
+						rendComp = checkbox;
+						checkbox.configureAsTableCellRendererComponent(table, boolVal, null, isSelected, hasFocus, getCustomForeground, getCustomBackground);
+					}
+					else
+					{
+						if (columnID.getDisplayStr!=null && movie!=null)
+						{
+							valueStr = columnID.getDisplayStr.apply(movie);
+						}
+						label.setHorizontalAlignment(columnID.horizontalAlignment);
+					}
 				}
+				label.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, getCustomBackground, getCustomForeground);
 				
-				if (isSelected)
-					setForeground(table.getSelectionForeground());
-				else if (deletedMovies.contains(movie))
-					setForeground(COLOR_DELETED);
-				else
-					setForeground(table.getForeground());
-				
-				return comp;
+				return rendComp;
 			}
 		}
 		

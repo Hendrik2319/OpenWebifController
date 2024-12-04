@@ -9,7 +9,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Vector;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -29,7 +28,6 @@ import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
-import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedTableModel;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
@@ -466,7 +464,7 @@ public class TimersPanel extends JSplitPane {
 			if (columnID!=null) {
 				Supplier<Color> bgCol = ()->timer==null ? null : TimerTools.getBgColor(tableModel.timerStateGuesser.getState(timer));
 				Supplier<Color> fgCol = null;
-				if (columnID.config.columnClass==Boolean.class) {
+				if (columnID.cfg.columnClass==Boolean.class) {
 					if (value instanceof Boolean boolVal) {
 						rendererComp = chkbxRenderer;
 						chkbxRenderer.configureAsTableCellRendererComponent(table, boolVal.booleanValue(), null, isSelected, hasFocus, fgCol, bgCol);
@@ -475,12 +473,12 @@ public class TimersPanel extends JSplitPane {
 						labRenderer.configureAsTableCellRendererComponent(table, null, "", isSelected, hasFocus, bgCol, fgCol);
 					
 				} else {
-					if (columnID.config.columnClass==Timer.Type.class && value instanceof Timer.Type timerType)
+					if (columnID.cfg.columnClass==Timer.Type.class && value instanceof Timer.Type timerType)
 						bgCol = ()->TimerTools.getBgColor(timerType);
 					
-					String valueStr = columnID.toString!=null ? columnID.toString.apply(value) : value!=null ? value.toString() : null;
+					String valueStr = columnID.cfg.toString!=null ? columnID.cfg.toString.apply(value) : value!=null ? value.toString() : null;
 					labRenderer.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
-					labRenderer.setHorizontalAlignment(columnID.horizontalAlignment);
+					labRenderer.setHorizontalAlignment(columnID.cfg.horizontalAlignment);
 				}
 			}
 			
@@ -492,71 +490,56 @@ public class TimersPanel extends JSplitPane {
 	{
 		// [90, 70, 170, 60, 60, 220, 110, 180, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants {
-			type               ("Type"                 , Timer.Type .class,  90, CENTER, t->t.type               ),
-			state_             ("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER, (m,t)->m.timerStateGuesser.getState(t)),
-			begin_date         ("Begin"                , Long       .class, 170, null  , t->t.begin              , t->formatDate(t*1000,  true,  true, false,  true, false)),
-			end                ("End"                  , Long       .class,  60, null  , t->t.end                , t->formatDate(t*1000, false, false, false,  true, false)),
-			duration           ("Duration"             , Double     .class,  60, null  , t->t.duration           , DateTimeFormatter::getDurationStr),
-			name               ("Name"                 , String     .class, 220, null  , t->t.name               ),
-			servicename        ("Station"              , String     .class, 110, null  , t->t.servicename        ),
-			seen               ("Seen"                 , Boolean    .class,  50, null  , AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen),
-			serviceref         ("Service Reference"    , String     .class, 180, null  , t->t.serviceref         ),
-			isAutoTimer        ("is AutoTimer"         , Long       .class,  70, CENTER, t->t.isAutoTimer        ),
-			tags               ("Tags"                 , String     .class, 190, null  , t->t.tags               ),
-			dirname            ("Dir Name"             , String     .class, 120, null  , t->t.dirname            ),
-			filename           ("File Name"            , String     .class, 350, null  , t->t.filename           ),
+			type               (config("Type"                 , Timer.Type .class,  90, CENTER).setValFunc(t->t.type               )),
+			state_             (config("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((m,t)->m.timerStateGuesser.getState(t))),
+			begin_date         (config("Begin"                , Long       .class, 170, null  ).setValFunc(t->t.begin              ).setToString(t->formatDate(t*1000,  true,  true, false,  true, false))),
+			end                (config("End"                  , Long       .class,  60, null  ).setValFunc(t->t.end                ).setToString(t->formatDate(t*1000, false, false, false,  true, false))),
+			duration           (config("Duration"             , Double     .class,  60, null  ).setValFunc(t->t.duration           ).setToString(DateTimeFormatter::getDurationStr)),
+			name               (config("Name"                 , String     .class, 220, null  ).setValFunc(t->t.name               )),
+			servicename        (config("Station"              , String     .class, 110, null  ).setValFunc(t->t.servicename        )),
+			seen               (config("Seen"                 , Boolean    .class,  50, null  ).setValFunc(AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen)),
+			serviceref         (config("Service Reference"    , String     .class, 180, null  ).setValFunc(t->t.serviceref         )),
+			isAutoTimer        (config("is AutoTimer"         , Long       .class,  70, CENTER).setValFunc(t->t.isAutoTimer        )),
+			tags               (config("Tags"                 , String     .class, 190, null  ).setValFunc(t->t.tags               )),
+			dirname            (config("Dir Name"             , String     .class, 120, null  ).setValFunc(t->t.dirname            )),
+			filename           (config("File Name"            , String     .class, 350, null  ).setValFunc(t->t.filename           )),
 			
-			realbegin          ("<realbegin>"          , String     .class, 100, null  , t->t.realbegin          ),
-			realend            ("<realend>"            , String     .class, 100, null  , t->t.realend            ),
-			startprepare       ("<startprepare>"       , Double     .class, 170, null  , t->t.startprepare       , d->formatDate(Math.round(d*1000), true, true, false, true, false)),
-			nextactivation     ("<nextactivation>"     , Long       .class, 170, null  , t->t.nextactivation     , t->formatDate(           t*1000 , true, true, false, true, false)),
-			eit                ("<eit>"                , Long       .class,  60, null  , t->t.eit                ),
-			state              ("<state>"              , Long       .class,  55, CENTER, t->t.state              ),
-			justplay           ("<justplay>"           , Long       .class,  65, CENTER, t->t.justplay           ),
-			always_zap         ("<always_zap>"         , Long       .class,  85, CENTER, t->t.always_zap         ),
-			disabled           ("<disabled>"           , Long       .class,  65, CENTER, t->t.disabled           ),
-			cancelled          ("<cancelled>"          , Boolean    .class,  70, CENTER, t->t.cancelled          ),
-			toggledisabled     ("<toggledisabled>"     , Long       .class,  95, CENTER, t->t.toggledisabled     ),
-			toggledisabledimg  ("<toggledisabledimg>"  , String     .class, 115, CENTER, t->t.toggledisabledimg  ),
+			realbegin          (config("<realbegin>"          , String     .class, 100, null  ).setValFunc(t->t.realbegin          )),
+			realend            (config("<realend>"            , String     .class, 100, null  ).setValFunc(t->t.realend            )),
+			startprepare       (config("<startprepare>"       , Double     .class, 170, null  ).setValFunc(t->t.startprepare       ).setToString(d->formatDate(Math.round(d*1000), true, true, false, true, false))),
+			nextactivation     (config("<nextactivation>"     , Long       .class, 170, null  ).setValFunc(t->t.nextactivation     ).setToString(t->formatDate(           t*1000 , true, true, false, true, false))),
+			eit                (config("<eit>"                , Long       .class,  60, null  ).setValFunc(t->t.eit                )),
+			state              (config("<state>"              , Long       .class,  55, CENTER).setValFunc(t->t.state              )),
+			justplay           (config("<justplay>"           , Long       .class,  65, CENTER).setValFunc(t->t.justplay           )),
+			always_zap         (config("<always_zap>"         , Long       .class,  85, CENTER).setValFunc(t->t.always_zap         )),
+			disabled           (config("<disabled>"           , Long       .class,  65, CENTER).setValFunc(t->t.disabled           )),
+			cancelled          (config("<cancelled>"          , Boolean    .class,  70, CENTER).setValFunc(t->t.cancelled          )),
+			toggledisabled     (config("<toggledisabled>"     , Long       .class,  95, CENTER).setValFunc(t->t.toggledisabled     )),
+			toggledisabledimg  (config("<toggledisabledimg>"  , String     .class, 115, CENTER).setValFunc(t->t.toggledisabledimg  )),
 			                   
-			afterevent         ("<afterevent>"         , Long       .class,  80, CENTER, t->t.afterevent         ),
-			allow_duplicate    ("<allow_duplicate>"    , Long       .class, 100, CENTER, t->t.allow_duplicate    ),
-			asrefs             ("<asrefs>"             , String     .class,  60, CENTER, t->t.asrefs             ),
-			autoadjust         ("<autoadjust>"         , Long       .class,  80, CENTER, t->t.autoadjust         ),
-			backoff            ("<backoff>"            , Long       .class,  65, CENTER, t->t.backoff            ),
-			dontsave           ("<dontsave>"           , Long       .class,  75, CENTER, t->t.dontsave           ),
-			firsttryprepare    ("<firsttryprepare>"    , Long       .class, 100, CENTER, t->t.firsttryprepare    ),
-			pipzap             ("<pipzap>"             , Long       .class,  60, CENTER, t->t.pipzap             ),
-			repeated           ("<repeated>"           , Long       .class,  70, CENTER, t->t.repeated           ),
-			vpsplugin_enabled  ("<vpsplugin_enabled>"  , Boolean    .class, 120, CENTER, t->t.vpsplugin_enabled  ),
-			vpsplugin_overwrite("<vpsplugin_overwrite>", Boolean    .class, 125, CENTER, t->t.vpsplugin_overwrite),
-			vpsplugin_time     ("<vpsplugin_time>"     , Long       .class, 100, CENTER, t->t.vpsplugin_time     ),
+			afterevent         (config("<afterevent>"         , Long       .class,  80, CENTER).setValFunc(t->t.afterevent         )),
+			allow_duplicate    (config("<allow_duplicate>"    , Long       .class, 100, CENTER).setValFunc(t->t.allow_duplicate    )),
+			asrefs             (config("<asrefs>"             , String     .class,  60, CENTER).setValFunc(t->t.asrefs             )),
+			autoadjust         (config("<autoadjust>"         , Long       .class,  80, CENTER).setValFunc(t->t.autoadjust         )),
+			backoff            (config("<backoff>"            , Long       .class,  65, CENTER).setValFunc(t->t.backoff            )),
+			dontsave           (config("<dontsave>"           , Long       .class,  75, CENTER).setValFunc(t->t.dontsave           )),
+			firsttryprepare    (config("<firsttryprepare>"    , Long       .class, 100, CENTER).setValFunc(t->t.firsttryprepare    )),
+			pipzap             (config("<pipzap>"             , Long       .class,  60, CENTER).setValFunc(t->t.pipzap             )),
+			repeated           (config("<repeated>"           , Long       .class,  70, CENTER).setValFunc(t->t.repeated           )),
+			vpsplugin_enabled  (config("<vpsplugin_enabled>"  , Boolean    .class, 120, CENTER).setValFunc(t->t.vpsplugin_enabled  )),
+			vpsplugin_overwrite(config("<vpsplugin_overwrite>", Boolean    .class, 125, CENTER).setValFunc(t->t.vpsplugin_overwrite)),
+			vpsplugin_time     (config("<vpsplugin_time>"     , Long       .class, 100, CENTER).setValFunc(t->t.vpsplugin_time     )),
 			;
 			
-			private final SimplifiedColumnConfig config;
-			private final int horizontalAlignment;
-			private final Function<Timer, ?> getValue;
-			private final BiFunction<TimersTableModel, Timer, ?> getValueM;
-			private final Function<Object,String> toString;
+			private final Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, ?> cfg;
+			ColumnID(Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, ?> cfg) { this.cfg = cfg; }
+			@Override public Tables.SimplifiedColumnConfig getColumnConfig() { return this.cfg; }
+			@Override public Function<Timer, ?> getGetValue() { return cfg.getValue; }
 			
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<Timer, T> getValue) {
-				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null, null);
+			private static <T> Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, T> config(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment)
+			{
+				return new Tables.SimplifiedColumnConfig2<>(name, columnClass, 20, -1, prefWidth, prefWidth, horizontalAlignment);
 			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<TimersTableModel, Timer, T> getValue) {
-				this(name, columnClass, prefWidth, horizontalAlignment, null, getValue, null);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<Timer, T> getValue, Function<T,String> toString) {
-				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null, toString);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<Timer, T> getValue, BiFunction<TimersTableModel, Timer, T> getValueM, Function<T,String> toString) {
-				this.horizontalAlignment = Tables.UseFulColumnDefMethods.getHorizontalAlignment(horizontalAlignment, columnClass);
-				config = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
-				this.getValue = getValue;
-				this.getValueM = getValueM;
-				this.toString = Tables.UseFulColumnDefMethods.createToString(columnClass, toString);
-			}
-			@Override public SimplifiedColumnConfig getColumnConfig() { return this.config; }
-			@Override public Function<Timer, ?> getGetValue() { return getValue; }
 		}
 
 		private final TimerStateGuesser timerStateGuesser;
@@ -583,8 +566,8 @@ public class TimersPanel extends JSplitPane {
 		
 		@Override protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, Timer row)
 		{
-			if (columnID!=null && columnID.getValueM!=null)
-				return columnID.getValueM.apply(this, row);
+			if (columnID!=null && columnID.cfg.getValueM!=null)
+				return columnID.cfg.getValueM.apply(this, row);
 			
 			return super.getValueAt(rowIndex, columnIndex, columnID, row);
 		}

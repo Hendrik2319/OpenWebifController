@@ -15,7 +15,6 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -47,7 +46,6 @@ import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.GetValueTableModelOutputter.OutputType;
-import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
@@ -643,44 +641,25 @@ class MoviesPanel extends JSplitPane {
 		
 		// Column Widths: [280, 50, 109, 450, 59, 108]
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<MovieList.Movie>, SwingConstants {
-			Name    ("Name"    ,  String.class, 280, null, MovieTableModel::getRowName),
-			Progress("Progress",    Long.class,  60, null, m->m.lastseen           ),
-			Length  ("Length"  , Integer.class,  50, null, m->m.length_s     , m->m.lengthStr),
-			Size    ("Size"    ,    Long.class,  60, null, m->m.filesize     , m->m.filesize_readable),
-			Time    ("Time"    ,    Long.class, 110, null, m->m.recordingtime, m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false)),
-			Seen    ("Seen"    , Boolean.class,  50, null, AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen),
-			Station ("Station" ,  String.class, 110, null, m->m.servicename        ),
-			File    ("File"    ,  String.class, 450, null, m->m.filename_stripped  ),
+			Name    (config("Name"    ,  String.class, 280, null).setValFunc(MovieTableModel::getRowName)),
+			Progress(config("Progress",    Long.class,  60, null).setValFunc(m->m.lastseen         )),
+			Length  (config("Length"  , Integer.class,  50, null).setValFunc(m->m.length_s         ).setToStringR(m->m.lengthStr        )),
+			Size    (config("Size"    ,    Long.class,  60, null).setValFunc(m->m.filesize         ).setToStringR(m->m.filesize_readable)),
+			Time    (config("Time"    ,    Long.class, 110, null).setValFunc(m->m.recordingtime    ).setToStringR(m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false))),
+			Seen    (config("Seen"    , Boolean.class,  50, null).setValFunc(AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen)),
+			Station (config("Station" ,  String.class, 110, null).setValFunc(m->m.servicename      )),
+			File    (config("File"    ,  String.class, 450, null).setValFunc(m->m.filename_stripped)),
 			;
-		
-			final SimplifiedColumnConfig cfg;
-			final Function<MovieList.Movie, ?> getValue;
-			final BiFunction<MovieTableModel, MovieList.Movie, ?> getValue2;
-			final Function<MovieList.Movie, String> getDisplayStr;
-			final int horizontalAlignment;
 			
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<MovieList.Movie,T> getValue) {
-				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null, null);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<MovieTableModel,MovieList.Movie,T> getValue2) {
-				this(name, columnClass, prefWidth, horizontalAlignment, null, getValue2, null);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<MovieList.Movie,T> getValue, Function<MovieList.Movie,String> getDisplayStr) {
-				this(name, columnClass, prefWidth, horizontalAlignment, getValue, null, getDisplayStr);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, BiFunction<MovieTableModel,MovieList.Movie,T> getValue2, Function<MovieList.Movie,String> getDisplayStr) {
-				this(name, columnClass, prefWidth, horizontalAlignment, null, getValue2, getDisplayStr);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment, Function<MovieList.Movie,T> getValue, BiFunction<MovieTableModel,MovieList.Movie,T> getValue2, Function<MovieList.Movie,String> getDisplayStr) {
-				this.horizontalAlignment = Tables.UseFulColumnDefMethods.getHorizontalAlignment(horizontalAlignment, columnClass);
-				this.getValue = getValue;
-				this.getValue2 = getValue2;
-				this.getDisplayStr = getDisplayStr;
-				cfg = new SimplifiedColumnConfig(name, columnClass, 20, -1, prefWidth, prefWidth);
-			}
+			private final Tables.SimplifiedColumnConfig2<MovieTableModel, MovieList.Movie, ?> cfg;
+			ColumnID(Tables.SimplifiedColumnConfig2<MovieTableModel, MovieList.Movie, ?> cfg) { this.cfg = cfg; }
+			@Override public Tables.SimplifiedColumnConfig getColumnConfig() { return this.cfg; }
+			@Override public Function<MovieList.Movie, ?> getGetValue() { return cfg.getValue; }
 			
-			@Override public SimplifiedColumnConfig getColumnConfig() { return cfg; }
-			@Override public Function<MovieList.Movie,?> getGetValue() { return getValue; }
+			private static <T> Tables.SimplifiedColumnConfig2<MovieTableModel, MovieList.Movie, T> config(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment)
+			{
+				return new Tables.SimplifiedColumnConfig2<>(name, columnClass, 20, -1, prefWidth, prefWidth, horizontalAlignment);
+			}
 		}
 	
 		private boolean showDescriptionInNameColumn;
@@ -726,8 +705,8 @@ class MoviesPanel extends JSplitPane {
 		@Override
 		protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, MovieList.Movie row)
 		{
-			if (columnID.getValue2!=null)
-				return columnID.getValue2.apply(this, row);
+			if (columnID.cfg.getValueM!=null)
+				return columnID.cfg.getValueM.apply(this, row);
 			return super.getValueAt(rowIndex, columnIndex, columnID, row);
 		}
 
@@ -862,11 +841,11 @@ class MoviesPanel extends JSplitPane {
 					}
 					else
 					{
-						if (columnID.getDisplayStr!=null && movie!=null)
-						{
-							valueStr = columnID.getDisplayStr.apply(movie);
-						}
-						label.setHorizontalAlignment(columnID.horizontalAlignment);
+						if (columnID.cfg.toStringR!=null && movie!=null)
+							valueStr = columnID.cfg.toStringR.apply(movie);
+						if (columnID.cfg.toString!=null)
+							valueStr = columnID.cfg.toString.apply(value);
+						label.setHorizontalAlignment(columnID.cfg.horizontalAlignment);
 					}
 				}
 				label.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, getCustomBackground, getCustomForeground);

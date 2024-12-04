@@ -8,7 +8,6 @@ import java.awt.Window;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Vector;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -26,7 +25,6 @@ import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.Tables;
-import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
@@ -252,8 +250,8 @@ class TimersDialog extends JDialog {
 			Supplier<Color> fgCol = null;
 			
 			String valueStr;
-			if (columnID!=null && columnID.toString!=null)
-				valueStr = columnID.toString.apply(value);
+			if (columnID!=null && columnID.cfg.toString!=null)
+				valueStr = columnID.cfg.toString.apply(value);
 			else
 				valueStr = value==null ? null : value.toString();
 			
@@ -265,12 +263,8 @@ class TimersDialog extends JDialog {
 			
 			
 			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
-			if (columnID!=null && columnID.horizontalAlignment!=null)
-				rendererComp.setHorizontalAlignment(columnID.horizontalAlignment);
-			else if (columnID!=null && Number.class.isAssignableFrom(columnID.cfg.columnClass))
-				rendererComp.setHorizontalAlignment(SwingConstants.RIGHT);
-			else
-				rendererComp.setHorizontalAlignment(SwingConstants.LEFT);
+			if (columnID!=null)
+				rendererComp.setHorizontalAlignment(columnID.cfg.horizontalAlignment);
 			
 			return rendererComp;
 		}
@@ -280,51 +274,62 @@ class TimersDialog extends JDialog {
 	{
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants
 		{
-			type       ("Type"        , Timer.Type .class,  90, CENTER, timer -> timer.type       ),
-			state      ("State"       , TimerStateGuesser.ExtTimerState.class, 70, CENTER, (model, timer) -> model.timerStateGuesser.getState(timer)),
-			servicename("Station"     , String     .class, 110, null  , timer -> timer.servicename),
-			name       ("Name"        , String     .class, 220, null  , timer -> timer.name       ),
-			begin_date ("Begin"       , Long       .class, 170, RIGHT , timer -> timer.begin   , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false,  true, false)),
-			end        ("End"         , Long       .class,  55, RIGHT , timer -> timer.end     , val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false)),
-			duration   ("Duration"    , Double     .class,  60, RIGHT , timer -> timer.duration, val -> DateTimeFormatter.getDurationStr(val)),
+			type       (config("Type"        , Timer.Type .class,  90, CENTER).setValFunc(timer -> timer.type       )),
+			state      (config("State"       , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((model, timer) -> model.timerStateGuesser.getState(timer))),
+			servicename(config("Station"     , String     .class, 110, null  ).setValFunc(timer -> timer.servicename)),
+			name       (config("Name"        , String     .class, 220, null  ).setValFunc(timer -> timer.name       )),
+			begin_date (config("Begin"       , Long       .class, 170, RIGHT ).setValFunc(timer -> timer.begin      ).setToString(val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false,  true, false))),
+			end        (config("End"         , Long       .class,  55, RIGHT ).setValFunc(timer -> timer.end        ).setToString(val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false))),
+			duration   (config("Duration"    , Double     .class,  60, RIGHT ).setValFunc(timer -> timer.duration   ).setToString(val -> DateTimeFormatter.getDurationStr(val))),
 			;
-			private final SimplifiedColumnConfig cfg;
-			private final Function<Timer, ?> getValue;
-			private final BiFunction<TimersTableModel, Timer, ?> getValueM;
-			private final Integer horizontalAlignment;
-			private final Function<Object, String> toString;
-			/*
-			ColumnID(String name, Class<?> columnClass, int width) {
-				this(name, columnClass, width, null, null);
+			
+			private final Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, ?> cfg;
+			ColumnID(Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, ?> cfg) { this.cfg = cfg; }
+			@Override public Tables.SimplifiedColumnConfig getColumnConfig() { return this.cfg; }
+			@Override public Function<Timer, ?> getGetValue() { return cfg.getValue; }
+			
+			private static <T> Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, T> config(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment)
+			{
+				return new Tables.SimplifiedColumnConfig2<>(name, columnClass, 20, -1, prefWidth, prefWidth, horizontalAlignment);
 			}
-			ColumnID(String name, Class<?> columnClass, int width, Integer horizontalAlignment) {
-				this(name, columnClass, width, horizontalAlignment, null);
-			}
-			*/
-			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue) {
-				this(name, columnClass, width, horizontalAlignment, getValue, null, null);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, BiFunction<TimersTableModel, Timer, T> getValue) {
-				this(name, columnClass, width, horizontalAlignment, null, getValue, null);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue, Function<T,String> toString) {
-				this(name, columnClass, width, horizontalAlignment, getValue, null, toString);
-			}
-			<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue, BiFunction<TimersTableModel, Timer, T> getValueM, Function<T,String> toString) {
-				this.horizontalAlignment = horizontalAlignment;
-				this.getValue = getValue;
-				this.getValueM = getValueM;
-				this.toString = toString==null ? null : obj -> {
-					if (columnClass.isInstance(obj))
-						return toString.apply(columnClass.cast(obj));
-					if (obj!=null)
-						return obj.toString();
-					return null;
-				};
-				this.cfg = new SimplifiedColumnConfig(name, columnClass, 20, -1, width, width);
-			}
-			@Override public Function<Timer, ?> getGetValue() { return getValue; }
-			@Override public SimplifiedColumnConfig getColumnConfig() { return cfg; }
+			
+		//	private final SimplifiedColumnConfig cfg;
+		//	private final Function<Timer, ?> getValue;
+		//	private final BiFunction<TimersTableModel, Timer, ?> getValueM;
+		//	private final Integer horizontalAlignment;
+		//	private final Function<Object, String> toString;
+		//	/*
+		//	ColumnID(String name, Class<?> columnClass, int width) {
+		//		this(name, columnClass, width, null, null);
+		//	}
+		//	ColumnID(String name, Class<?> columnClass, int width, Integer horizontalAlignment) {
+		//		this(name, columnClass, width, horizontalAlignment, null);
+		//	}
+		//	*/
+		//	<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue) {
+		//		this(name, columnClass, width, horizontalAlignment, getValue, null, null);
+		//	}
+		//	<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, BiFunction<TimersTableModel, Timer, T> getValue) {
+		//		this(name, columnClass, width, horizontalAlignment, null, getValue, null);
+		//	}
+		//	<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue, Function<T,String> toString) {
+		//		this(name, columnClass, width, horizontalAlignment, getValue, null, toString);
+		//	}
+		//	<T> ColumnID(String name, Class<T> columnClass, int width, Integer horizontalAlignment, Function<Timer, T> getValue, BiFunction<TimersTableModel, Timer, T> getValueM, Function<T,String> toString) {
+		//		this.horizontalAlignment = horizontalAlignment;
+		//		this.getValue = getValue;
+		//		this.getValueM = getValueM;
+		//		this.toString = toString==null ? null : obj -> {
+		//			if (columnClass.isInstance(obj))
+		//				return toString.apply(columnClass.cast(obj));
+		//			if (obj!=null)
+		//				return obj.toString();
+		//			return null;
+		//		};
+		//		this.cfg = new SimplifiedColumnConfig(name, columnClass, 20, -1, width, width);
+		//	}
+		//	@Override public Function<Timer, ?> getGetValue() { return getValue; }
+		//	@Override public SimplifiedColumnConfig getColumnConfig() { return cfg; }
 		}
 	
 		private final TimerStateGuesser timerStateGuesser;
@@ -354,8 +359,8 @@ class TimersDialog extends JDialog {
 		
 		@Override protected Object getValueAt(int rowIndex, int columnIndex, ColumnID columnID, Timer row)
 		{
-			if (columnID!=null && columnID.getValueM!=null)
-				return columnID.getValueM.apply(this, row);
+			if (columnID!=null && columnID.cfg.getValueM!=null)
+				return columnID.cfg.getValueM.apply(this, row);
 			
 			return super.getValueAt(rowIndex, columnIndex, columnID, row);
 		}

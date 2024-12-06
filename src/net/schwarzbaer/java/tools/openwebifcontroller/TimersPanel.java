@@ -462,13 +462,22 @@ public class TimersPanel extends JSplitPane {
 			Component rendererComp = labRenderer;
 			
 			if (columnID!=null) {
-				Supplier<Color> bgCol = ()->timer==null ? null : TimerTools.getBgColor(tableModel.timerStateGuesser.getState(timer));
+				Supplier<Color> bgCol = ()->timer==null ? null : TimerTools.getBgColor(
+						tableModel.timerStateGuesser.getState(timer),
+						AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(timer)
+				);
 				Supplier<Color> fgCol = null;
 				if (columnID.cfg.columnClass==Boolean.class) {
 					if (value instanceof Boolean boolVal) {
-						rendererComp = chkbxRenderer;
-						chkbxRenderer.configureAsTableCellRendererComponent(table, boolVal.booleanValue(), null, isSelected, hasFocus, fgCol, bgCol);
-						chkbxRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+						if (columnID.cfg.toString != null)
+							labRenderer.configureAsTableCellRendererComponent(table, null, columnID.cfg.toString.apply(boolVal), isSelected, hasFocus, bgCol, fgCol);
+						else if (columnID.cfg.toStringR != null)
+							labRenderer.configureAsTableCellRendererComponent(table, null, columnID.cfg.toStringR.apply(timer), isSelected, hasFocus, bgCol, fgCol);
+						else {
+							rendererComp = chkbxRenderer;
+							chkbxRenderer.configureAsTableCellRendererComponent(table, boolVal.booleanValue(), null, isSelected, hasFocus, fgCol, bgCol);
+							chkbxRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+						}
 					} else
 						labRenderer.configureAsTableCellRendererComponent(table, null, "", isSelected, hasFocus, bgCol, fgCol);
 					
@@ -488,17 +497,17 @@ public class TimersPanel extends JSplitPane {
 	
 	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
 	{
-		// [90, 70, 170, 60, 60, 220, 110, 180, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
+		// Column Widths: [90, 70, 50, 170, 60, 60, 220, 110, 220, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants {
 			type               (config("Type"                 , Timer.Type .class,  90, CENTER).setValFunc(t->t.type               )),
 			state_             (config("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((m,t)->m.timerStateGuesser.getState(t))),
+			seen               (config("Seen"                 , Boolean    .class,  50, null  ).setValFunc(AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen).setToString(b->b?"Seen":null)),
 			begin_date         (config("Begin"                , Long       .class, 170, null  ).setValFunc(t->t.begin              ).setToString(t->formatDate(t*1000,  true,  true, false,  true, false))),
 			end                (config("End"                  , Long       .class,  60, null  ).setValFunc(t->t.end                ).setToString(t->formatDate(t*1000, false, false, false,  true, false))),
 			duration           (config("Duration"             , Double     .class,  60, null  ).setValFunc(t->t.duration           ).setToString(DateTimeFormatter::getDurationStr)),
 			name               (config("Name"                 , String     .class, 220, null  ).setValFunc(t->t.name               )),
 			servicename        (config("Station"              , String     .class, 110, null  ).setValFunc(t->t.servicename        )),
-			seen               (config("Seen"                 , Boolean    .class,  50, null  ).setValFunc(AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen)),
-			serviceref         (config("Service Reference"    , String     .class, 180, null  ).setValFunc(t->t.serviceref         )),
+			serviceref         (config("Service Reference"    , String     .class, 220, null  ).setValFunc(t->t.serviceref         )),
 			isAutoTimer        (config("is AutoTimer"         , Long       .class,  70, CENTER).setValFunc(t->t.isAutoTimer        )),
 			tags               (config("Tags"                 , String     .class, 190, null  ).setValFunc(t->t.tags               )),
 			dirname            (config("Dir Name"             , String     .class, 120, null  ).setValFunc(t->t.dirname            )),

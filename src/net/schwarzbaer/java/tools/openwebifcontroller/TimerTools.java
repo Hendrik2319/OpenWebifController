@@ -17,6 +17,7 @@ public class TimerTools
 	private static final Color BGCOLOR_Type_Unknown       = new Color(0xFF5CFF);
 	private static final Color BGCOLOR_State_Running      = new Color(0xFFFFD9);
 	private static final Color BGCOLOR_State_Waiting      = new Color(0xD9FFD9);
+	private static final Color BGCOLOR_State_Waiting_Seen = new Color(0xFAFFD9);
 	private static final Color BGCOLOR_State_Finished     = new Color(0xFFD9D9);
 	private static final Color BGCOLOR_State_Deactivated  = new Color(0xD9D9D9);
 	private static final Color BGCOLOR_State_Unknown      = new Color(0xFF5CFF);
@@ -43,10 +44,14 @@ public class TimerTools
 		return null;
 	}
 	
-	public static Color getBgColor(TimerStateGuesser.ExtTimerState state) {
+	public static Color getBgColor(TimerStateGuesser.ExtTimerState state)
+	{
+		return getBgColor(state, false);
+	}
+	public static Color getBgColor(TimerStateGuesser.ExtTimerState state, boolean markedAsAlreadySeen) {
 		switch (state) {
 			case Running    : return BGCOLOR_State_Running;
-			case Waiting    : return BGCOLOR_State_Waiting;
+			case Waiting    : return markedAsAlreadySeen ? BGCOLOR_State_Waiting_Seen : BGCOLOR_State_Waiting;
 			case Finished   : return BGCOLOR_State_Finished;
 			case Deactivated: return BGCOLOR_State_Deactivated;
 			case Unknown    : return BGCOLOR_State_Unknown;

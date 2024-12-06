@@ -30,7 +30,7 @@ public class AlreadySeenEvents
 	private static final AlreadySeenEvents instance = new AlreadySeenEvents();
 	public static AlreadySeenEvents getInstance() { return instance; }
 	
-	private record StationData (
+	record StationData (
 			String name,
 			Set<String> descriptions
 	) {
@@ -45,7 +45,7 @@ public class AlreadySeenEvents
 		}
 	}
 	
-	private record EventCriteriaSet (
+	record EventCriteriaSet (
 			String name,
 			Map<String, StationData> stations,
 			Set<String> descriptions
@@ -558,6 +558,9 @@ public class AlreadySeenEvents
 		
 		return descriptions.contains(description);
 	}
-	
-	
+
+	AlreadySeenEventsViewer.RootTreeNode createTreeRoot()
+	{
+		return new AlreadySeenEventsViewer.RootTreeNode(alreadySeenEvents);
+	}
 }

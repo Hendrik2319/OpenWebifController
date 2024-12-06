@@ -414,6 +414,10 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		lookAndFeelSwitch.setUITreeRoot(mainWindow);
 		extrasMenu.add(lookAndFeelSwitch.createMenu("Look & Feel"));
 		
+		extrasMenu.add(createMenuItem("Show Definitions of Already Seen Events", e->{
+			AlreadySeenEventsViewer.showViewer(mainWindow, "Already Seen Events");
+		}));
+		
 		JMenu logsMenu = menuBar.add(createMenu("Logs"));
 		logsMenu.add(createMenuItem("Show Response Log", e->{
 			logWindow.showDialog();

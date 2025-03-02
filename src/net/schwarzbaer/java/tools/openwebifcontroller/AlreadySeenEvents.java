@@ -12,10 +12,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.Vector;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -30,16 +28,29 @@ public class AlreadySeenEvents
 	private static final AlreadySeenEvents instance = new AlreadySeenEvents();
 	public static AlreadySeenEvents getInstance() { return instance; }
 	
+	static class EpisodeInfo
+	{
+		String episodeStr;
+		
+		EpisodeInfo()                  { this.episodeStr = null; }
+		EpisodeInfo(EpisodeInfo other) { this.episodeStr = other.episodeStr; }
+		
+		boolean hasEpisodeStr()
+		{
+			return episodeStr!=null && !episodeStr.isBlank();
+		}
+	}
+	
 	record StationData (
 			String name,
-			Set<String> descriptions
+			Map<String, EpisodeInfo> descriptions
 	) {
 		static StationData create(String name, boolean createDescriptions)
 		{
 			return new StationData(
 					Objects.requireNonNull( name ),
 					createDescriptions
-						? new HashSet<>()
+						? new HashMap<>()
 						: null
 			);
 		}
@@ -47,18 +58,25 @@ public class AlreadySeenEvents
 	
 	record EventCriteriaSet (
 			String name,
+			EpisodeInfo episode,
 			Map<String, StationData> stations,
-			Set<String> descriptions
+			Map<String, EpisodeInfo> descriptions
 	) {
 		static EventCriteriaSet create(String name, boolean createStations, boolean createDescriptions)
 		{
+			return create(name, null, createStations, createDescriptions);
+		}
+		
+		static EventCriteriaSet create(String name, EpisodeInfo episode, boolean createStations, boolean createDescriptions)
+		{
 			return new EventCriteriaSet(
 					Objects.requireNonNull( name ),
+					new EpisodeInfo(episode),
 					createStations
 						? new HashMap<>()
 						: null,
 					createDescriptions
-						? new HashSet<>()
+						? new HashMap<>()
 						: null
 			);
 		}
@@ -67,7 +85,7 @@ public class AlreadySeenEvents
 	private static class MutableStationData
 	{
 		final String name;
-		Set<String> descriptions = new HashSet<>();
+		Map<String, EpisodeInfo> descriptions = new HashMap<>();
 		
 		MutableStationData(String name)
 		{
@@ -79,32 +97,34 @@ public class AlreadySeenEvents
 			StationData stationData = StationData.create(name, !descriptions.isEmpty());
 			
 			if (stationData.descriptions != null)
-				stationData.descriptions.addAll( descriptions );
+				stationData.descriptions.putAll( descriptions );
 			
 			return stationData;
 		}
 	}
 	
-	private static class MutableTCS
+	private static class MutableECS
 	{
 		final String name;
+		EpisodeInfo episode;
 		Map<String, StationData> stations = new HashMap<>();
-		Set<String> descriptions = new HashSet<>();
+		Map<String, EpisodeInfo> descriptions = new HashMap<>();
 		
-		MutableTCS(String name)
+		MutableECS(String name)
 		{
 			this.name = name;
+			episode = new EpisodeInfo();
 		}
 		
 		EventCriteriaSet convertToRecord()
 		{
-			EventCriteriaSet ecs = EventCriteriaSet.create(name, !stations.isEmpty(), !descriptions.isEmpty());
+			EventCriteriaSet ecs = EventCriteriaSet.create(name, episode, !stations.isEmpty(), !descriptions.isEmpty());
 			
 			if (ecs.stations != null)
-				ecs.stations.putAll(stations);
+				ecs.stations.putAll( stations );
 			
 			if (ecs.descriptions != null)
-				ecs.descriptions.addAll( descriptions );
+				ecs.descriptions.putAll( descriptions );
 			
 			return ecs;
 		}
@@ -133,8 +153,9 @@ public class AlreadySeenEvents
 		try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)))
 		{
 			String value, line;
-			MutableTCS tcs = null;
+			MutableECS ecs = null;
 			MutableStationData stationData = null;
+			EpisodeInfo episodeInfo = null;
 			
 			while ( (line=in.readLine())!=null )
 			{
@@ -143,50 +164,61 @@ public class AlreadySeenEvents
 				
 				if (line.equals("[EventCriteriaSet]"))
 				{
-					if (tcs!=null)
+					if (ecs!=null)
 					{
 						if (stationData!=null)
-							tcs.stations.put(stationData.name, stationData.convertToRecord());
-						alreadySeenEvents.put(tcs.name, tcs.convertToRecord());
+							ecs.stations.put(stationData.name, stationData.convertToRecord());
+						alreadySeenEvents.put(ecs.name, ecs.convertToRecord());
 					}
 					
-					tcs = null;
+					ecs = null;
 					stationData = null;
+					episodeInfo = null;
 				}
 				
-				if ( tcs == null)
+				if ( ecs == null)
 				{
 					if ((value=getValue(line, "title = "))!=null)
-						tcs = new MutableTCS( decode( value ) );
+						ecs = new MutableECS( decode( value ) );
 				}
 				else
 				{
 					if (line.equals("[Station]"))
 					{
 						if (stationData!=null)
-							tcs.stations.put(stationData.name, stationData.convertToRecord());
+							ecs.stations.put(stationData.name, stationData.convertToRecord());
 						
 						stationData = null;
 					}
 					
-					if ( (value=getValue(line, "station = "))!=null && stationData == null)
+					if ( (value=getValue(line, "station = "))!=null && stationData==null )
 						stationData = new MutableStationData( decode( value ) );
 					
-					if ( (value=getValue(line, "desc = "))!=null)
+					if ( (value=getValue(line, "desc = "))!=null )
 					{
 						if (stationData != null)
-							stationData.descriptions.add( decode( value ) );
+							stationData.descriptions.put( decode( value ), episodeInfo = new EpisodeInfo() );
 						else
-							tcs.descriptions.add( decode( value ) );
+							ecs.descriptions.put( decode( value ), episodeInfo = new EpisodeInfo() );
+					}
+					
+					if ( (value=getValue(line, "episodeT = "))!=null)
+					{
+						ecs.episode.episodeStr = value;
+					}
+					
+					if ( (value=getValue(line, "episodeD = "))!=null && episodeInfo!=null )
+					{
+						episodeInfo.episodeStr = value;
 					}
 				}
 			}
 			
-			if (tcs!=null)
+			if (ecs!=null)
 			{
 				if (stationData!=null)
-					tcs.stations.put(stationData.name, stationData.convertToRecord());
-				alreadySeenEvents.put(tcs.name, tcs.convertToRecord());
+					ecs.stations.put(stationData.name, stationData.convertToRecord());
+				alreadySeenEvents.put(ecs.name, ecs.convertToRecord());
 			}
 		}
 		catch (FileNotFoundException ex) {}
@@ -230,12 +262,21 @@ public class AlreadySeenEvents
 					out.printf("title = %s%n", encode(title));
 					
 					EventCriteriaSet ecs = alreadySeenEvents.get(title);
+					if (ecs.episode!=null && ecs.episode.hasEpisodeStr())
+						out.printf("episodeT = %s%n", ecs.episode.episodeStr);
+					
 					if (ecs.descriptions != null)
 					{
-						Vector<String> descriptions = new Vector<>( ecs.descriptions );
+						Vector<String> descriptions = new Vector<>( ecs.descriptions.keySet() );
 						descriptions.sort(stringComparator);
 						for (String desc : descriptions)
+						{
 							out.printf("desc = %s%n", encode(desc));
+							EpisodeInfo episode = ecs.descriptions.get(desc);
+							if (episode == null) continue;
+							if (episode.hasEpisodeStr())
+								out.printf("episodeD = %s%n", episode.episodeStr);
+						}
 					}
 					
 					if (ecs.stations != null)
@@ -251,10 +292,16 @@ public class AlreadySeenEvents
 							
 							if (stationData.descriptions != null)
 							{
-								Vector<String> descriptions = new Vector<>( stationData.descriptions );
+								Vector<String> descriptions = new Vector<>( stationData.descriptions.keySet() );
 								descriptions.sort(stringComparator);
 								for (String desc : descriptions)
+								{
 									out.printf("desc = %s%n", encode(desc));
+									EpisodeInfo episode = ecs.descriptions.get(desc);
+									if (episode == null) continue;
+									if (episode.hasEpisodeStr())
+										out.printf("episodeD = %s%n", episode.episodeStr);
+								}
 							}
 						}
 					}
@@ -402,7 +449,7 @@ public class AlreadySeenEvents
 		}
 		else
 		{
-			final Set<String> descriptions;
+			final Map<String, EpisodeInfo> descriptions;
 			if (!useStation)
 				descriptions = ecs.descriptions;
 			else
@@ -432,7 +479,7 @@ public class AlreadySeenEvents
 				if (description == null)
 					return; // no description defined in source
 				
-				descriptions.add(description);
+				descriptions.put(description, new EpisodeInfo());
 			}
 		}
 	}
@@ -461,7 +508,7 @@ public class AlreadySeenEvents
 			return;
 		}
 		
-		final Set<String> descriptions;
+		final Map<String,EpisodeInfo> descriptions;
 		if (!useStation)
 			descriptions = ecs.descriptions;
 		
@@ -529,7 +576,7 @@ public class AlreadySeenEvents
 			return true;
 		
 		
-		Set<String> descriptions = null;
+		Map<String,EpisodeInfo> descriptions = null;
 		if (ecs.stations != null)
 		{
 			final String station = getData.getStation(source);
@@ -556,11 +603,11 @@ public class AlreadySeenEvents
 		if (description == null)
 			return false; // no description defined in source
 		
-		return descriptions.contains(description);
+		return descriptions.containsKey(description);
 	}
 
-	AlreadySeenEventsViewer.RootTreeNode createTreeRoot()
+	AlreadySeenEventsViewer.RootTreeNode createTreeRoot(AlreadySeenEventsViewer viewer)
 	{
-		return new AlreadySeenEventsViewer.RootTreeNode(alreadySeenEvents);
+		return viewer.createTreeRoot(alreadySeenEvents);
 	}
 }

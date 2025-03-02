@@ -164,6 +164,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			System.out.println("  -mute                      Turns volume off");
 			System.out.println("  --reboot                   Restarts STB (Linux & GUI)");
 			System.out.println("  --stationswitch            Start StationSwitch");
+			System.out.println();
 			
 		} else {
 			if (args[0].equals("-start") && args.length>1) {
@@ -1295,8 +1296,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 						/* String  */ out.add(2, "IPV4 Method", iface.ipv4method ); 
 						/* String  */ out.add(2, "IP Method"  , iface.ipmethod   ); 
 						/* String  */ out.add(2, "IPV6"       , iface.ipv6       ); 
-						
-						/* Null  */ //out.add(2, "firstpublic", iface.firstpublic); 
+						/* String  */ out.add(2, "firstpublic", iface.firstpublic); 
 					}
 				}
 			}

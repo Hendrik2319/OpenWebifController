@@ -35,10 +35,7 @@ public class AlreadySeenEvents
 		EpisodeInfo()                  { this(null); }
 		EpisodeInfo(EpisodeInfo other) { this.episodeStr = other==null ? null : other.episodeStr; }
 		
-		boolean hasEpisodeStr()
-		{
-			return episodeStr!=null && !episodeStr.isBlank();
-		}
+		boolean hasEpisodeStr() { return episodeStr!=null && !episodeStr.isBlank(); }
 	}
 	
 	record StationData (
@@ -64,25 +61,26 @@ public class AlreadySeenEvents
 		{
 			super(episode);
 			this.group = group;
-			
 		}
+		
+		boolean hasGroup() { return group!=null && !group.isBlank(); }
 	}
 	
 	record EventCriteriaSet (
-			String name,
+			String title,
 			VariableECSData variableData,
 			Map<String, StationData> stations,
 			Map<String, EpisodeInfo> descriptions
 	) {
-		static EventCriteriaSet create(String name, boolean createStations, boolean createDescriptions)
+		static EventCriteriaSet create(String title, boolean createStations, boolean createDescriptions)
 		{
-			return create(name, null, null, createStations, createDescriptions);
+			return create(title, null, null, createStations, createDescriptions);
 		}
 		
-		static EventCriteriaSet create(String name, String group, EpisodeInfo episode, boolean createStations, boolean createDescriptions)
+		static EventCriteriaSet create(String title, String group, EpisodeInfo episode, boolean createStations, boolean createDescriptions)
 		{
 			return new EventCriteriaSet(
-					Objects.requireNonNull( name ),
+					Objects.requireNonNull( title ),
 					new VariableECSData(group, episode),
 					createStations
 						? new HashMap<>()
@@ -117,22 +115,22 @@ public class AlreadySeenEvents
 	
 	private static class MutableECS
 	{
-		final String name;
+		final String title;
 		String group;
 		EpisodeInfo episode;
 		Map<String, StationData> stations = new HashMap<>();
 		Map<String, EpisodeInfo> descriptions = new HashMap<>();
 		
-		MutableECS(String name)
+		MutableECS(String title)
 		{
-			this.name = name;
+			this.title = title;
 			episode = new EpisodeInfo();
 			group = null;
 		}
 		
 		EventCriteriaSet convertToRecord()
 		{
-			EventCriteriaSet ecs = EventCriteriaSet.create(name, group, episode, !stations.isEmpty(), !descriptions.isEmpty());
+			EventCriteriaSet ecs = EventCriteriaSet.create(title, group, episode, !stations.isEmpty(), !descriptions.isEmpty());
 			
 			if (ecs.stations != null)
 				ecs.stations.putAll( stations );
@@ -182,7 +180,7 @@ public class AlreadySeenEvents
 					{
 						if (stationData!=null)
 							ecs.stations.put(stationData.name, stationData.convertToRecord());
-						alreadySeenEvents.put(ecs.name, ecs.convertToRecord());
+						alreadySeenEvents.put(ecs.title, ecs.convertToRecord());
 					}
 					
 					ecs = null;
@@ -216,15 +214,14 @@ public class AlreadySeenEvents
 							ecs.descriptions.put( decode( value ), episodeInfo = new EpisodeInfo() );
 					}
 					
+					if ( (value=getValue(line, "group = "))!=null)
+						ecs.group = value;
+					
 					if ( (value=getValue(line, "episodeT = "))!=null)
-					{
 						ecs.episode.episodeStr = value;
-					}
 					
 					if ( (value=getValue(line, "episodeD = "))!=null && episodeInfo!=null )
-					{
 						episodeInfo.episodeStr = value;
-					}
 				}
 			}
 			
@@ -232,7 +229,7 @@ public class AlreadySeenEvents
 			{
 				if (stationData!=null)
 					ecs.stations.put(stationData.name, stationData.convertToRecord());
-				alreadySeenEvents.put(ecs.name, ecs.convertToRecord());
+				alreadySeenEvents.put(ecs.title, ecs.convertToRecord());
 			}
 		}
 		catch (FileNotFoundException ex) {}
@@ -276,8 +273,15 @@ public class AlreadySeenEvents
 					out.printf("title = %s%n", encode(title));
 					
 					EventCriteriaSet ecs = alreadySeenEvents.get(title);
-					if (ecs.variableData!=null && ecs.variableData.hasEpisodeStr())
-						out.printf("episodeT = %s%n", ecs.variableData.episodeStr);
+					
+					VariableECSData variableData = ecs.variableData;
+					if (variableData!=null)
+					{
+						if (variableData.group!=null && !variableData.group.isBlank())
+							out.printf("group = %s%n", variableData.group);
+						if (variableData.hasEpisodeStr())
+							out.printf("episodeT = %s%n", ecs.variableData.episodeStr);
+					}
 					
 					if (ecs.descriptions != null)
 					{

@@ -4,12 +4,17 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Window;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Vector;
+import java.util.function.Predicate;
 
 import javax.swing.Icon;
+import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -30,6 +35,7 @@ import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.StationData;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.VariableECSData;
 
 class AlreadySeenEventsViewer extends StandardDialog
 {
@@ -115,25 +121,35 @@ class AlreadySeenEventsViewer extends StandardDialog
 	{
 		private static final long serialVersionUID = -3347262887544423895L;
 		
-		private TreePath clickedPath;
-		private AbstractTreeNode clickedTreeNode;
+		private final Window parent;
+		private final JMenu menuMoveToGroup;
+		
+		private TreePath                 clickedPath;
+		private AbstractTreeNode         clickedTreeNode;
+		private ECSGroupTreeNode         clickedGroupTreeNode;
 		private EventCriteriaSetTreeNode clickedEcsTreeNode;
-		private StationTreeNode clickedStationTreeNode;
-		private DescriptionTreeNode clickedDescriptionTreeNode;
-		private EpisodeInfo clickedEpisodeInfo;
+		private StationTreeNode          clickedStationTreeNode;
+		private DescriptionTreeNode      clickedDescriptionTreeNode;
+		private EpisodeInfo              clickedEpisodeInfo;
 		
 		TreeContextMenu(Window parent)
 		{
-			clickedPath = null;
-			clickedTreeNode = null;
-			clickedEcsTreeNode = null;
-			clickedStationTreeNode = null;
+			this.parent = parent;
+			
+			clickedPath                = null;
+			clickedTreeNode            = null;
+			clickedGroupTreeNode       = null;
+			clickedEcsTreeNode         = null;
+			clickedStationTreeNode     = null;
 			clickedDescriptionTreeNode = null;
-			clickedEpisodeInfo = null;
+			clickedEpisodeInfo         = null;
 			
 			JMenuItem miCopyStr = add( OpenWebifController.createMenuItem( "##", e->{
+				if (clickedGroupTreeNode!=null)
+					ClipboardTools.copyStringSelectionToClipBoard(clickedGroupTreeNode.groupName);
+				
 				if (clickedEcsTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clickedEcsTreeNode.ecsTitle);
+					ClipboardTools.copyStringSelectionToClipBoard(clickedEcsTreeNode.ecs.title());
 				
 				if (clickedStationTreeNode!=null)
 					ClipboardTools.copyStringSelectionToClipBoard(clickedStationTreeNode.station);
@@ -142,7 +158,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 					ClipboardTools.copyStringSelectionToClipBoard(clickedDescriptionTreeNode.description);
 			} ) );
 			
-			JMenuItem miEditEpisodeStr = add( OpenWebifController.createMenuItem("##", e->{
+			JMenuItem miEditEpisodeStr = add( OpenWebifController.createMenuItem( "##", e->{
 				if (clickedEpisodeInfo==null)
 					return;
 				
@@ -158,18 +174,38 @@ class AlreadySeenEventsViewer extends StandardDialog
 				}
 			}) );
 			
+			addSeparator();
+			
+			add(menuMoveToGroup = OpenWebifController.createMenu("Move to group"));
+			updateMenuMoveToGroup();
+			
+			JMenuItem miRemoveFromGroup = add( OpenWebifController.createMenuItem( "##", e->{
+				treeModel.removeEcsTreeNodeFromGroup( clickedEcsTreeNode );
+				AlreadySeenEvents.getInstance().writeToFile();
+			} ) );
+			
+			JMenuItem miDeleteGroup = add( OpenWebifController.createMenuItem( "##", e->{
+				treeModel.deleteGroup( clickedGroupTreeNode );
+				AlreadySeenEvents.getInstance().writeToFile();
+			} ) );
+			
 			addContextMenuInvokeListener((comp, x, y) -> {
 				clickedPath = tree.getPathForLocation(x, y);
 				Object lastPathComp = clickedPath.getLastPathComponent();
+				tree.setSelectionPath(clickedPath);
 				
-				clickedTreeNode = null;
-				clickedEcsTreeNode = null;
-				clickedStationTreeNode = null;
+				clickedTreeNode            = null;
+				clickedGroupTreeNode       = null;
+				clickedEcsTreeNode         = null;
+				clickedStationTreeNode     = null;
 				clickedDescriptionTreeNode = null;
-				clickedEpisodeInfo = null;
+				clickedEpisodeInfo         = null;
 				
 				if (lastPathComp instanceof AbstractTreeNode treeNode)
 					clickedTreeNode = treeNode;
+				
+				if (clickedTreeNode instanceof ECSGroupTreeNode treeNode)
+					clickedGroupTreeNode = treeNode;
 				
 				if (clickedTreeNode instanceof EventCriteriaSetTreeNode treeNode)
 					clickedEcsTreeNode = treeNode;
@@ -193,22 +229,84 @@ class AlreadySeenEventsViewer extends StandardDialog
 				);
 				
 				miCopyStr.setEnabled(
+						clickedGroupTreeNode!=null ||
 						clickedEcsTreeNode!=null ||
 						clickedStationTreeNode!=null ||
 						clickedDescriptionTreeNode!=null
 				);
 				miCopyStr.setText(
-						clickedEcsTreeNode!=null
-							? "Copy title to clipboard"
-							: clickedStationTreeNode!=null
-								? "Copy station name to clipboard"
-								: clickedDescriptionTreeNode!=null
-									? "Copy description to clipboard"
-									: "Copy text to clipboard"
+						clickedGroupTreeNode!=null
+							? "Copy group name to clipboard"
+							: clickedEcsTreeNode!=null
+								? "Copy title to clipboard"
+								: clickedStationTreeNode!=null
+									? "Copy station name to clipboard"
+									: clickedDescriptionTreeNode!=null
+										? "Copy description to clipboard"
+										: "Copy text to clipboard"
+				);
+				
+				menuMoveToGroup.setEnabled(clickedEcsTreeNode!=null && !CustomTreeModel.isInGroup(clickedEcsTreeNode));
+				
+				miRemoveFromGroup.setEnabled(clickedEcsTreeNode!=null && CustomTreeModel.isInGroup(clickedEcsTreeNode));
+				miRemoveFromGroup.setText(
+						clickedEcsTreeNode!=null && CustomTreeModel.isInGroup(clickedEcsTreeNode)
+							? "Remove from group \"%s\"".formatted( CustomTreeModel.getGroupName(clickedEcsTreeNode) )
+							: "Remove from group"
+				);
+				
+				miDeleteGroup.setEnabled(clickedGroupTreeNode!=null && false); // TODO: activate deleteGroup button after implementing CustomTreeModel.deleteGroup
+				miDeleteGroup.setText(
+						clickedGroupTreeNode!=null
+							? "Delete group \"%s\"".formatted( clickedGroupTreeNode.groupName )
+							: "Delete group"
 				);
 			});
 			
 			addTo(tree);
+		}
+
+		private void updateMenuMoveToGroup()
+		{
+			menuMoveToGroup.removeAll();
+			Collection<String> groupNames = treeModel.getGroupNames();
+			if (groupNames==null)
+				return;
+			
+			Vector<String> groupNamesVec = new Vector<>(groupNames);
+			groupNamesVec.sort(stringComparator);
+			
+			for (String groupName : groupNamesVec)
+			{
+				menuMoveToGroup.add( OpenWebifController.createMenuItem( groupName, e->{
+					treeModel.moveEcsTreeNodeToGroup( groupName, clickedEcsTreeNode );
+					AlreadySeenEvents.getInstance().writeToFile();
+				} ) );
+			}
+			
+			if (!groupNamesVec.isEmpty())
+				menuMoveToGroup.addSeparator();
+			
+			menuMoveToGroup.add( OpenWebifController.createMenuItem( "New group ...", e->{
+				String groupName = JOptionPane.showInputDialog(parent, "Group name", "");
+				if (groupName==null) return;
+				
+				boolean groupExists = groupNames.contains(groupName);
+				treeModel.moveEcsTreeNodeToGroup( groupName, clickedEcsTreeNode );
+				if (groupExists)
+				{
+					String title = "Group exists";
+					String[] msg = {
+							"A group with name \"%s\" exists already.".formatted(groupName),
+							"Node was moved in this existing group."
+					};
+					JOptionPane.showMessageDialog(parent, msg, title, JOptionPane.INFORMATION_MESSAGE);
+				}
+				else
+					updateMenuMoveToGroup();
+				
+				AlreadySeenEvents.getInstance().writeToFile();
+			} ) );
 		}
 	}
 
@@ -245,16 +343,88 @@ class AlreadySeenEventsViewer extends StandardDialog
 			listeners = new Vector<>();
 		}
 
+		static boolean isInGroup(EventCriteriaSetTreeNode node)
+		{
+			return node!=null && node.parent instanceof ECSGroupTreeNode;
+		}
+
+		static String getGroupName(EventCriteriaSetTreeNode node)
+		{
+			if (node!=null && node.parent instanceof ECSGroupTreeNode groupNode)
+				return groupNode.groupName;
+			return null;
+		}
+
+		Collection<String> getGroupNames()
+		{
+			if (treeRoot != null)
+				return treeRoot.getGroupNames();
+			return null;
+		}
+
+		void moveEcsTreeNodeToGroup(String groupName, EventCriteriaSetTreeNode node)
+		{
+			if (node==null) return;
+			if (node.parent instanceof ECSGroupTreeNode) return;
+			if (node.parent==null) return;
+			if (treeRoot==null) return;
+			
+			int oldNodeIndex = node.parent.removeNode(node);
+			if (oldNodeIndex < 0) return;
+			fireTreeNodeRemoved(node.parent, node, oldNodeIndex);
+			
+			ECSGroupTreeNode groupNode = treeRoot.groupNodes.get(groupName);
+			if (groupNode==null)
+			{
+				NewNode<ECSGroupTreeNode> newGroupNode = treeRoot.createGroupNode( groupName );
+				groupNode = newGroupNode.node;
+				fireTreeNodeInserted(treeRoot, groupNode, newGroupNode.index);
+			}
+			
+			node.ecs.variableData().group = groupName;
+			NewNode<EventCriteriaSetTreeNode> newNode = groupNode.createChild( node.ecs );
+			fireTreeNodeInserted(groupNode, newNode.node, newNode.index);
+		}
+
+		void removeEcsTreeNodeFromGroup(EventCriteriaSetTreeNode node)
+		{
+			if (node==null) return;
+			if (node.parent instanceof ECSGroupTreeNode groupNode) 
+			{
+				int oldNodeIndex = groupNode.removeNode(node);
+				if (oldNodeIndex < 0) return;
+				fireTreeNodeRemoved(groupNode, node, oldNodeIndex);
+				
+				node.ecs.variableData().group = null;
+				NewNode<EventCriteriaSetTreeNode> newNode = treeRoot.createECSNode( node.ecs );
+				fireTreeNodeInserted(treeRoot, newNode.node, newNode.index);
+			}
+		}
+
+		void deleteGroup(ECSGroupTreeNode groupNode)
+		{
+			// TODO: implement CustomTreeModel.deleteGroup
+			// 1. remove all children from <groupNode> (-> nodes & indices)
+			// 2. remove <groupNode> from <treeRoot> (-> node & index)
+			// 3. create all new nodes in <treeRoot> (-> nodes & indices)
+			// 4. fire all updates ( "nodes removed", "node removed", "nodes inserted" )
+		}
+
 		@Override public void addTreeModelListener   (TreeModelListener l) { listeners.add   (l); }
 		@Override public void removeTreeModelListener(TreeModelListener l) { listeners.remove(l); }
 		
-		private void fireTreeNodesChangedEvent    (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesChanged    (ev); }
-		@SuppressWarnings("unused")
 		private void fireTreeNodesInsertedEvent   (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesInserted   (ev); }
-		@SuppressWarnings("unused")
+		private void fireTreeNodesChangedEvent    (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesChanged    (ev); }
 		private void fireTreeNodesRemovedEvent    (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesRemoved    (ev); }
 		@SuppressWarnings("unused")
 		private void fireTreeStructureChangedEvent(TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeStructureChanged(ev); }
+
+		@SuppressWarnings("unused")
+		private String getSimpleClassName(Object obj)
+		{
+			if (obj==null) return "null";
+			return obj.getClass().getSimpleName();
+		}
 
 		void fireTreeNodeUpdate(AbstractTreeNode treeNode)
 		{
@@ -264,16 +434,57 @@ class AlreadySeenEventsViewer extends StandardDialog
 			int index = treeNode.parent.getIndex(treeNode);
 			if (index<0) return;
 			
-			Vector<AbstractTreeNode> path = new Vector<>();
-			for (AbstractTreeNode node = treeNode.parent; node!=null; node = node.parent)
-				path.add(node);
-			path.reversed().toArray();
+			//System.out.printf("TreeNodeUpdate:%n   parent: [%s] %s%n   treeNode: [%s] %s%n   index: %d%n", getSimpleClassName(treeNode.parent), treeNode.parent, getSimpleClassName(treeNode), treeNode, index);
 			
+			Object[] parentPath = getPath(treeNode.parent);
 			int[] changedIndices = { index };
 			Object[] changedChildren = { treeNode };
 			
-			TreeModelEvent event = new TreeModelEvent(this, path.reversed().toArray(), changedIndices, changedChildren);
+			TreeModelEvent event = new TreeModelEvent(this, parentPath, changedIndices, changedChildren);
 			fireTreeNodesChangedEvent(event);
+		}
+
+		void fireTreeNodeRemoved(AbstractTreeNode parent, AbstractTreeNode treeNode, int oldNodeIndex)
+		{
+			if (parent == null) return;
+			if (treeNode == null) return;
+			if (oldNodeIndex < 0) return;
+			
+			//System.out.printf("TreeNodeRemoved:%n   parent: [%s] %s%n   treeNode: [%s] %s%n   index: %d%n", getSimpleClassName(parent), parent, getSimpleClassName(treeNode), treeNode, oldNodeIndex);
+			
+			Object[] parentPath = getPath(parent);
+			int[] changedIndices = { oldNodeIndex };
+			Object[] changedChildren = { treeNode };
+			
+			TreeModelEvent event = new TreeModelEvent(this, parentPath, changedIndices, changedChildren);
+			fireTreeNodesRemovedEvent(event);
+		}
+
+		void fireTreeNodeInserted(AbstractTreeNode parent, AbstractTreeNode treeNode, int index)
+		{
+			if (parent == null) return;
+			if (treeNode == null) return;
+			if (index < 0) return;
+			
+			//System.out.printf("TreeNodeInserted:%n   parent: [%s] %s%n   treeNode: [%s] %s%n   index: %d%n", getSimpleClassName(parent), parent, getSimpleClassName(treeNode), treeNode, index);
+			
+			Object[] parentPath = getPath(parent);
+			int[] changedIndices = { index };
+			Object[] changedChildren = { treeNode };
+			
+			TreeModelEvent event = new TreeModelEvent(this, parentPath, changedIndices, changedChildren);
+			fireTreeNodesInsertedEvent(event);
+		}
+
+		static Object[] getPath(AbstractTreeNode treeNode)
+		{
+			Vector<AbstractTreeNode> path = new Vector<>();
+			
+			for (AbstractTreeNode node = treeNode; node!=null; node = node.parent)
+				path.add(node);
+			Object[] pathArr = path.reversed().toArray();
+			
+			return pathArr;
 		}
 
 		@Override
@@ -325,8 +536,15 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 
+	record NewNode<NodeType extends AbstractTreeNode> (
+			int index,
+			NodeType node
+	) {}
+
 	private abstract class AbstractTreeNode implements TreeNode
 	{
+		static final Comparator<AbstractTreeNode> SORT_BY_TITLE = Comparator.comparing(node -> node.title, stringComparator);
+		
 		protected final AbstractTreeNode parent;
 		protected       String title;
 		protected final boolean allowsChildren;
@@ -340,11 +558,52 @@ class AlreadySeenEventsViewer extends StandardDialog
 			children = null;
 		}
 		
+		int removeNode(TreeNode node)
+		{
+			if (node==null) return -1;
+			
+			Vector<TreeNode> childrenVec = new Vector<>(Arrays.asList(children));
+			
+			int index = childrenVec.indexOf(node);
+			if (index<0) return -1;
+			
+			childrenVec.remove(index);
+			
+			children = childrenVec.toArray(TreeNode[]::new);
+			
+			return index;
+		}
+
+		int insertNode(TreeNode node, Predicate<TreeNode> insertBeforeNode)
+		{
+			int insertIndex = -1;
+			for (int i=0; i<children.length; i++)
+				if (insertBeforeNode.test( children[i] ))
+				{
+					insertIndex = i;
+					break;
+				}
+			
+			Vector<TreeNode> childrenVec = new Vector<>(Arrays.asList(children));
+			
+			if (0 <= insertIndex)
+				childrenVec.insertElementAt(node, insertIndex);
+			else
+			{
+				insertIndex = childrenVec.size();
+				childrenVec.add(node);
+			}
+			
+			children = childrenVec.toArray(TreeNode[]::new);
+			
+			return insertIndex;
+		}
+
 		protected abstract void determineChildren();
 		protected abstract TreeIcons getIcon();
 		protected void updateTitle() {}
 		
-		private void checkChildren()
+		protected void checkChildren()
 		{
 			if (children == null)
 				determineChildren();
@@ -389,13 +648,54 @@ class AlreadySeenEventsViewer extends StandardDialog
 	class RootTreeNode extends AbstractTreeNode
 	{
 		private final Map<String, EventCriteriaSet> data;
+		private final Map<String, ECSGroupTreeNode> groupNodes;
 
 		RootTreeNode(Map<String, EventCriteriaSet> data)
 		{
 			super(null, "<>", true);
 			this.data = data;
+			groupNodes = new HashMap<>();
 		}
 		
+		@Override
+		int removeNode(TreeNode node)
+		{
+			int index = super.removeNode(node);
+			
+			if (index>=0 && node instanceof ECSGroupTreeNode groupNode)
+				groupNodes.remove(groupNode.groupName);
+			
+			return index;
+		}
+
+		NewNode<ECSGroupTreeNode> createGroupNode(String groupName)
+		{
+			if (groupNodes.containsKey(groupName))
+				throw new IllegalArgumentException("A group node with name \"%s\" exists already.".formatted(groupName));
+			
+			ECSGroupTreeNode groupNode = new ECSGroupTreeNode(this, groupName);
+			groupNodes.put(groupName, groupNode);
+			
+			int insertIndex = insertNode(groupNode, node -> !(node instanceof ECSGroupTreeNode existingGroupNode) || stringComparator.compare(groupNode.groupName, existingGroupNode.groupName) <= 0);
+			
+			return new NewNode<>( insertIndex, groupNode );
+		}
+		
+		NewNode<EventCriteriaSetTreeNode> createECSNode(EventCriteriaSet ecs)
+		{
+			EventCriteriaSetTreeNode ecsNode = new EventCriteriaSetTreeNode(this, ecs);
+			
+			int insertIndex = insertNode(ecsNode, node -> !(node instanceof EventCriteriaSetTreeNode existingECSNode) || SORT_BY_TITLE.compare(ecsNode, existingECSNode) <= 0);
+			
+			return new NewNode<>( insertIndex, ecsNode );
+		}
+
+		Collection<String> getGroupNames()
+		{
+			checkChildren();
+			return groupNodes.keySet();
+		}
+
 		@Override
 		protected TreeIcons getIcon()
 		{
@@ -405,30 +705,98 @@ class AlreadySeenEventsViewer extends StandardDialog
 		@Override
 		protected void determineChildren()
 		{
-			children = data.keySet()
-					.stream()
-					.map(title -> new EventCriteriaSetTreeNode(this, title, data.get(title)))
-					.sorted(Comparator.comparing(node -> node.title, stringComparator))
-					.toArray(TreeNode[]::new);
+			groupNodes.clear();
+			Vector<EventCriteriaSetTreeNode> ungroupedECSNodes = new Vector<>();
+			
+			data.forEach((title, ecs) -> {
+				VariableECSData variableData = ecs.variableData();
+				if (variableData!=null && variableData.hasGroup())
+				{
+					ECSGroupTreeNode groupNode = groupNodes.computeIfAbsent(variableData.group, group -> new ECSGroupTreeNode(this, group));
+					groupNode.ecsList.add(ecs);
+				}
+				else
+				{
+					ungroupedECSNodes.add(new EventCriteriaSetTreeNode(this, ecs));
+				}
+			});
+			
+			Vector<AbstractTreeNode> childrenVec = new Vector<>( groupNodes.values() );
+			childrenVec.sort(SORT_BY_TITLE);
+			
+			ungroupedECSNodes.sort(SORT_BY_TITLE);
+			childrenVec.addAll(ungroupedECSNodes);
+			
+			children = childrenVec.toArray(TreeNode[]::new);
 		}
 	}
 	
+	private class ECSGroupTreeNode extends AbstractTreeNode
+	{
+		private final Vector<EventCriteriaSet> ecsList;
+		private final String groupName;
+
+		ECSGroupTreeNode(RootTreeNode parent, String groupName)
+		{
+			super(parent, groupName, true);
+			this.groupName = groupName;
+			ecsList = new Vector<>();
+		}
+
+		@Override
+		int removeNode(TreeNode node)
+		{
+			int index = super.removeNode(node);
+			
+			if (index>=0 && node instanceof EventCriteriaSetTreeNode ecsNode)
+				ecsList.remove(ecsNode.ecs);
+			
+			return index;
+		}
+
+		@Override
+		protected TreeIcons getIcon()
+		{
+			return null;
+		}
+
+		NewNode<EventCriteriaSetTreeNode> createChild(EventCriteriaSet ecs)
+		{
+			EventCriteriaSetTreeNode ecsNode = new EventCriteriaSetTreeNode(this, ecs);
+			ecsList.add(ecs);
+			
+			int insertIndex = insertNode(ecsNode, node -> !(node instanceof AbstractTreeNode existingNode) || SORT_BY_TITLE.compare(ecsNode, existingNode) <= 0);
+			
+			return new NewNode<>(insertIndex, ecsNode);
+		}
+
+		@Override
+		protected void determineChildren()
+		{
+			children = ecsList
+					.stream()
+					.map(ecs -> new EventCriteriaSetTreeNode(this, ecs))
+					.sorted(SORT_BY_TITLE)
+					.toArray(TreeNode[]::new);
+		}
+	}
+
 	private class EventCriteriaSetTreeNode extends AbstractTreeNode
 	{
 		private final EventCriteriaSet ecs;
-		private final String ecsTitle;
 
-		EventCriteriaSetTreeNode(RootTreeNode parent, String title, EventCriteriaSet ecs)
+		EventCriteriaSetTreeNode(AbstractTreeNode parent, EventCriteriaSet ecs)
 		{
-			super(parent, generateTitle(title, ecs.variableData()), ecs.stations()!=null || ecs.descriptions()!=null);
-			ecsTitle = title;
+			super(parent, generateTitle(ecs.title(), ecs.variableData()), ecs.stations()!=null || ecs.descriptions()!=null);
 			this.ecs = ecs;
 		}
+
+		@Override int removeNode(TreeNode node) { throw new UnsupportedOperationException(); }
 
 		@Override
 		protected void updateTitle()
 		{
-			title = generateTitle(ecsTitle, ecs.variableData());
+			title = generateTitle(ecs.title(), ecs.variableData());
 		}
 
 		@Override
@@ -451,7 +819,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				childrenVec.addAll( descriptions.keySet()
 						.stream()
 						.map(description -> new DescriptionTreeNode(this, description, descriptions.get(description)))
-						.sorted(Comparator.comparing(node -> node.title, stringComparator))
+						.sorted(SORT_BY_TITLE)
 						.toList()
 				);
 			}
@@ -462,7 +830,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				childrenVec.addAll( stations.keySet()
 						.stream()
 						.map(station -> new StationTreeNode(this, station, stations.get(station)))
-						.sorted(Comparator.comparing(node -> node.title, stringComparator))
+						.sorted(SORT_BY_TITLE)
 						.toList()
 				);
 			}
@@ -483,6 +851,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 			this.episode = episode;
 			children = new TreeNode[0];
 		}
+		
+		@Override int removeNode(TreeNode node) { throw new UnsupportedOperationException(); }
 
 		@Override
 		protected void updateTitle()
@@ -515,6 +885,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 			this.station = station;
 			this.stationData = stationData;
 		}
+		
+		@Override int removeNode(TreeNode node) { throw new UnsupportedOperationException(); }
 
 		@Override
 		protected TreeIcons getIcon()
@@ -531,7 +903,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				children = descriptions.keySet()
 						.stream()
 						.map(description -> new DescriptionTreeNode(this, description, descriptions.get(description)))
-						.sorted(Comparator.comparing(node -> node.title, stringComparator))
+						.sorted(SORT_BY_TITLE)
 						.toArray(TreeNode[]::new);
 			}
 			else

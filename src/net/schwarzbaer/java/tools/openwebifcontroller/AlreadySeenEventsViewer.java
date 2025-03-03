@@ -16,14 +16,17 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JToolBar;
 import javax.swing.JTree;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
-import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
+import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.StationData;
@@ -42,16 +45,18 @@ class AlreadySeenEventsViewer extends StandardDialog
 	
 	private boolean episodeStringFirst = false;
 	private final JTree tree;
+	private CustomTreeModel treeModel;
 
 	private AlreadySeenEventsViewer(Window parent, String title)
 	{
 		super(parent, title, ModalityType.APPLICATION_MODAL, false);
 		
-		tree = new JTree(AlreadySeenEvents.getInstance().createTreeRoot(this));
+		treeModel = new CustomTreeModel(AlreadySeenEvents.getInstance().createTreeRoot(this));
+		tree = new JTree(treeModel);
 		tree.setCellRenderer(new TCR());
 		JScrollPane treeScrollPane = new JScrollPane(tree);
 		
-		new TreeContextMenu(parent, tree);
+		new TreeContextMenu(parent);
 		
 		JToolBar toolBar = new JToolBar();
 		toolBar.setFloatable(false);
@@ -83,7 +88,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 	private void rebuildTree()
 	{
-		tree.setModel(new DefaultTreeModel(AlreadySeenEvents.getInstance().createTreeRoot(this)));
+		tree.setModel(treeModel = new CustomTreeModel(AlreadySeenEvents.getInstance().createTreeRoot(this)));
 	}
 	
 	static void showViewer(Window parent, String title)
@@ -106,23 +111,36 @@ class AlreadySeenEventsViewer extends StandardDialog
 			return String.format("%s (%s)", title, episode.episodeStr);
 	}
 	
-	private static class TreeContextMenu extends ContextMenu
+	private class TreeContextMenu extends ContextMenu
 	{
 		private static final long serialVersionUID = -3347262887544423895L;
 		
 		private TreePath clickedPath;
 		private AbstractTreeNode clickedTreeNode;
-		private DescriptionTreeNode clickedDescriptionTreeNode;
 		private EventCriteriaSetTreeNode clickedEcsTreeNode;
+		private StationTreeNode clickedStationTreeNode;
+		private DescriptionTreeNode clickedDescriptionTreeNode;
 		private EpisodeInfo clickedEpisodeInfo;
 		
-		TreeContextMenu(Window parent, JTree tree)
+		TreeContextMenu(Window parent)
 		{
 			clickedPath = null;
 			clickedTreeNode = null;
-			clickedDescriptionTreeNode = null;
 			clickedEcsTreeNode = null;
+			clickedStationTreeNode = null;
+			clickedDescriptionTreeNode = null;
 			clickedEpisodeInfo = null;
+			
+			JMenuItem miCopyStr = add( OpenWebifController.createMenuItem( "##", e->{
+				if (clickedEcsTreeNode!=null)
+					ClipboardTools.copyStringSelectionToClipBoard(clickedEcsTreeNode.ecsTitle);
+				
+				if (clickedStationTreeNode!=null)
+					ClipboardTools.copyStringSelectionToClipBoard(clickedStationTreeNode.station);
+				
+				if (clickedDescriptionTreeNode!=null)
+					ClipboardTools.copyStringSelectionToClipBoard(clickedDescriptionTreeNode.description);
+			} ) );
 			
 			JMenuItem miEditEpisodeStr = add( OpenWebifController.createMenuItem("##", e->{
 				if (clickedEpisodeInfo==null)
@@ -134,6 +152,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				{
 					clickedEpisodeInfo.episodeStr = result;
 					clickedTreeNode.updateTitle();
+					treeModel.fireTreeNodeUpdate(clickedTreeNode);
 					tree.repaint();
 					AlreadySeenEvents.getInstance().writeToFile();
 				}
@@ -144,29 +163,48 @@ class AlreadySeenEventsViewer extends StandardDialog
 				Object lastPathComp = clickedPath.getLastPathComponent();
 				
 				clickedTreeNode = null;
-				clickedDescriptionTreeNode = null;
 				clickedEcsTreeNode = null;
+				clickedStationTreeNode = null;
+				clickedDescriptionTreeNode = null;
 				clickedEpisodeInfo = null;
 				
 				if (lastPathComp instanceof AbstractTreeNode treeNode)
 					clickedTreeNode = treeNode;
 				
-				if (clickedTreeNode instanceof DescriptionTreeNode treeNode)
-					clickedDescriptionTreeNode = treeNode;
-				
 				if (clickedTreeNode instanceof EventCriteriaSetTreeNode treeNode)
 					clickedEcsTreeNode = treeNode;
+				
+				if (clickedTreeNode instanceof StationTreeNode treeNode)
+					clickedStationTreeNode = treeNode;
+				
+				if (clickedTreeNode instanceof DescriptionTreeNode treeNode)
+					clickedDescriptionTreeNode = treeNode;
 				
 				if (clickedDescriptionTreeNode!=null)
 					clickedEpisodeInfo = clickedDescriptionTreeNode.episode;
 				if (clickedEcsTreeNode!=null && clickedEcsTreeNode.ecs!=null)
-					clickedEpisodeInfo = clickedEcsTreeNode.ecs.episode();
+					clickedEpisodeInfo = clickedEcsTreeNode.ecs.variableData();
 				
 				miEditEpisodeStr.setEnabled( clickedEpisodeInfo!=null );
 				miEditEpisodeStr.setText(
 						clickedEpisodeInfo==null || !clickedEpisodeInfo.hasEpisodeStr()
 							?    "Add Episode Text"
 							: "Change Episode Text"
+				);
+				
+				miCopyStr.setEnabled(
+						clickedEcsTreeNode!=null ||
+						clickedStationTreeNode!=null ||
+						clickedDescriptionTreeNode!=null
+				);
+				miCopyStr.setText(
+						clickedEcsTreeNode!=null
+							? "Copy title to clipboard"
+							: clickedStationTreeNode!=null
+								? "Copy station name to clipboard"
+								: clickedDescriptionTreeNode!=null
+									? "Copy description to clipboard"
+									: "Copy text to clipboard"
 				);
 			});
 			
@@ -195,14 +233,106 @@ class AlreadySeenEventsViewer extends StandardDialog
 		
 	}
 	
+	private static class CustomTreeModel implements TreeModel
+	{
+	
+		private final RootTreeNode treeRoot;
+		private final Vector<TreeModelListener> listeners;
+
+		CustomTreeModel(RootTreeNode treeRoot)
+		{
+			this.treeRoot = treeRoot;
+			listeners = new Vector<>();
+		}
+
+		@Override public void addTreeModelListener   (TreeModelListener l) { listeners.add   (l); }
+		@Override public void removeTreeModelListener(TreeModelListener l) { listeners.remove(l); }
+		
+		private void fireTreeNodesChangedEvent    (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesChanged    (ev); }
+		@SuppressWarnings("unused")
+		private void fireTreeNodesInsertedEvent   (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesInserted   (ev); }
+		@SuppressWarnings("unused")
+		private void fireTreeNodesRemovedEvent    (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesRemoved    (ev); }
+		@SuppressWarnings("unused")
+		private void fireTreeStructureChangedEvent(TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeStructureChanged(ev); }
+
+		void fireTreeNodeUpdate(AbstractTreeNode treeNode)
+		{
+			if (treeNode == null) return;
+			if (treeNode.parent == null) return;
+			
+			int index = treeNode.parent.getIndex(treeNode);
+			if (index<0) return;
+			
+			Vector<AbstractTreeNode> path = new Vector<>();
+			for (AbstractTreeNode node = treeNode.parent; node!=null; node = node.parent)
+				path.add(node);
+			path.reversed().toArray();
+			
+			int[] changedIndices = { index };
+			Object[] changedChildren = { treeNode };
+			
+			TreeModelEvent event = new TreeModelEvent(this, path.reversed().toArray(), changedIndices, changedChildren);
+			fireTreeNodesChangedEvent(event);
+		}
+
+		@Override
+		public void valueForPathChanged(TreePath path, Object newValue)
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public RootTreeNode getRoot()
+		{
+			return treeRoot;
+		}
+	
+		@Override
+		public boolean isLeaf(Object node)
+		{
+			if (node instanceof TreeNode treeNode)
+				return treeNode.isLeaf();
+			
+			return false;
+		}
+
+		@Override
+		public int getChildCount(Object parent)
+		{
+			if (parent instanceof TreeNode parentTreeNode)
+				return parentTreeNode.getChildCount();
+			
+			return 0;
+		}
+
+		@Override
+		public TreeNode getChild(Object parent, int index)
+		{
+			if (parent instanceof TreeNode parentTreeNode)
+				return parentTreeNode.getChildAt(index);
+			
+			return null;
+		}
+	
+		@Override
+		public int getIndexOfChild(Object parent, Object child)
+		{
+			if (parent instanceof TreeNode parentTreeNode && child instanceof TreeNode childTreeNode)
+				return parentTreeNode.getIndex(childTreeNode);
+			
+			return -1;
+		}
+	}
+
 	private abstract class AbstractTreeNode implements TreeNode
 	{
-		protected final TreeNode parent;
+		protected final AbstractTreeNode parent;
 		protected       String title;
 		protected final boolean allowsChildren;
 		protected       TreeNode[] children;
 		
-		AbstractTreeNode(TreeNode parent, String title, boolean allowsChildren)
+		AbstractTreeNode(AbstractTreeNode parent, String title, boolean allowsChildren)
 		{
 			this.parent = parent;
 			this.title = title;
@@ -286,11 +416,11 @@ class AlreadySeenEventsViewer extends StandardDialog
 	private class EventCriteriaSetTreeNode extends AbstractTreeNode
 	{
 		private final EventCriteriaSet ecs;
-		private String ecsTitle;
+		private final String ecsTitle;
 
 		EventCriteriaSetTreeNode(RootTreeNode parent, String title, EventCriteriaSet ecs)
 		{
-			super(parent, generateTitle(title, ecs.episode()), ecs.stations()!=null || ecs.descriptions()!=null);
+			super(parent, generateTitle(title, ecs.variableData()), ecs.stations()!=null || ecs.descriptions()!=null);
 			ecsTitle = title;
 			this.ecs = ecs;
 		}
@@ -298,13 +428,13 @@ class AlreadySeenEventsViewer extends StandardDialog
 		@Override
 		protected void updateTitle()
 		{
-			title = generateTitle(ecsTitle, ecs.episode());
+			title = generateTitle(ecsTitle, ecs.variableData());
 		}
 
 		@Override
 		protected TreeIcons getIcon()
 		{
-			EpisodeInfo episode = ecs.episode();
+			EpisodeInfo episode = ecs.variableData();
 			if (episode!=null && episode.hasEpisodeStr())
 				return TreeIcons.TitleWithEpisode;
 			return TreeIcons.Title;
@@ -346,7 +476,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		private final EpisodeInfo episode;
 		private final String description;
 
-		DescriptionTreeNode(TreeNode parent, String description, EpisodeInfo episode)
+		DescriptionTreeNode(AbstractTreeNode parent, String description, EpisodeInfo episode)
 		{
 			super(parent, generateTitle(description, episode), false);
 			this.description = description;
@@ -377,10 +507,12 @@ class AlreadySeenEventsViewer extends StandardDialog
 	private class StationTreeNode extends AbstractTreeNode
 	{
 		private final StationData stationData;
+		private final String station;
 
 		StationTreeNode(EventCriteriaSetTreeNode parent, String station, StationData stationData)
 		{
 			super(parent, station, stationData.descriptions()!=null);
+			this.station = station;
 			this.stationData = stationData;
 		}
 

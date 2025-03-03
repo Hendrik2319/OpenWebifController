@@ -32,8 +32,8 @@ public class AlreadySeenEvents
 	{
 		String episodeStr;
 		
-		EpisodeInfo()                  { this.episodeStr = null; }
-		EpisodeInfo(EpisodeInfo other) { this.episodeStr = other.episodeStr; }
+		EpisodeInfo()                  { this(null); }
+		EpisodeInfo(EpisodeInfo other) { this.episodeStr = other==null ? null : other.episodeStr; }
 		
 		boolean hasEpisodeStr()
 		{
@@ -56,22 +56,34 @@ public class AlreadySeenEvents
 		}
 	}
 	
+	static class VariableECSData extends EpisodeInfo
+	{
+		String group;
+
+		VariableECSData(String group, EpisodeInfo episode)
+		{
+			super(episode);
+			this.group = group;
+			
+		}
+	}
+	
 	record EventCriteriaSet (
 			String name,
-			EpisodeInfo episode,
+			VariableECSData variableData,
 			Map<String, StationData> stations,
 			Map<String, EpisodeInfo> descriptions
 	) {
 		static EventCriteriaSet create(String name, boolean createStations, boolean createDescriptions)
 		{
-			return create(name, null, createStations, createDescriptions);
+			return create(name, null, null, createStations, createDescriptions);
 		}
 		
-		static EventCriteriaSet create(String name, EpisodeInfo episode, boolean createStations, boolean createDescriptions)
+		static EventCriteriaSet create(String name, String group, EpisodeInfo episode, boolean createStations, boolean createDescriptions)
 		{
 			return new EventCriteriaSet(
 					Objects.requireNonNull( name ),
-					new EpisodeInfo(episode),
+					new VariableECSData(group, episode),
 					createStations
 						? new HashMap<>()
 						: null,
@@ -106,6 +118,7 @@ public class AlreadySeenEvents
 	private static class MutableECS
 	{
 		final String name;
+		String group;
 		EpisodeInfo episode;
 		Map<String, StationData> stations = new HashMap<>();
 		Map<String, EpisodeInfo> descriptions = new HashMap<>();
@@ -114,11 +127,12 @@ public class AlreadySeenEvents
 		{
 			this.name = name;
 			episode = new EpisodeInfo();
+			group = null;
 		}
 		
 		EventCriteriaSet convertToRecord()
 		{
-			EventCriteriaSet ecs = EventCriteriaSet.create(name, episode, !stations.isEmpty(), !descriptions.isEmpty());
+			EventCriteriaSet ecs = EventCriteriaSet.create(name, group, episode, !stations.isEmpty(), !descriptions.isEmpty());
 			
 			if (ecs.stations != null)
 				ecs.stations.putAll( stations );
@@ -262,8 +276,8 @@ public class AlreadySeenEvents
 					out.printf("title = %s%n", encode(title));
 					
 					EventCriteriaSet ecs = alreadySeenEvents.get(title);
-					if (ecs.episode!=null && ecs.episode.hasEpisodeStr())
-						out.printf("episodeT = %s%n", ecs.episode.episodeStr);
+					if (ecs.variableData!=null && ecs.variableData.hasEpisodeStr())
+						out.printf("episodeT = %s%n", ecs.variableData.episodeStr);
 					
 					if (ecs.descriptions != null)
 					{

@@ -49,13 +49,15 @@ class AlreadySeenEventsViewer extends StandardDialog
 		private static IconSource.CachedIcons<TreeIcons> IS = IconSource.createCachedIcons(16, 16, "/images/AlreadySeenEventsViewerTreeIcons.png", TreeIcons.values());
 	}
 	
-	private boolean episodeStringFirst = false;
+	private boolean episodeStringFirst;
 	private final JTree tree;
 	private CustomTreeModel treeModel;
 
 	private AlreadySeenEventsViewer(Window parent, String title)
 	{
 		super(parent, title, ModalityType.APPLICATION_MODAL, false);
+		
+		episodeStringFirst = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, false);
 		
 		treeModel = new CustomTreeModel(AlreadySeenEvents.getInstance().createTreeRoot(this));
 		tree = new JTree(treeModel);
@@ -73,6 +75,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		
 		toolBar.add(OpenWebifController.createCheckBox("Episode Text before Title", episodeStringFirst, val -> {
 			episodeStringFirst = val;
+			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, episodeStringFirst);
 			rebuildTree();
 		} ));
 		

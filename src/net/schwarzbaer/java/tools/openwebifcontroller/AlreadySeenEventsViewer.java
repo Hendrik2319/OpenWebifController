@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Vector;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import javax.swing.Icon;
 import javax.swing.JMenu;
@@ -192,14 +193,32 @@ class AlreadySeenEventsViewer extends StandardDialog
 				AlreadySeenEvents.getInstance().writeToFile();
 			} ) );
 			
+			JMenuItem miRenameGroup = add( OpenWebifController.createMenuItem( "##", e->{
+				String result = JOptionPane.showInputDialog(this.window, "New group name", clickedGroupTreeNode.groupName);
+				if (result==null || result.isBlank() || result.equals(clickedGroupTreeNode.groupName)) return;
+				if (treeModel.isExistingGroupName( result ))
+				{
+					String[] msg = {
+							"A group with name \"%s\" exists already.".formatted( result ),
+							"Please choose anonther name."
+					};
+					JOptionPane.showMessageDialog(window, msg, "Group already exists", JOptionPane.ERROR_MESSAGE);
+					return;
+				}
+				
+				treeModel.renameGroup( clickedGroupTreeNode, result );
+				updateMenuMoveToGroup();
+				AlreadySeenEvents.getInstance().writeToFile();
+			} ) );
+			
 			JMenuItem miDeleteGroup = add( OpenWebifController.createMenuItem( "##", e->{
 				treeModel.deleteGroup( clickedGroupTreeNode );
+				updateMenuMoveToGroup();
 				AlreadySeenEvents.getInstance().writeToFile();
 			} ) );
 			
 			addContextMenuInvokeListener((comp, x, y) -> {
 				clickedPath = tree.getPathForLocation(x, y);
-				Object lastPathComp = clickedPath.getLastPathComponent();
 				tree.setSelectionPath(clickedPath);
 				
 				clickedTreeNode            = null;
@@ -209,6 +228,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				clickedDescriptionTreeNode = null;
 				clickedEpisodeInfo         = null;
 				
+				Object lastPathComp = clickedPath==null ? null : clickedPath.getLastPathComponent();
 				if (lastPathComp instanceof AbstractTreeNode treeNode)
 					clickedTreeNode = treeNode;
 				
@@ -279,7 +299,14 @@ class AlreadySeenEventsViewer extends StandardDialog
 							: "Remove from group"
 				);
 				
-				miDeleteGroup.setEnabled(clickedGroupTreeNode!=null && false); // TODO: activate deleteGroup button after implementing CustomTreeModel.deleteGroup
+				miRenameGroup.setEnabled(clickedGroupTreeNode!=null);
+				miRenameGroup.setText(
+						clickedGroupTreeNode!=null
+							? "Rename group \"%s\"".formatted( clickedGroupTreeNode.groupName )
+							: "Rename group"
+				);
+				
+				miDeleteGroup.setEnabled(clickedGroupTreeNode!=null);
 				miDeleteGroup.setText(
 						clickedGroupTreeNode!=null
 							? "Delete group \"%s\"".formatted( clickedGroupTreeNode.groupName )
@@ -402,6 +429,34 @@ class AlreadySeenEventsViewer extends StandardDialog
 			return null;
 		}
 
+		boolean isExistingGroupName(String groupName)
+		{
+			return treeRoot.groupNodes.containsKey(groupName);
+		}
+
+		void renameGroup(ECSGroupTreeNode groupNode, String newGroupName)
+		{
+			if (groupNode==null) return;
+			if (treeRoot.groupNodes.containsKey(newGroupName)) throw new IllegalArgumentException();
+			if (treeRoot.groupNodes.get(groupNode.groupName) != groupNode) throw new IllegalStateException();
+			
+			treeRoot.groupNodes.remove( groupNode.groupName );
+			treeRoot.groupNodes.put( newGroupName, groupNode );
+			
+			groupNode.groupName = newGroupName;
+			groupNode.updateTitle();
+			fireTreeNodeUpdate(groupNode);
+			
+			groupNode.forEachChildNode( node -> {
+				if (!(node instanceof EventCriteriaSetTreeNode ecsNode)) return;
+				if (ecsNode.ecs == null) return;
+				VariableECSData variableData = ecsNode.ecs.variableData();
+				if (variableData == null) return;
+				variableData.group = newGroupName;
+			} );
+			fireAllSubNodesUpdate(groupNode);
+		}
+
 		void moveEcsTreeNodeToGroup(String groupName, EventCriteriaSetTreeNode node)
 		{
 			if (node==null) return;
@@ -443,11 +498,18 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 		void deleteGroup(ECSGroupTreeNode groupNode)
 		{
-			// TODO: implement CustomTreeModel.deleteGroup
-			// 1. remove all children from <groupNode> (-> nodes & indices)
-			// 2. remove <groupNode> from <treeRoot> (-> node & index)
-			// 3. create all new nodes in <treeRoot> (-> nodes & indices)
-			// 4. fire all updates ( "nodes removed", "node removed", "nodes inserted" )
+			if (groupNode==null) return;
+			
+			AbstractTreeNode[] children = groupNode.getChildren();
+			children = Arrays.copyOf(children, children.length);
+			
+			for (AbstractTreeNode node : children)
+				if (node instanceof EventCriteriaSetTreeNode ecsNode)
+					removeEcsTreeNodeFromGroup( ecsNode );
+			
+			int index = treeRoot.removeNode( groupNode );
+			if (index >= 0)
+				fireTreeNodeRemoved( treeRoot, groupNode, index );
 		}
 
 		@Override public void addTreeModelListener   (TreeModelListener l) { listeners.add   (l); }
@@ -472,6 +534,20 @@ class AlreadySeenEventsViewer extends StandardDialog
 			Object[] parentPath = AbstractTreeNode.getPath(treeNode.parent);
 			int[] changedIndices = { index };
 			Object[] changedChildren = { treeNode };
+			
+			fireTreeModelEvent(
+					new TreeModelEvent(this, parentPath, changedIndices, changedChildren),
+					TreeModelListener::treeNodesChanged
+			);
+		}
+
+		void fireAllSubNodesUpdate(AbstractTreeNode parent)
+		{
+			if (parent == null) return;
+			
+			Object[] parentPath = AbstractTreeNode.getPath( parent );
+			int[] changedIndices = generateAscendingInts( 0, parent.getChildCount() );
+			Object[] changedChildren = parent.getChildren();
 			
 			fireTreeModelEvent(
 					new TreeModelEvent(this, parentPath, changedIndices, changedChildren),
@@ -513,6 +589,17 @@ class AlreadySeenEventsViewer extends StandardDialog
 					new TreeModelEvent(this, parentPath, changedIndices, changedChildren),
 					TreeModelListener::treeNodesInserted
 			);
+		}
+
+		private int[] generateAscendingInts(int start, int end)
+		{
+			int n = Math.max( 0, end-start);
+			
+			int[] arr = new int[n];
+			for (int i=start; i<end; i++)
+				arr[i-start] = i;
+			
+			return arr;
 		}
 
 		@SuppressWarnings("unused")
@@ -583,7 +670,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		protected final AbstractTreeNode parent;
 		protected       String title;
 		protected final boolean allowsChildren;
-		protected       AbstractTreeNode [] children;
+		protected       AbstractTreeNode[] children;
 		protected final Comparator<AbstractTreeNode> childrenOrder;
 		
 		AbstractTreeNode(AbstractTreeNode parent, String title, boolean allowsChildren, Comparator<AbstractTreeNode> childrenOrder)
@@ -593,6 +680,19 @@ class AlreadySeenEventsViewer extends StandardDialog
 			this.allowsChildren = allowsChildren;
 			this.childrenOrder = childrenOrder;
 			children = null;
+		}
+
+		AbstractTreeNode[] getChildren()
+		{
+			checkChildren();
+			return children;
+		}
+
+		void forEachChildNode(Consumer<AbstractTreeNode> action)
+		{
+			checkChildren();
+			for (AbstractTreeNode childNode : children)
+				action.accept(childNode);
 		}
 		
 		static Object[] getPath(AbstractTreeNode treeNode)
@@ -731,7 +831,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 		RootTreeNode(Map<String, EventCriteriaSet> data)
 		{
-			super(null, "<>", true, ORDER);
+			super(null, "Already Seen Events", true, ORDER);
 			this.data = data;
 			groupNodes = new HashMap<>();
 		}
@@ -813,13 +913,19 @@ class AlreadySeenEventsViewer extends StandardDialog
 	private class ECSGroupTreeNode extends AbstractTreeNode
 	{
 		private final Vector<EventCriteriaSet> ecsList;
-		private final String groupName;
+		private       String groupName;
 
 		ECSGroupTreeNode(RootTreeNode parent, String groupName)
 		{
 			super(parent, groupName, true, SORT_BY_TITLE);
 			this.groupName = groupName;
 			ecsList = new Vector<>();
+		}
+
+		@Override
+		protected void updateTitle()
+		{
+			title = groupName;
 		}
 
 		@Override

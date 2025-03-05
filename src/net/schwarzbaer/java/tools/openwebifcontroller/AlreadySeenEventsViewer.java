@@ -11,7 +11,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Vector;
-import java.util.function.Predicate;
+import java.util.function.BiConsumer;
 
 import javax.swing.Icon;
 import javax.swing.JMenu;
@@ -59,8 +59,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 		
 		episodeStringFirst = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, false);
 		
-		treeModel = new CustomTreeModel(AlreadySeenEvents.getInstance().createTreeRoot(this));
-		tree = new JTree(treeModel);
+		tree = new JTree();
+		tree.setModel(treeModel = new CustomTreeModel(tree, AlreadySeenEvents.getInstance().createTreeRoot(this)));
 		tree.setCellRenderer(new TCR());
 		JScrollPane treeScrollPane = new JScrollPane(tree);
 		
@@ -97,7 +97,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 	private void rebuildTree()
 	{
-		tree.setModel(treeModel = new CustomTreeModel(AlreadySeenEvents.getInstance().createTreeRoot(this)));
+		tree.setModel(treeModel = new CustomTreeModel(tree, AlreadySeenEvents.getInstance().createTreeRoot(this)));
 	}
 	
 	static void showViewer(Window parent, String title)
@@ -124,7 +124,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 	{
 		private static final long serialVersionUID = -3347262887544423895L;
 		
-		private final Window parent;
+		private final Window window;
 		private final JMenu menuMoveToGroup;
 		
 		private TreePath                 clickedPath;
@@ -135,9 +135,9 @@ class AlreadySeenEventsViewer extends StandardDialog
 		private DescriptionTreeNode      clickedDescriptionTreeNode;
 		private EpisodeInfo              clickedEpisodeInfo;
 		
-		TreeContextMenu(Window parent)
+		TreeContextMenu(Window window)
 		{
-			this.parent = parent;
+			this.window = window;
 			
 			clickedPath                = null;
 			clickedTreeNode            = null;
@@ -166,7 +166,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 					return;
 				
 				String episodeStr = !clickedEpisodeInfo.hasEpisodeStr() ? "" : clickedEpisodeInfo.episodeStr;
-				String result = JOptionPane.showInputDialog(parent, "Episode Text", episodeStr);
+				String result = JOptionPane.showInputDialog(this.window, "Episode Text", episodeStr);
 				if (result!=null)
 				{
 					clickedEpisodeInfo.episodeStr = result;
@@ -175,7 +175,12 @@ class AlreadySeenEventsViewer extends StandardDialog
 					tree.repaint();
 					AlreadySeenEvents.getInstance().writeToFile();
 				}
-			}) );
+			} ) );
+			
+			JMenuItem miReorder = add( OpenWebifController.createMenuItem( "Reorder", e->{
+				treeModel.reorderSiblings(clickedTreeNode);
+				tree.repaint();
+			} ) );
 			
 			addSeparator();
 			
@@ -249,6 +254,22 @@ class AlreadySeenEventsViewer extends StandardDialog
 										: "Copy text to clipboard"
 				);
 				
+				AbstractTreeNode parent = clickedTreeNode!=null ? clickedTreeNode.parent : null;
+				miReorder.setEnabled(parent!=null);
+				miReorder.setText(
+						parent instanceof RootTreeNode
+							? "Reorder subnodes of root"
+							: parent instanceof ECSGroupTreeNode
+								? "Reorder subnodes of group \"%s\"".formatted( parent.title )
+								: parent instanceof EventCriteriaSetTreeNode
+									? "Reorder subnodes of title \"%s\"".formatted( parent.title )
+									: parent instanceof StationTreeNode
+										? "Reorder subnodes of station \"%s\"".formatted( parent.title )
+										: parent instanceof DescriptionTreeNode
+											? "Reorder subnodes of description \"%s\"".formatted( parent.title )
+											: "Reorder nodes"
+				);
+				
 				menuMoveToGroup.setEnabled(clickedEcsTreeNode!=null && !CustomTreeModel.isInGroup(clickedEcsTreeNode));
 				
 				miRemoveFromGroup.setEnabled(clickedEcsTreeNode!=null && CustomTreeModel.isInGroup(clickedEcsTreeNode));
@@ -291,7 +312,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				menuMoveToGroup.addSeparator();
 			
 			menuMoveToGroup.add( OpenWebifController.createMenuItem( "New group ...", e->{
-				String groupName = JOptionPane.showInputDialog(parent, "Group name", "");
+				String groupName = JOptionPane.showInputDialog(window, "Group name", "");
 				if (groupName==null) return;
 				
 				boolean groupExists = groupNames.contains(groupName);
@@ -303,7 +324,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 							"A group with name \"%s\" exists already.".formatted(groupName),
 							"Node was moved in this existing group."
 					};
-					JOptionPane.showMessageDialog(parent, msg, title, JOptionPane.INFORMATION_MESSAGE);
+					JOptionPane.showMessageDialog(window, msg, title, JOptionPane.INFORMATION_MESSAGE);
 				}
 				else
 					updateMenuMoveToGroup();
@@ -337,13 +358,29 @@ class AlreadySeenEventsViewer extends StandardDialog
 	private static class CustomTreeModel implements TreeModel
 	{
 	
+		@SuppressWarnings("unused")
+		private final JTree tree;
 		private final RootTreeNode treeRoot;
 		private final Vector<TreeModelListener> listeners;
 
-		CustomTreeModel(RootTreeNode treeRoot)
+		CustomTreeModel(JTree tree, RootTreeNode treeRoot)
 		{
+			this.tree = tree;
 			this.treeRoot = treeRoot;
 			listeners = new Vector<>();
+		}
+
+		void reorderSiblings(AbstractTreeNode node)
+		{
+			if (node==null) return;
+			if (node.parent==null) return;
+			
+			node.parent.reorderChildren();
+			
+			fireTreeModelEvent(
+					new TreeModelEvent(this, AbstractTreeNode.getPath(node.parent), null, null),
+					TreeModelListener::treeStructureChanged
+			);
 		}
 
 		static boolean isInGroup(EventCriteriaSetTreeNode node)
@@ -416,17 +453,10 @@ class AlreadySeenEventsViewer extends StandardDialog
 		@Override public void addTreeModelListener   (TreeModelListener l) { listeners.add   (l); }
 		@Override public void removeTreeModelListener(TreeModelListener l) { listeners.remove(l); }
 		
-		private void fireTreeNodesInsertedEvent   (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesInserted   (ev); }
-		private void fireTreeNodesChangedEvent    (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesChanged    (ev); }
-		private void fireTreeNodesRemovedEvent    (TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeNodesRemoved    (ev); }
-		@SuppressWarnings("unused")
-		private void fireTreeStructureChangedEvent(TreeModelEvent ev) { for (TreeModelListener l : listeners) l.treeStructureChanged(ev); }
-
-		@SuppressWarnings("unused")
-		private String getSimpleClassName(Object obj)
+		private void fireTreeModelEvent(TreeModelEvent ev, BiConsumer<TreeModelListener, TreeModelEvent> action)
 		{
-			if (obj==null) return "null";
-			return obj.getClass().getSimpleName();
+			for (TreeModelListener l : listeners)
+				action.accept(l, ev);
 		}
 
 		void fireTreeNodeUpdate(AbstractTreeNode treeNode)
@@ -439,12 +469,14 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			//System.out.printf("TreeNodeUpdate:%n   parent: [%s] %s%n   treeNode: [%s] %s%n   index: %d%n", getSimpleClassName(treeNode.parent), treeNode.parent, getSimpleClassName(treeNode), treeNode, index);
 			
-			Object[] parentPath = getPath(treeNode.parent);
+			Object[] parentPath = AbstractTreeNode.getPath(treeNode.parent);
 			int[] changedIndices = { index };
 			Object[] changedChildren = { treeNode };
 			
-			TreeModelEvent event = new TreeModelEvent(this, parentPath, changedIndices, changedChildren);
-			fireTreeNodesChangedEvent(event);
+			fireTreeModelEvent(
+					new TreeModelEvent(this, parentPath, changedIndices, changedChildren),
+					TreeModelListener::treeNodesChanged
+			);
 		}
 
 		void fireTreeNodeRemoved(AbstractTreeNode parent, AbstractTreeNode treeNode, int oldNodeIndex)
@@ -455,12 +487,14 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			//System.out.printf("TreeNodeRemoved:%n   parent: [%s] %s%n   treeNode: [%s] %s%n   index: %d%n", getSimpleClassName(parent), parent, getSimpleClassName(treeNode), treeNode, oldNodeIndex);
 			
-			Object[] parentPath = getPath(parent);
+			Object[] parentPath = AbstractTreeNode.getPath(parent);
 			int[] changedIndices = { oldNodeIndex };
 			Object[] changedChildren = { treeNode };
 			
-			TreeModelEvent event = new TreeModelEvent(this, parentPath, changedIndices, changedChildren);
-			fireTreeNodesRemovedEvent(event);
+			fireTreeModelEvent(
+					new TreeModelEvent(this, parentPath, changedIndices, changedChildren),
+					TreeModelListener::treeNodesRemoved
+			);
 		}
 
 		void fireTreeNodeInserted(AbstractTreeNode parent, AbstractTreeNode treeNode, int index)
@@ -471,23 +505,21 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			//System.out.printf("TreeNodeInserted:%n   parent: [%s] %s%n   treeNode: [%s] %s%n   index: %d%n", getSimpleClassName(parent), parent, getSimpleClassName(treeNode), treeNode, index);
 			
-			Object[] parentPath = getPath(parent);
+			Object[] parentPath = AbstractTreeNode.getPath(parent);
 			int[] changedIndices = { index };
 			Object[] changedChildren = { treeNode };
 			
-			TreeModelEvent event = new TreeModelEvent(this, parentPath, changedIndices, changedChildren);
-			fireTreeNodesInsertedEvent(event);
+			fireTreeModelEvent(
+					new TreeModelEvent(this, parentPath, changedIndices, changedChildren),
+					TreeModelListener::treeNodesInserted
+			);
 		}
 
-		static Object[] getPath(AbstractTreeNode treeNode)
+		@SuppressWarnings("unused")
+		private static String getSimpleClassName(Object obj)
 		{
-			Vector<AbstractTreeNode> path = new Vector<>();
-			
-			for (AbstractTreeNode node = treeNode; node!=null; node = node.parent)
-				path.add(node);
-			Object[] pathArr = path.reversed().toArray();
-			
-			return pathArr;
+			if (obj==null) return "null";
+			return obj.getClass().getSimpleName();
 		}
 
 		@Override
@@ -551,43 +583,72 @@ class AlreadySeenEventsViewer extends StandardDialog
 		protected final AbstractTreeNode parent;
 		protected       String title;
 		protected final boolean allowsChildren;
-		protected       TreeNode[] children;
+		protected       AbstractTreeNode [] children;
+		protected final Comparator<AbstractTreeNode> childrenOrder;
 		
-		AbstractTreeNode(AbstractTreeNode parent, String title, boolean allowsChildren)
+		AbstractTreeNode(AbstractTreeNode parent, String title, boolean allowsChildren, Comparator<AbstractTreeNode> childrenOrder)
 		{
 			this.parent = parent;
 			this.title = title;
 			this.allowsChildren = allowsChildren;
+			this.childrenOrder = childrenOrder;
 			children = null;
 		}
 		
-		int removeNode(TreeNode node)
+		static Object[] getPath(AbstractTreeNode treeNode)
+		{
+			Vector<AbstractTreeNode> path = new Vector<>();
+			
+			for (AbstractTreeNode node = treeNode; node!=null; node = node.parent)
+				path.add(node);
+			Object[] pathArr = path.reversed().toArray();
+			
+			return pathArr;
+		}
+
+		TreePath[] getChildPaths()
+		{
+			checkChildren();
+			
+			TreePath path = new TreePath( getPath(this) );
+			
+			return Arrays
+					.stream(children)
+					.map(path::pathByAddingChild)
+					.toArray(TreePath[]::new);
+		}
+
+		int removeNode(AbstractTreeNode node)
 		{
 			if (node==null) return -1;
 			
-			Vector<TreeNode> childrenVec = new Vector<>(Arrays.asList(children));
+			checkChildren();
+			
+			Vector<AbstractTreeNode> childrenVec = new Vector<>(Arrays.asList(children));
 			
 			int index = childrenVec.indexOf(node);
 			if (index<0) return -1;
 			
 			childrenVec.remove(index);
 			
-			children = childrenVec.toArray(TreeNode[]::new);
+			children = childrenVec.toArray(AbstractTreeNode[]::new);
 			
 			return index;
 		}
 
-		int insertNode(TreeNode node, Predicate<TreeNode> insertBeforeNode)
+		int insertNode(AbstractTreeNode node)
 		{
+			checkChildren();
+			
 			int insertIndex = -1;
 			for (int i=0; i<children.length; i++)
-				if (insertBeforeNode.test( children[i] ))
+				if (childrenOrder.compare(node, children[i]) <= 0)
 				{
 					insertIndex = i;
 					break;
 				}
 			
-			Vector<TreeNode> childrenVec = new Vector<>(Arrays.asList(children));
+			Vector<AbstractTreeNode> childrenVec = new Vector<>(Arrays.asList(children));
 			
 			if (0 <= insertIndex)
 				childrenVec.insertElementAt(node, insertIndex);
@@ -597,9 +658,16 @@ class AlreadySeenEventsViewer extends StandardDialog
 				childrenVec.add(node);
 			}
 			
-			children = childrenVec.toArray(TreeNode[]::new);
+			children = childrenVec.toArray(AbstractTreeNode[]::new);
 			
 			return insertIndex;
+		}
+
+		void reorderChildren()
+		{
+			checkChildren();
+			
+			Arrays.sort(children, childrenOrder);
 		}
 
 		protected abstract void determineChildren();
@@ -612,13 +680,13 @@ class AlreadySeenEventsViewer extends StandardDialog
 				determineChildren();
 		}
 		
-		@Override public String   toString         () { return title; }
-		@Override public TreeNode getParent        () { return parent; }
-		@Override public boolean  getAllowsChildren() { return allowsChildren; }
-		@Override public boolean  isLeaf           () { checkChildren(); return children.length == 0; }
-		@Override public int      getChildCount    () { checkChildren(); return children.length; }
+		@Override public String           toString         () { return title; }
+		@Override public AbstractTreeNode getParent        () { return parent; }
+		@Override public boolean          getAllowsChildren() { return allowsChildren; }
+		@Override public boolean          isLeaf           () { checkChildren(); return children.length == 0; }
+		@Override public int              getChildCount    () { checkChildren(); return children.length; }
 		
-		@Override public TreeNode getChildAt(int childIndex)
+		@Override public AbstractTreeNode getChildAt(int childIndex)
 		{
 			checkChildren();
 			if (childIndex < 0 || childIndex >= children.length)
@@ -637,31 +705,39 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 
 		@Override
-		public Enumeration<? extends TreeNode> children()
+		public Enumeration<AbstractTreeNode> children()
 		{
 			checkChildren();
 			return new Enumeration<>() {
 				private int index = 0;
 				@Override public boolean hasMoreElements() { return index < children.length; }
-				@Override public TreeNode nextElement() { return children[index++]; }
+				@Override public AbstractTreeNode nextElement() { return children[index++]; }
 			};
 		}
 	}
 	
 	class RootTreeNode extends AbstractTreeNode
 	{
+		private static final Comparator<AbstractTreeNode> ORDER = Comparator
+				.<AbstractTreeNode,Integer>comparing( node -> {
+					if (node instanceof ECSGroupTreeNode) return 0;
+					if (node instanceof EventCriteriaSetTreeNode) return 1;
+					return 2;
+				} )
+				.thenComparing(SORT_BY_TITLE);
+		
 		private final Map<String, EventCriteriaSet> data;
 		private final Map<String, ECSGroupTreeNode> groupNodes;
 
 		RootTreeNode(Map<String, EventCriteriaSet> data)
 		{
-			super(null, "<>", true);
+			super(null, "<>", true, ORDER);
 			this.data = data;
 			groupNodes = new HashMap<>();
 		}
 		
 		@Override
-		int removeNode(TreeNode node)
+		int removeNode(AbstractTreeNode node)
 		{
 			int index = super.removeNode(node);
 			
@@ -679,7 +755,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			ECSGroupTreeNode groupNode = new ECSGroupTreeNode(this, groupName);
 			groupNodes.put(groupName, groupNode);
 			
-			int insertIndex = insertNode(groupNode, node -> !(node instanceof ECSGroupTreeNode existingGroupNode) || stringComparator.compare(groupNode.groupName, existingGroupNode.groupName) <= 0);
+			int insertIndex = insertNode(groupNode);
 			
 			return new NewNode<>( insertIndex, groupNode );
 		}
@@ -688,7 +764,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		{
 			EventCriteriaSetTreeNode ecsNode = new EventCriteriaSetTreeNode(this, ecs);
 			
-			int insertIndex = insertNode(ecsNode, node -> !(node instanceof EventCriteriaSetTreeNode existingECSNode) || SORT_BY_TITLE.compare(ecsNode, existingECSNode) <= 0);
+			int insertIndex = insertNode(ecsNode);
 			
 			return new NewNode<>( insertIndex, ecsNode );
 		}
@@ -730,7 +806,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			ungroupedECSNodes.sort(SORT_BY_TITLE);
 			childrenVec.addAll(ungroupedECSNodes);
 			
-			children = childrenVec.toArray(TreeNode[]::new);
+			children = childrenVec.toArray(AbstractTreeNode[]::new);
 		}
 	}
 	
@@ -741,13 +817,13 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 		ECSGroupTreeNode(RootTreeNode parent, String groupName)
 		{
-			super(parent, groupName, true);
+			super(parent, groupName, true, SORT_BY_TITLE);
 			this.groupName = groupName;
 			ecsList = new Vector<>();
 		}
 
 		@Override
-		int removeNode(TreeNode node)
+		int removeNode(AbstractTreeNode node)
 		{
 			int index = super.removeNode(node);
 			
@@ -768,7 +844,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			EventCriteriaSetTreeNode ecsNode = new EventCriteriaSetTreeNode(this, ecs);
 			ecsList.add(ecs);
 			
-			int insertIndex = insertNode(ecsNode, node -> !(node instanceof AbstractTreeNode existingNode) || SORT_BY_TITLE.compare(ecsNode, existingNode) <= 0);
+			int insertIndex = insertNode(ecsNode);
 			
 			return new NewNode<>(insertIndex, ecsNode);
 		}
@@ -779,22 +855,30 @@ class AlreadySeenEventsViewer extends StandardDialog
 			children = ecsList
 					.stream()
 					.map(ecs -> new EventCriteriaSetTreeNode(this, ecs))
-					.sorted(SORT_BY_TITLE)
-					.toArray(TreeNode[]::new);
+					.sorted(childrenOrder)
+					.toArray(AbstractTreeNode[]::new);
 		}
 	}
 
 	private class EventCriteriaSetTreeNode extends AbstractTreeNode
 	{
+		private static final Comparator<AbstractTreeNode> ORDER = Comparator
+				.<AbstractTreeNode,Integer>comparing( node -> {
+					if (node instanceof DescriptionTreeNode) return 0;
+					if (node instanceof StationTreeNode) return 1;
+					return 2;
+				} )
+				.thenComparing(SORT_BY_TITLE);
+		
 		private final EventCriteriaSet ecs;
 
 		EventCriteriaSetTreeNode(AbstractTreeNode parent, EventCriteriaSet ecs)
 		{
-			super(parent, generateTitle(ecs.title(), ecs.variableData()), ecs.stations()!=null || ecs.descriptions()!=null);
+			super(parent, generateTitle(ecs.title(), ecs.variableData()), ecs.stations()!=null || ecs.descriptions()!=null, ORDER);
 			this.ecs = ecs;
 		}
 
-		@Override int removeNode(TreeNode node) { throw new UnsupportedOperationException(); }
+		@Override int removeNode(AbstractTreeNode node) { throw new UnsupportedOperationException(); }
 
 		@Override
 		protected void updateTitle()
@@ -814,7 +898,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		@Override
 		protected void determineChildren()
 		{
-			Vector<TreeNode> childrenVec = new Vector<>();
+			Vector<AbstractTreeNode> childrenVec = new Vector<>();
 			
 			if (ecs.descriptions()!=null)
 			{
@@ -838,7 +922,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				);
 			}
 			
-			children = childrenVec.toArray(TreeNode[]::new);
+			children = childrenVec.toArray(AbstractTreeNode[]::new);
 		}
 	}
 	
@@ -849,13 +933,11 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 		DescriptionTreeNode(AbstractTreeNode parent, String description, EpisodeInfo episode)
 		{
-			super(parent, generateTitle(description, episode), false);
+			super(parent, generateTitle(description, episode), false, null);
 			this.description = description;
 			this.episode = episode;
-			children = new TreeNode[0];
+			children = new AbstractTreeNode[0];
 		}
-		
-		@Override int removeNode(TreeNode node) { throw new UnsupportedOperationException(); }
 
 		@Override
 		protected void updateTitle()
@@ -884,12 +966,12 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 		StationTreeNode(EventCriteriaSetTreeNode parent, String station, StationData stationData)
 		{
-			super(parent, station, stationData.descriptions()!=null);
+			super(parent, station, stationData.descriptions()!=null, SORT_BY_TITLE);
 			this.station = station;
 			this.stationData = stationData;
 		}
 		
-		@Override int removeNode(TreeNode node) { throw new UnsupportedOperationException(); }
+		@Override int removeNode(AbstractTreeNode node) { throw new UnsupportedOperationException(); }
 
 		@Override
 		protected TreeIcons getIcon()
@@ -906,11 +988,11 @@ class AlreadySeenEventsViewer extends StandardDialog
 				children = descriptions.keySet()
 						.stream()
 						.map(description -> new DescriptionTreeNode(this, description, descriptions.get(description)))
-						.sorted(SORT_BY_TITLE)
-						.toArray(TreeNode[]::new);
+						.sorted(childrenOrder)
+						.toArray(AbstractTreeNode[]::new);
 			}
 			else
-				children = new TreeNode[0];
+				children = new AbstractTreeNode[0];
 		}
 	}
 }

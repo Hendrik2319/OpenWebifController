@@ -32,6 +32,7 @@ import javax.swing.tree.TreePath;
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
@@ -69,16 +70,6 @@ class AlreadySeenEventsViewer extends StandardDialog
 		
 		JToolBar toolBar = new JToolBar();
 		toolBar.setFloatable(false);
-		
-		toolBar.add(OpenWebifController.createButton("Rebuild Tree", true, e -> {
-			rebuildTree();
-		}));
-		
-		toolBar.add(OpenWebifController.createCheckBox("Episode Text before Title", episodeStringFirst, val -> {
-			episodeStringFirst = val;
-			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, episodeStringFirst);
-			rebuildTree();
-		} ));
 		
 		JPanel contentPane = new JPanel(new BorderLayout());
 		contentPane.add(toolBar, BorderLayout.PAGE_END);
@@ -148,7 +139,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			clickedDescriptionTreeNode = null;
 			clickedEpisodeInfo         = null;
 			
-			JMenuItem miCopyStr = add( OpenWebifController.createMenuItem( "##", e->{
+			JMenuItem miCopyStr = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Copy, e->{
 				if (clickedGroupTreeNode!=null)
 					ClipboardTools.copyStringSelectionToClipBoard(clickedGroupTreeNode.groupName);
 				
@@ -177,6 +168,12 @@ class AlreadySeenEventsViewer extends StandardDialog
 					AlreadySeenEvents.getInstance().writeToFile();
 				}
 			} ) );
+			
+			add(OpenWebifController.createCheckBoxMenuItem("Episode Text before Title", episodeStringFirst, val -> {
+				episodeStringFirst = val;
+				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, episodeStringFirst);
+				rebuildTree();
+			} ));
 			
 			JMenuItem miReorder = add( OpenWebifController.createMenuItem( "Reorder", e->{
 				treeModel.reorderSiblings(clickedTreeNode);
@@ -211,11 +208,17 @@ class AlreadySeenEventsViewer extends StandardDialog
 				AlreadySeenEvents.getInstance().writeToFile();
 			} ) );
 			
-			JMenuItem miDeleteGroup = add( OpenWebifController.createMenuItem( "##", e->{
+			JMenuItem miDeleteGroup = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Delete, e->{
 				treeModel.deleteGroup( clickedGroupTreeNode );
 				updateMenuMoveToGroup();
 				AlreadySeenEvents.getInstance().writeToFile();
 			} ) );
+			
+			addSeparator();
+			
+			add(OpenWebifController.createMenuItem("Rebuild Tree", GrayCommandIcons.IconGroup.Reload, e -> {
+				rebuildTree();
+			}));
 			
 			addContextMenuInvokeListener((comp, x, y) -> {
 				clickedPath = tree.getPathForLocation(x, y);

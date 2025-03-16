@@ -36,6 +36,7 @@ import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
+import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
@@ -216,13 +217,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		{
 			epgTableModel.setData(data);
 			if (dataSourceTask!=null)
-			{
-				EPGTableModel.ColumnID[] columnIDArray = dataSourceTask.getSpecialEPGTableColumnIDArray();
-				if (columnIDArray==null)
-					columnIDArray = EPGTableModel.getDefaultColumnIDArray();
-				
-				epgTableModel.changeColumns(columnIDArray);
-			}
+				epgTableModel.setViewStyle( dataSourceTask.sourceDependingViewStyle );
 			setTextboxOutput.accept(text);
 			currentTask = nextTask;
 		}
@@ -233,14 +228,16 @@ public class SingleStationEPGPanel extends JSplitPane
 		protected final SourceType source;
 		private   final Class<SourceType> sourceClass;
 		private   final String sourceLabel;
+		private   final EPGTableModel.ViewStyle sourceDependingViewStyle;
 		protected final Consumer<String> setStatusOutput;
 		private   final Function<SourceType, String> getSRef;
 		
-		protected DataAcquisitionTask(SourceType source, Class<SourceType> sourceClass, String sourceLabel, Function<SourceType,String> getSRef, Consumer<String> setStatusOutput)
+		protected DataAcquisitionTask(SourceType source, Class<SourceType> sourceClass, String sourceLabel, EPGTableModel.ViewStyle sourceDependingViewStyle, Function<SourceType,String> getSRef, Consumer<String> setStatusOutput)
 		{
 			this.source          = Objects.requireNonNull(source         );
 			this.sourceClass     = Objects.requireNonNull(sourceClass    );
 			this.sourceLabel     = Objects.requireNonNull(sourceLabel    );
+			this.sourceDependingViewStyle = Objects.requireNonNull(sourceDependingViewStyle);
 			this.getSRef         = Objects.requireNonNull(getSRef        );
 			this.setStatusOutput = Objects.requireNonNull(setStatusOutput);
 		}
@@ -271,7 +268,6 @@ public class SingleStationEPGPanel extends JSplitPane
 		
 		boolean isOk() { return true; }
 		abstract Vector<EPGevent> readEPG(EPG epg, String baseURL);
-		EPGTableModel.ColumnID[] getSpecialEPGTableColumnIDArray() { return null; }
 		
 		
 		static class StationTask extends DataAcquisitionTask<SubService>
@@ -284,6 +280,7 @@ public class SingleStationEPGPanel extends JSplitPane
 						station,
 						SubService.class,
 						String.format("Station \"%s\"", station.name),
+						EPGTableModel.ViewStyle.Station,
 						st -> st.servicereference,
 						setStatusOutput
 				);
@@ -308,27 +305,16 @@ public class SingleStationEPGPanel extends JSplitPane
 		
 		static class BouquetTask extends DataAcquisitionTask<Bouquet>
 		{
-			private static EPGTableModel.ColumnID[] specialColumnOrder =
-					new Tables.ArrayReorderer<>(EPGTableModel.getDefaultColumnIDArray())
-						.moveToFirst(EPGTableModel.ColumnID.Station)
-						.moveAfter  (EPGTableModel.ColumnID.CompProgress, EPGTableModel.ColumnID.Duration)
-						.toArray    (EPGTableModel.ColumnID[]::new);
-					
 			BouquetTask(Bouquet bouquet, Consumer<String> setStatusOutput)
 			{
 				super(
 						bouquet,
 						Bouquet.class,
 						String.format("Bouquet \"%s\"", bouquet.name),
+						EPGTableModel.ViewStyle.Bouquet,
 						b -> b.servicereference,
 						setStatusOutput
 				);
-			}
-
-			@Override
-			EPGTableModel.ColumnID[] getSpecialEPGTableColumnIDArray()
-			{
-				return specialColumnOrder;
 			}
 
 			@Override
@@ -336,7 +322,6 @@ public class SingleStationEPGPanel extends JSplitPane
 			{
 				return epg.readEPGNowNextForBouquet(baseURL, source, this::setDefaultProgressOutput);
 			}
-			
 		}
 	}
 	
@@ -457,6 +442,13 @@ public class SingleStationEPGPanel extends JSplitPane
 			return ev.begin_timestamp+duration_sec;
 		}
 		
+		private static boolean isInTimeSpan(EPGevent ev, long millis)
+		{
+			Long start = ev.begin_timestamp;
+			Long end   = getEnd(ev);
+			return start != null && end != null && start*1000 <= millis && millis <= end*1000;
+		}
+
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<EPGevent>, SwingConstants
 		{
 			// Column Widths: [45, 200, 170, 60, 60, 90, 350, 250, 250, 60, 60, 60, 110, 85, 90, 75, 75, 55, 105, 70, 300, 230] in ModelOrder
@@ -501,14 +493,19 @@ public class SingleStationEPGPanel extends JSplitPane
 				return timer==null ? null : timer.type;
 			}
 		}
-
+		
+		private static final ViewStyle INITIAL_VIEW_STYLE = ViewStyle.Station;
 		private Timers timers;
 		private final TimersMap timersMap;
+		private final CustomCellRenderer renderer;
+		private ViewStyle viewStyle;
+		private long dataTimeStamp_ms;
 		
 		EPGTableModel(TimerDataUpdateNotifier timerNotifier)
 		{
-			super( getDefaultColumnIDArray() );
+			super( INITIAL_VIEW_STYLE.columns );
 			
+			viewStyle = INITIAL_VIEW_STYLE;
 			timersMap = new TimersMap();
 			timers = timerNotifier.getTimers();
 			timerNotifier.addListener(timers -> {
@@ -516,6 +513,8 @@ public class SingleStationEPGPanel extends JSplitPane
 				timersMap.updateData(this.timers, dataVec);
 				fireTableUpdate();
 			});
+			renderer = new CustomCellRenderer();
+			dataTimeStamp_ms = System.currentTimeMillis();
 		}
 		
 		public static ColumnID[] getDefaultColumnIDArray()
@@ -523,11 +522,16 @@ public class SingleStationEPGPanel extends JSplitPane
 			return ColumnID.values();
 		}
 
-		public void changeColumns(ColumnID[] newColumns)
+		public void setViewStyle(ViewStyle viewStyle)
 		{
-			if (newColumns!=null && !areEqual(columns, newColumns))
+			if (this.viewStyle == viewStyle)
+				return;
+			
+			this.viewStyle = Objects.requireNonNull(viewStyle);
+			
+			if (!areEqual(columns, viewStyle.columns))
 			{
-				columns = newColumns;
+				columns = viewStyle.columns;
 				fireTableStructureUpdate();
 				setColumnWidths(table);
 			}
@@ -537,6 +541,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		public void setData(Vector<EPGevent> data)
 		{
 			super.setData(data);
+			dataTimeStamp_ms = System.currentTimeMillis();
 			timersMap.updateData(this.timers, dataVec);
 		}
 		@Override
@@ -560,12 +565,33 @@ public class SingleStationEPGPanel extends JSplitPane
 
 		void setCellRenderers()
 		{
-			CustomCellRenderer renderer = new CustomCellRenderer();
 			setDefaultRenderers(clazz -> renderer);
+		}
+		
+		enum ViewStyle
+		{
+			Station(
+					EPGTableModel.getDefaultColumnIDArray()
+			),
+			Bouquet(
+					new Tables.ArrayReorderer<>(EPGTableModel.getDefaultColumnIDArray())
+					.moveToFirst(EPGTableModel.ColumnID.Station)
+					.moveAfter  (EPGTableModel.ColumnID.CompProgress, EPGTableModel.ColumnID.Duration)
+					.toArray    (EPGTableModel.ColumnID[]::new)
+			),
+			;
+			private final ColumnID[] columns;
+
+			ViewStyle(ColumnID[] columns)
+			{
+				this.columns = Objects.requireNonNull( columns );
+			}
 		}
 		
 		private class CustomCellRenderer implements TableCellRenderer
 		{
+			private static final Color COLOR_FG_INACTIVE_EVENT = new Color(0x92B4C9);
+			private static final Color COLOR_FG_MARKER         = new Color(0xFF8700);
 			private final Tables.LabelRendererComponent label;
 			private final ProgressScaleRC progressScale;
 			
@@ -584,6 +610,7 @@ public class SingleStationEPGPanel extends JSplitPane
 				Timer timer = getEventTimer(event);
 				
 				Supplier<Color> getCustomBackground = null;
+				Supplier<Color> getCustomForeground = null;
 				
 				if (timer!=null)
 				{
@@ -593,9 +620,21 @@ public class SingleStationEPGPanel extends JSplitPane
 					getCustomBackground = ()->bgColor;
 				}
 				
+				if (viewStyle==ViewStyle.Bouquet)
+				{
+					if (event!=null)
+					{
+						if (StationID.isMarker(event.sref))
+							getCustomForeground = ()->COLOR_FG_MARKER;
+							
+						else if (!EPGTableModel.isInTimeSpan( event, dataTimeStamp_ms ))
+							getCustomForeground = ()->COLOR_FG_INACTIVE_EVENT;
+					}
+				}
+				
 				if (columnID==ColumnID.CompProgress)
 				{
-					progressScale.configureAsTableCellRendererComponent(table, value, isSelected, hasFocus, getCustomBackground, null);
+					progressScale.configureAsTableCellRendererComponent(table, value, isSelected, hasFocus, getCustomBackground, getCustomForeground);
 					return progressScale;
 				}
 				
@@ -609,7 +648,7 @@ public class SingleStationEPGPanel extends JSplitPane
 					horizontalAlignment = columnID.cfg.horizontalAlignment;
 				}
 				
-				label.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, getCustomBackground, null);
+				label.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, getCustomBackground, getCustomForeground);
 				label.setHorizontalAlignment(horizontalAlignment);
 				
 				return label;
@@ -642,21 +681,15 @@ public class SingleStationEPGPanel extends JSplitPane
 				
 				int scaleWidth = (int) ((width-2) * Math.min(Math.max(0, value), 1));
 				
-				g.setColor(isSelected ? getTableOrListSelectionForeground() : getTableOrListForeground());
+				g.setColor(isSelected ? getSelectionForeground() : getForeground());
 				g.drawRect(x  , y  , width-1   , height-1);
 				g.fillRect(x+1, y+1, scaleWidth, height-2);
 			}
 
-			private Color getTableOrListSelectionForeground() {
+			private Color getSelectionForeground() {
 				if (table!=null) return table.getSelectionForeground();
 				if (list !=null) return list .getSelectionForeground();
-				return Color.BLACK;
-			}
-
-			private Color getTableOrListForeground() {
-				if (table!=null) return table.getForeground();
-				if (list !=null) return list .getForeground();
-				return Color.BLACK;
+				return getForeground();
 			}
 		}
 		

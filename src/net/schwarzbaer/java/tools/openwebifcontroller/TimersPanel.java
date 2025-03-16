@@ -440,6 +440,7 @@ public class TimersPanel extends JSplitPane {
 	
 	public static class TimersTableCellRenderer implements TableCellRenderer {
 		
+		private static final Color COLOR_FG_SEEN_EVENT = new Color(0x00619B);
 		private final TimersTableModel tableModel;
 		private final Tables.LabelRendererComponent labRenderer;
 		private final Tables.CheckBoxRendererComponent chkbxRenderer;
@@ -462,11 +463,14 @@ public class TimersPanel extends JSplitPane {
 			Component rendererComp = labRenderer;
 			
 			if (columnID!=null) {
+				boolean markedAsAlreadySeen = AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(timer);
+				
 				Supplier<Color> bgCol = ()->timer==null ? null : TimerTools.getBgColor(
 						tableModel.timerStateGuesser.getState(timer),
-						AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(timer)
+						markedAsAlreadySeen
 				);
-				Supplier<Color> fgCol = null;
+				Supplier<Color> fgCol = ()->markedAsAlreadySeen ? COLOR_FG_SEEN_EVENT : null;
+				
 				if (columnID.cfg.columnClass==Boolean.class) {
 					if (value instanceof Boolean boolVal) {
 						if (columnID.cfg.toString != null)

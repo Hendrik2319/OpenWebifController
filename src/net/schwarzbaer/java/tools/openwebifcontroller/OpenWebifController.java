@@ -211,6 +211,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			if (turnOn || turnOff || reboot || mute || stationswitch) {
 				if (baseURL==null) baseURL = getBaseURL_DontAskUser();
 				if (stationswitch) {
+					initializeBeforeStart();
 					StationSwitch.start(baseURL,false);
 					return;
 				}
@@ -227,7 +228,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			
 		}
 		
+		initializeBeforeStart();
 		start(false);
+	}
+	
+	private static void initializeBeforeStart()
+	{
+		UserDefColors.readFromSettings();
 	}
 	
 	public static void start(boolean asSubWindow)
@@ -255,7 +262,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			SplitPaneDivider_BouquetsNStations_ValuePanel,
 			SplitPaneDivider_BouquetsNStations_SingleStationEPGPanel,
 			AlreadySeenEventsViewer_EpisodeStringFirst,
-			LookAndFeel,
+			LookAndFeel, UserDefColors,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {

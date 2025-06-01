@@ -405,6 +405,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			File file = askUserForBrowser();
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
+		settingsMenu.addSeparator();
+		settingsMenu.add(createMenuItem("Configure User Defined Colors", e->UserDefColors.EditDialog.showDialog(mainWindow)));
 		
 		JMenu updatesMenu = menuBar.add(createMenu("Init / Updates"));
 		fillUpdatesMenu(updatesMenu);

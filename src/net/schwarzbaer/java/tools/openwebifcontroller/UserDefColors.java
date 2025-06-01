@@ -126,7 +126,7 @@ public enum UserDefColors
 	{
 		return Arrays
 			.stream(values())
-			.map(udc -> udc.color==null ? "%s%s%n".formatted(NULL_AS_STRING, udc.name()) : "%06X%s%n".formatted(udc.color.getRGB(), udc.name()))
+			.map(udc -> udc.color==null ? "%s%s%n".formatted(NULL_AS_STRING, udc.name()) : "%06X%s%n".formatted(udc.color.getRGB()&0xFFFFFF, udc.name()))
 			.collect(Collectors.joining());
 	}
 	
@@ -155,7 +155,10 @@ public enum UserDefColors
 		String str = null;
 		try
 		{
-			str = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+			str = Files.readString(
+					file.toPath(),
+					StandardCharsets.UTF_8
+			);
 		}
 		catch (IOException ex)
 		{
@@ -173,7 +176,14 @@ public enum UserDefColors
 		
 		try
 		{
-			Files.writeString(file.toPath(), writeToString(), StandardCharsets.UTF_8, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+			Files.writeString(
+					file.toPath(),
+					writeToString(),
+					StandardCharsets.UTF_8,
+					StandardOpenOption.WRITE,
+					StandardOpenOption.CREATE,
+					StandardOpenOption.TRUNCATE_EXISTING
+			);
 		}
 		catch (IOException ex)
 		{
@@ -229,25 +239,44 @@ public enum UserDefColors
 				c.weightx = 1;
 				c.gridx++; contentPane.add(button,c);
 				c.weightx = 0;
-				c.gridx++; contentPane.add(OpenWebifController.createButton("Reset" , GrayCommandIcons.IconGroup.Reload, true, e->udc.resetToDefault(true)),c);
+				c.gridx++; contentPane.add(OpenWebifController.createButton("Reset" , GrayCommandIcons.IconGroup.Reload, true, e->resetToDefault(udc)),c);
 				if (udc.isNullable) {
-					c.gridx++; contentPane.add(OpenWebifController.createButton("Remove", GrayCommandIcons.IconGroup.Delete, true, e->udc.setColor(null)),c);
+					c.gridx++; contentPane.add(OpenWebifController.createButton("Remove", GrayCommandIcons.IconGroup.Delete, true, e->removeColor(udc)),c);
 				}
 			}
 			
 			createGUI(
 					contentPane,
-					OpenWebifController.createButton("Reset all to Defaults", true, e -> this.resetAllToDefault()),
+					OpenWebifController.createButton("Reset all to Defaults", GrayCommandIcons.IconGroup.Reload, true, e -> this.resetAllToDefault()),
 					OpenWebifController.createButton("Read from File", GrayCommandIcons.IconGroup.Folder, true, e -> this.readFromFile()),
 					OpenWebifController.createButton("Write to File" , GrayCommandIcons.IconGroup.Save  , true, e -> this.writeToFile()),
 					OpenWebifController.createButton("Close", true, e -> closeDialog())
 					);
+			pack();
+			setSizeAsMinSize();
+		}
+
+		private void removeColor(UserDefColors udc)
+		{
+			udc.setColor(null);
+			updateButton(udc);
+		}
+
+		private void resetToDefault(UserDefColors udc)
+		{
+			udc.resetToDefault(true);
+			updateButton(udc);
+		}
+
+		private void updateButton(UserDefColors udc)
+		{
+			buttonMap.get(udc).setColor(udc.getColor());
 		}
 
 		private void updateButtons()
 		{
 			for (UserDefColors udc : values())
-				buttonMap.get(udc).setColor(udc.getColor());
+				updateButton(udc);
 		}
 
 		private void resetAllToDefault()

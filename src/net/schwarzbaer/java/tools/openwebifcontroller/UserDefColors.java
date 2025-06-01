@@ -63,16 +63,24 @@ public enum UserDefColors
 		if (str!=null)
 			str.lines().forEach(line -> {
 				if (line.length() > 6)
-					try {
-						valueOf( line.substring(6) ).value = parseHex( line.substring(0, 6) );
-					}
-					catch (Exception e) {}
+				{
+					String name = line.substring(6);
+					String valueStr = line.substring(0, 6);
+					
+					UserDefColors udc;
+					try { udc = valueOf( name ); }
+					catch (Exception e) { return; }
+					
+					Integer value;
+					try { value = valueStr.equals(NULL_AS_STRING) ? null : Integer.parseInt( valueStr, 16 ); }
+					catch (NumberFormatException e) { return; }
+					
+					if (value==null && !udc.isNullable)
+						return; // don't change current value (-> old value or default)
+					
+					udc.value = value;
+				}
 			});
-	}
-	private static Integer parseHex(String str) throws NumberFormatException
-	{
-		if (str.equals(NULL_AS_STRING)) return null;
-		return Integer.parseInt( str, 16 );
 	}
 	private static String writeToString()
 	{

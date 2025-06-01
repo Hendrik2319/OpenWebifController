@@ -25,7 +25,26 @@ import net.schwarzbaer.java.lib.gui.StandardDialog;
 
 public enum UserDefColors
 {
-	// to be defined
+	BGCOLOR_Type_Record       ("Timer Type \"Record\""         , false, false, 0xD9D9FF),
+	BGCOLOR_Type_RecordNSwitch("Timer Type \"RecordNSwitch\""  , false, false, 0xD9FFFF),
+	BGCOLOR_Type_Switch       ("Timer Type \"Switch\""         , false, false, 0xFFEDD9),
+	BGCOLOR_Type_Unknown      ("Timer Type \"Unknown\""        , false, false, 0xFF5CFF),
+	
+	BGCOLOR_State_Running     ("Timer State \"Running\""       , false, false, 0xFFFFD9),
+	BGCOLOR_State_Waiting     ("Timer State \"Waiting\""       , false, false, 0xD9FFD9),
+	BGCOLOR_State_Finished    ("Timer State \"Finished\""      , false, false, 0xFFD9D9),
+	BGCOLOR_State_Deactivated ("Timer State \"Deactivated\""   , false, false, 0xD9D9D9),
+	BGCOLOR_State_Unknown     ("Timer State \"Unknown\""       , false, false, 0xFF5CFF),
+	BGCOLOR_State_Deleted     ("Timer State \"Deleted\""       , false, false, 0xFF5CFF),
+	
+	BGCOLOR_State_Running_Seen    ("Timer State \"Running\""    +" (Seen)", false, true, null),
+	BGCOLOR_State_Waiting_Seen    ("Timer State \"Waiting\""    +" (Seen)", false, true, 0xFAFFD9),
+	BGCOLOR_State_Finished_Seen   ("Timer State \"Finished\""   +" (Seen)", false, true, null),
+	BGCOLOR_State_Deactivated_Seen("Timer State \"Deactivated\""+" (Seen)", false, true, null),
+	BGCOLOR_State_Unknown_Seen    ("Timer State \"Unknown\""    +" (Seen)", false, true, null),
+	BGCOLOR_State_Deleted_Seen    ("Timer State \"Deleted\""    +" (Seen)", false, true, null),
+	
+	TXTCOLOR_Event_Seen("Timer \"Seen\"", true, true, 0x00619B),
 	;
 	private static final String NULL_AS_STRING = "<NULL>";
 	
@@ -42,6 +61,8 @@ public enum UserDefColors
 		this.isNullable = isNullable;
 		this.defaultValue = defaultValue;
 		setValue(defaultValue);
+		if (defaultValue==null && !isNullable)
+			throw new IllegalArgumentException();
 	}
 	
 	
@@ -203,7 +224,8 @@ public enum UserDefColors
 				c.gridy++;
 				
 				c.weightx = 0;
-				c.gridx++; contentPane.add(new JLabel(udc.label+"  "),c);
+				c.gridx++; contentPane.add(new JLabel(udc.label+" "),c);
+				c.gridx++; contentPane.add(new JLabel((udc.isForText ? "(Txt)" : "(Bg)")+"   "),c);
 				c.weightx = 1;
 				c.gridx++; contentPane.add(button,c);
 				c.weightx = 0;

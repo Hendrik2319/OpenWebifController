@@ -11,23 +11,23 @@ import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerStateGues
 
 public class TimerTools
 {
-	private static final Color BGCOLOR_Type_Record        = new Color(0xD9D9FF);
-	private static final Color BGCOLOR_Type_RecordNSwitch = new Color(0xD9FFFF);
-	private static final Color BGCOLOR_Type_Switch        = new Color(0xFFEDD9);
-	private static final Color BGCOLOR_Type_Unknown       = new Color(0xFF5CFF);
-	private static final Color BGCOLOR_State_Running      = new Color(0xFFFFD9);
-	private static final Color BGCOLOR_State_Waiting      = new Color(0xD9FFD9);
-	private static final Color BGCOLOR_State_Waiting_Seen = new Color(0xFAFFD9);
-	private static final Color BGCOLOR_State_Finished     = new Color(0xFFD9D9);
-	private static final Color BGCOLOR_State_Deactivated  = new Color(0xD9D9D9);
-	private static final Color BGCOLOR_State_Unknown      = new Color(0xFF5CFF);
+//	private static final Color BGCOLOR_Type_Record        = new Color(0xD9D9FF);
+//	private static final Color BGCOLOR_Type_RecordNSwitch = new Color(0xD9FFFF);
+//	private static final Color BGCOLOR_Type_Switch        = new Color(0xFFEDD9);
+//	private static final Color BGCOLOR_Type_Unknown       = new Color(0xFF5CFF);
+//	private static final Color BGCOLOR_State_Running      = new Color(0xFFFFD9);
+//	private static final Color BGCOLOR_State_Waiting      = new Color(0xD9FFD9);
+//	private static final Color BGCOLOR_State_Waiting_Seen = new Color(0xFAFFD9);
+//	private static final Color BGCOLOR_State_Finished     = new Color(0xFFD9D9);
+//	private static final Color BGCOLOR_State_Deactivated  = new Color(0xD9D9D9);
+//	private static final Color BGCOLOR_State_Unknown      = new Color(0xFF5CFF);
 	
 	public static Color getBgColor(Timer.Type type) {
 		switch (type) {
-		case Record       : return BGCOLOR_Type_Record;
-		case RecordNSwitch: return BGCOLOR_Type_RecordNSwitch;
-		case Switch       : return BGCOLOR_Type_Switch;
-		case Unknown      : return BGCOLOR_Type_Unknown;
+		case Record       : return UserDefColors.BGCOLOR_Type_Record       .getColor();
+		case RecordNSwitch: return UserDefColors.BGCOLOR_Type_RecordNSwitch.getColor();
+		case Switch       : return UserDefColors.BGCOLOR_Type_Switch       .getColor();
+		case Unknown      : return UserDefColors.BGCOLOR_Type_Unknown      .getColor();
 		}
 		return null;
 	}
@@ -35,11 +35,11 @@ public class TimerTools
 	public static Color getBgColor(Timer.State state)
 	{
 		switch (state) {
-			case Running    : return BGCOLOR_State_Running;
-			case Waiting    : return BGCOLOR_State_Waiting;
-			case Finished   : return BGCOLOR_State_Finished;
-			case Deactivated: return BGCOLOR_State_Deactivated;
-			case Unknown    : return BGCOLOR_State_Unknown;
+			case Running    : return UserDefColors.BGCOLOR_State_Running    .getColor();
+			case Waiting    : return UserDefColors.BGCOLOR_State_Waiting    .getColor();
+			case Finished   : return UserDefColors.BGCOLOR_State_Finished   .getColor();
+			case Deactivated: return UserDefColors.BGCOLOR_State_Deactivated.getColor();
+			case Unknown    : return UserDefColors.BGCOLOR_State_Unknown    .getColor();
 		}
 		return null;
 	}
@@ -50,14 +50,21 @@ public class TimerTools
 	}
 	public static Color getBgColor(TimerStateGuesser.ExtTimerState state, boolean markedAsAlreadySeen) {
 		switch (state) {
-			case Running    : return BGCOLOR_State_Running;
-			case Waiting    : return markedAsAlreadySeen ? BGCOLOR_State_Waiting_Seen : BGCOLOR_State_Waiting;
-			case Finished   : return BGCOLOR_State_Finished;
-			case Deactivated: return BGCOLOR_State_Deactivated;
-			case Unknown    : return BGCOLOR_State_Unknown;
-			case Deleted    : return BGCOLOR_State_Unknown;
+			case Running    : return getColor(UserDefColors.BGCOLOR_State_Running    , markedAsAlreadySeen, UserDefColors.BGCOLOR_State_Running_Seen    );
+			case Waiting    : return getColor(UserDefColors.BGCOLOR_State_Waiting    , markedAsAlreadySeen, UserDefColors.BGCOLOR_State_Waiting_Seen    );
+			case Finished   : return getColor(UserDefColors.BGCOLOR_State_Finished   , markedAsAlreadySeen, UserDefColors.BGCOLOR_State_Finished_Seen   );
+			case Deactivated: return getColor(UserDefColors.BGCOLOR_State_Deactivated, markedAsAlreadySeen, UserDefColors.BGCOLOR_State_Deactivated_Seen);
+			case Unknown    : return getColor(UserDefColors.BGCOLOR_State_Unknown    , markedAsAlreadySeen, UserDefColors.BGCOLOR_State_Unknown_Seen    );
+			case Deleted    : return getColor(UserDefColors.BGCOLOR_State_Deleted    , markedAsAlreadySeen, UserDefColors.BGCOLOR_State_Deleted_Seen    );
 		}
 		return null;
+	}
+
+	private static Color getColor(UserDefColors color, boolean markedAsAlreadySeen, UserDefColors colorSeen)
+	{
+		return markedAsAlreadySeen && colorSeen.getColor()!=null
+								? colorSeen.getColor()
+								: color    .getColor();
 	}
 
 	public static String generateDetailsOutput(Timer timer) {

@@ -1,6 +1,7 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Window;
@@ -11,7 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import javax.swing.JFileChooser;
@@ -25,38 +28,65 @@ import net.schwarzbaer.java.lib.gui.StandardDialog;
 
 public enum UserDefColors
 {
-	BGCOLOR_Type_Record       ("Timer Type \"Record\""         , false, false, 0xD9D9FF),
-	BGCOLOR_Type_RecordNSwitch("Timer Type \"RecordNSwitch\""  , false, false, 0xD9FFFF),
-	BGCOLOR_Type_Switch       ("Timer Type \"Switch\""         , false, false, 0xFFEDD9),
-	BGCOLOR_Type_Unknown      ("Timer Type \"Unknown\""        , false, false, 0xFF5CFF),
+	BGCOLOR_Type_Record       (Category.TimerType, "\"Record\""         , false, false, 0xD9D9FF),
+	BGCOLOR_Type_RecordNSwitch(Category.TimerType, "\"RecordNSwitch\""  , false, false, 0xD9FFFF),
+	BGCOLOR_Type_Switch       (Category.TimerType, "\"Switch\""         , false, false, 0xFFEDD9),
+	BGCOLOR_Type_Unknown      (Category.TimerType, "\"Unknown\""        , false, false, 0xFF5CFF),
 	
-	BGCOLOR_State_Running     ("Timer State \"Running\""       , false, false, 0xFFFFD9),
-	BGCOLOR_State_Waiting     ("Timer State \"Waiting\""       , false, false, 0xD9FFD9),
-	BGCOLOR_State_Finished    ("Timer State \"Finished\""      , false, false, 0xFFD9D9),
-	BGCOLOR_State_Deactivated ("Timer State \"Deactivated\""   , false, false, 0xD9D9D9),
-	BGCOLOR_State_Unknown     ("Timer State \"Unknown\""       , false, false, 0xFF5CFF),
-	BGCOLOR_State_Deleted     ("Timer State \"Deleted\""       , false, false, 0xFF5CFF),
+	BGCOLOR_State_Running     (Category.TimerState, "\"Running\""       , false, false, 0xFFFFD9),
+	BGCOLOR_State_Waiting     (Category.TimerState, "\"Waiting\""       , false, false, 0xD9FFD9),
+	BGCOLOR_State_Finished    (Category.TimerState, "\"Finished\""      , false, false, 0xFFD9D9),
+	BGCOLOR_State_Deactivated (Category.TimerState, "\"Deactivated\""   , false, false, 0xD9D9D9),
+	BGCOLOR_State_Unknown     (Category.TimerState, "\"Unknown\""       , false, false, 0xFF5CFF),
+	BGCOLOR_State_Deleted     (Category.TimerState, "\"Deleted\""       , false, false, 0xFF5CFF),
 	
-	BGCOLOR_State_Running_Seen    ("Timer State \"Running\""    +" (Seen)", false, true, null),
-	BGCOLOR_State_Waiting_Seen    ("Timer State \"Waiting\""    +" (Seen)", false, true, 0xFAFFD9),
-	BGCOLOR_State_Finished_Seen   ("Timer State \"Finished\""   +" (Seen)", false, true, null),
-	BGCOLOR_State_Deactivated_Seen("Timer State \"Deactivated\""+" (Seen)", false, true, null),
-	BGCOLOR_State_Unknown_Seen    ("Timer State \"Unknown\""    +" (Seen)", false, true, null),
-	BGCOLOR_State_Deleted_Seen    ("Timer State \"Deleted\""    +" (Seen)", false, true, null),
+	BGCOLOR_State_Running_Seen    (Category.TimerState, "\"Running\""    +" (Seen)", false, true, null),
+	BGCOLOR_State_Waiting_Seen    (Category.TimerState, "\"Waiting\""    +" (Seen)", false, true, 0xFAFFD9),
+	BGCOLOR_State_Finished_Seen   (Category.TimerState, "\"Finished\""   +" (Seen)", false, true, null),
+	BGCOLOR_State_Deactivated_Seen(Category.TimerState, "\"Deactivated\""+" (Seen)", false, true, null),
+	BGCOLOR_State_Unknown_Seen    (Category.TimerState, "\"Unknown\""    +" (Seen)", false, true, null),
+	BGCOLOR_State_Deleted_Seen    (Category.TimerState, "\"Deleted\""    +" (Seen)", false, true, null),
 	
-	TXTCOLOR_Event_Seen("Timer \"Seen\"", true, true, 0x00619B),
+	TXTCOLOR_Event_Seen(Category.TimerEvent, "Timer \"Seen\"", true, true, 0x00619B),
 	;
 	private static final String NULL_AS_STRING = "<NULL>";
 	
+	public enum Category
+	{
+		TimerType ("Timer Type"),
+		TimerState("Timer State"),
+		TimerEvent("Timer Event"),
+		;
+		public final String label;
+		Category(String label)
+		{
+			this.label = Objects.requireNonNull(label);
+		}
+		@Override
+		public String toString()
+		{
+			return label;
+		}
+		public List<UserDefColors> getUserDefColors()
+		{
+			return Arrays
+				.stream(UserDefColors.values())
+				.filter(udc -> udc.category==this)
+				.toList();
+		}
+	}
+	
+	public final Category category;
 	public final String label;
 	public final boolean isForText; // false -> for background
 	public final boolean isNullable;
 	public final Integer defaultValue;
 	private      Color color;
 
-	UserDefColors(String label, boolean isForText, boolean isNullable, Integer defaultValue)
+	UserDefColors(Category category, String label, boolean isForText, boolean isNullable, Integer defaultValue)
 	{
-		this.label = label;
+		this.category = Objects.requireNonNull(category);
+		this.label    = Objects.requireNonNull(label);
 		this.isForText = isForText;
 		this.isNullable = isNullable;
 		this.defaultValue = defaultValue;
@@ -220,28 +250,43 @@ public enum UserDefColors
 			c.gridheight = 1;
 			c.fill = GridBagConstraints.BOTH;
 			
-			for (UserDefColors udc : values())
+			for (Category cat : Category.values())
 			{
-				HSColorChooser.ColorButton button = HSColorChooser.createColorbutton(
-						udc.getColor(), this,
-						"Set %s".formatted(udc.label),
-						HSColorChooser.Position.PARENT_CENTER,
-						udc::setColor
-				);
-				buttonMap.put(udc, button);
+				JLabel catLabel = new JLabel(cat.label);
+				catLabel.setFont(catLabel.getFont().deriveFont(Font.BOLD));
 				
-				c.gridx = -1;
 				c.gridy++;
-				
-				c.weightx = 0;
-				c.gridx++; contentPane.add(new JLabel(udc.label+" "),c);
-				c.gridx++; contentPane.add(new JLabel((udc.isForText ? "(Txt)" : "(Bg)")+"   "),c);
+				c.gridx = 0;
+				c.gridwidth = GridBagConstraints.REMAINDER;
 				c.weightx = 1;
-				c.gridx++; contentPane.add(button,c);
-				c.weightx = 0;
-				c.gridx++; contentPane.add(OpenWebifController.createButton("Reset" , GrayCommandIcons.IconGroup.Reload, true, e->resetToDefault(udc)),c);
-				if (udc.isNullable) {
-					c.gridx++; contentPane.add(OpenWebifController.createButton("Remove", GrayCommandIcons.IconGroup.Delete, true, e->removeColor(udc)),c);
+				contentPane.add(catLabel,c);
+				c.gridwidth = 1;
+				
+				List<UserDefColors> colors = cat.getUserDefColors();
+				for (UserDefColors udc : colors)
+				{
+					HSColorChooser.ColorButton button = HSColorChooser.createColorbutton(
+							udc.getColor(), this,
+							"Set %s".formatted(udc.label),
+							HSColorChooser.Position.PARENT_CENTER,
+							udc::setColor
+					);
+					buttonMap.put(udc, button);
+					
+					c.gridx = -1;
+					c.gridy++;
+					
+					c.weightx = 0;
+					c.gridx++; contentPane.add(new JLabel("    "),c);
+					c.gridx++; contentPane.add(new JLabel(udc.label+" "),c);
+					c.gridx++; contentPane.add(new JLabel((udc.isForText ? "(Txt)" : "(Bg)")+"   "),c);
+					c.weightx = 1;
+					c.gridx++; contentPane.add(button,c);
+					c.weightx = 0;
+					c.gridx++; contentPane.add(OpenWebifController.createButton("Reset" , GrayCommandIcons.IconGroup.Reload, true, e->resetToDefault(udc)),c);
+					if (udc.isNullable) {
+						c.gridx++; contentPane.add(OpenWebifController.createButton("Remove", GrayCommandIcons.IconGroup.Delete, true, e->removeColor(udc)),c);
+					}
 				}
 			}
 			

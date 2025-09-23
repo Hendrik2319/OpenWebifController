@@ -106,10 +106,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		private static IconSource.CachedIcons<LedIcons> IS = IconSource.createCachedIcons(16, 16, "/images/LedIcons.png", LedIcons.values());
 	}
 	
-	public static final String FILE__EPG_EVENT_GENRES = "OpenWebifController - EPGEventGenres.data";
-	
 	public enum LocalDataFile {
 		AlreadySeenEvents("AlreadySeenEvents.data"),
+		EPGEventGenres("EPGEventGenres.data"),
 		;
 		private final String filename;
 		private LocalDataFile(String filename) { this.filename = filename; }

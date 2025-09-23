@@ -89,7 +89,12 @@ class EPGEventGenres
 
 	void readFromFile()
 	{
-		File file = new File(OpenWebifController.FILE__EPG_EVENT_GENRES);
+		File file = OpenWebifController.LocalDataFile.EPGEventGenres.getFileForRead();
+		if (file==null)
+		{
+			System.err.printf("Can't read EPGEvent Genres from file.%n");
+			return;
+		}
 		System.out.printf("Read EPGEvent Genres from file \"%s\" ...%n", file.getAbsolutePath());
 		
 		genres.clear();
@@ -144,7 +149,12 @@ class EPGEventGenres
 	
 	void writeToFile()
 	{
-		File file = new File(OpenWebifController.FILE__EPG_EVENT_GENRES);
+		File file = OpenWebifController.LocalDataFile.EPGEventGenres.getFileForWrite();
+		if (file==null)
+		{
+			System.err.printf("Can't write EPGEvent Genres to file.%n");
+			return;
+		}
 		System.out.printf("Write EPGEvent Genres to file \"%s\" ...%n", file.getAbsolutePath());
 		
 		try (PrintWriter out = new PrintWriter(file, StandardCharsets.UTF_8))

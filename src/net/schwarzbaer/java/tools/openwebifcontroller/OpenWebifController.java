@@ -106,10 +106,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		private static IconSource.CachedIcons<LedIcons> IS = IconSource.createCachedIcons(16, 16, "/images/LedIcons.png", LedIcons.values());
 	}
 	
-	public static final String FILE__EPG_EVENT_GENRES = "OpenWebifController - EPGEventGenres.data";
-	
 	public enum LocalDataFile {
 		AlreadySeenEvents("AlreadySeenEvents.data"),
+		EPGEventGenres("EPGEventGenres.data"),
 		;
 		private final String filename;
 		private LocalDataFile(String filename) { this.filename = filename; }
@@ -211,6 +210,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			if (turnOn || turnOff || reboot || mute || stationswitch) {
 				if (baseURL==null) baseURL = getBaseURL_DontAskUser();
 				if (stationswitch) {
+					initializeBeforeStart();
 					StationSwitch.start(baseURL,false);
 					return;
 				}
@@ -227,7 +227,13 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			
 		}
 		
+		initializeBeforeStart();
 		start(false);
+	}
+	
+	private static void initializeBeforeStart()
+	{
+		UserDefColors.readFromSettings();
 	}
 	
 	public static void start(boolean asSubWindow)
@@ -255,7 +261,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			SplitPaneDivider_BouquetsNStations_ValuePanel,
 			SplitPaneDivider_BouquetsNStations_SingleStationEPGPanel,
 			AlreadySeenEventsViewer_EpisodeStringFirst,
-			LookAndFeel,
+			LookAndFeel, UserDefColors,
 		}
 
 		private enum ValueGroup implements Settings.GroupKeys<ValueKey> {
@@ -398,6 +404,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			File file = askUserForBrowser();
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
+		settingsMenu.addSeparator();
+		settingsMenu.add(createMenuItem("Configure User Defined Colors", e->UserDefColors.EditDialog.showDialog(mainWindow)));
 		
 		JMenu updatesMenu = menuBar.add(createMenu("Init / Updates"));
 		fillUpdatesMenu(updatesMenu);

@@ -7,14 +7,17 @@ import java.awt.Window;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Vector;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import javax.swing.Icon;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -99,7 +102,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 	RootTreeNode createTreeRoot(Map<String, EventCriteriaSet> data)
 	{
-		return new RootTreeNode(data);
+		return new RootTreeNode( data, CustomTreeModel.getCurrentRootSubnodeOrder() );
 	}
 	
 	String generateTitle(String title, EpisodeInfo episode)
@@ -118,6 +121,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		
 		private final Window window;
 		private final JMenu menuMoveToGroup;
+		private final JMenu menuRootOrder;
 		
 		private TreePath                 clickedPath;
 		private AbstractTreeNode         clickedTreeNode;
@@ -175,10 +179,19 @@ class AlreadySeenEventsViewer extends StandardDialog
 				rebuildTree();
 			} ));
 			
-			JMenuItem miReorder = add( OpenWebifController.createMenuItem( "Reorder", e->{
+			JMenuItem miReorder = add( OpenWebifController.createMenuItem( "##", e->{
 				treeModel.reorderSiblings(clickedTreeNode);
 				tree.repaint();
 			} ) );
+			
+			add(menuRootOrder = OpenWebifController.createMenu("Order of subnodes of root"));
+			EnumMap<RootTreeNode.NodeOrder, JCheckBoxMenuItem> mapMiRootOrder = new EnumMap<>(RootTreeNode.NodeOrder.class);
+			for (RootTreeNode.NodeOrder order : RootTreeNode.NodeOrder.values())
+			{
+				JCheckBoxMenuItem checkBoxMenuItem = OpenWebifController.createCheckBoxMenuItem(order.title, false, b -> treeModel.setRootSubnodeOrder(order));
+				menuRootOrder.add(checkBoxMenuItem);
+				mapMiRootOrder.put(order, checkBoxMenuItem);
+			}
 			
 			addSeparator();
 			
@@ -315,6 +328,14 @@ class AlreadySeenEventsViewer extends StandardDialog
 							? "Delete group \"%s\"".formatted( clickedGroupTreeNode.groupName )
 							: "Delete group"
 				);
+				
+				RootTreeNode.NodeOrder currentOrder = CustomTreeModel.getCurrentRootSubnodeOrder();
+				for (RootTreeNode.NodeOrder order : RootTreeNode.NodeOrder.values())
+				{
+					JCheckBoxMenuItem menuItem = mapMiRootOrder.get(order);
+					if (menuItem!=null)
+						menuItem.setSelected(order == currentOrder);
+				}
 			});
 			
 			addTo(tree);
@@ -400,6 +421,33 @@ class AlreadySeenEventsViewer extends StandardDialog
 			listeners = new Vector<>();
 		}
 
+		void setRootSubnodeOrder(RootTreeNode.NodeOrder order)
+		{
+			if (treeRoot!=null)
+			{
+				treeRoot.setNodeOrder(order);
+				storeCurrentRootSubnodeOrder(order);
+				fireTreeStructureChanged(treeRoot);
+			}
+		}
+
+		static RootTreeNode.NodeOrder getCurrentRootSubnodeOrder()
+		{
+			return OpenWebifController.settings.getEnum(
+					OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_RootSubNodeOrder,
+					RootTreeNode.NodeOrder.GROUPS_FIRST,
+					RootTreeNode.NodeOrder.class
+			);
+		}
+
+		static void storeCurrentRootSubnodeOrder(RootTreeNode.NodeOrder order)
+		{
+			OpenWebifController.settings.putEnum(
+					OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_RootSubNodeOrder,
+					order
+			);
+		}
+
 		void reorderSiblings(AbstractTreeNode node)
 		{
 			if (node==null) return;
@@ -407,10 +455,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			node.parent.reorderChildren();
 			
-			fireTreeModelEvent(
-					new TreeModelEvent(this, AbstractTreeNode.getPath(node.parent), null, null),
-					TreeModelListener::treeStructureChanged
-			);
+			fireTreeStructureChanged(node.parent);
 		}
 
 		static boolean isInGroup(EventCriteriaSetTreeNode node)
@@ -594,6 +639,14 @@ class AlreadySeenEventsViewer extends StandardDialog
 			);
 		}
 
+		void fireTreeStructureChanged(AbstractTreeNode treeNode)
+		{
+			fireTreeModelEvent(
+					new TreeModelEvent(this, AbstractTreeNode.getPath(treeNode), null, null),
+					TreeModelListener::treeStructureChanged
+			);
+		}
+
 		private int[] generateAscendingInts(int start, int end)
 		{
 			int n = Math.max( 0, end-start);
@@ -674,7 +727,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		protected       String title;
 		protected final boolean allowsChildren;
 		protected       AbstractTreeNode[] children;
-		protected final Comparator<AbstractTreeNode> childrenOrder;
+		protected       Comparator<AbstractTreeNode> childrenOrder;
 		
 		AbstractTreeNode(AbstractTreeNode parent, String title, boolean allowsChildren, Comparator<AbstractTreeNode> childrenOrder)
 		{
@@ -766,6 +819,14 @@ class AlreadySeenEventsViewer extends StandardDialog
 			return insertIndex;
 		}
 
+		void setChildrenOrder(Comparator<AbstractTreeNode> childrenOrder)
+		{
+			checkChildren();
+			
+			this.childrenOrder = childrenOrder;
+			Arrays.sort(children, childrenOrder);
+		}
+
 		void reorderChildren()
 		{
 			checkChildren();
@@ -821,7 +882,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 	
 	class RootTreeNode extends AbstractTreeNode
 	{
-		private static final Comparator<AbstractTreeNode> ORDER = Comparator
+		private static final Comparator<AbstractTreeNode> ORDER_GROUPS_FIRST = Comparator
 				.<AbstractTreeNode,Integer>comparing( node -> {
 					if (node instanceof ECSGroupTreeNode) return 0;
 					if (node instanceof EventCriteriaSetTreeNode) return 1;
@@ -829,14 +890,33 @@ class AlreadySeenEventsViewer extends StandardDialog
 				} )
 				.thenComparing(SORT_BY_TITLE);
 		
+		enum NodeOrder
+		{
+			GROUPS_FIRST ("Groups first",ORDER_GROUPS_FIRST),
+			SORT_BY_TITLE("All sorted by title",AbstractTreeNode.SORT_BY_TITLE),
+			;
+			private final String title;
+			private final Comparator<AbstractTreeNode> order;
+			NodeOrder(String title, Comparator<AbstractTreeNode> order)
+			{
+				this.title = title;
+				this.order = order;
+			}
+		}
+		
 		private final Map<String, EventCriteriaSet> data;
 		private final Map<String, ECSGroupTreeNode> groupNodes;
-
-		RootTreeNode(Map<String, EventCriteriaSet> data)
+		
+		RootTreeNode(Map<String, EventCriteriaSet> data, NodeOrder subnodeOrder)
 		{
-			super(null, "Already Seen Events", true, ORDER);
+			super(null, "Already Seen Events", true, Objects.requireNonNull(subnodeOrder).order);
 			this.data = data;
 			groupNodes = new HashMap<>();
+		}
+		
+		void setNodeOrder(NodeOrder subnodeOrder)
+		{
+			setChildrenOrder(Objects.requireNonNull(subnodeOrder).order);
 		}
 		
 		@Override
@@ -904,11 +984,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 			});
 			
 			Vector<AbstractTreeNode> childrenVec = new Vector<>( groupNodes.values() );
-			childrenVec.sort(SORT_BY_TITLE);
-			
-			ungroupedECSNodes.sort(SORT_BY_TITLE);
 			childrenVec.addAll(ungroupedECSNodes);
-			
+			childrenVec.sort(childrenOrder);
 			children = childrenVec.toArray(AbstractTreeNode[]::new);
 		}
 	}

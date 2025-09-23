@@ -261,6 +261,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			SplitPaneDivider_BouquetsNStations_ValuePanel,
 			SplitPaneDivider_BouquetsNStations_SingleStationEPGPanel,
 			AlreadySeenEventsViewer_EpisodeStringFirst,
+			AlreadySeenEventsViewer_RootSubNodeOrder,
 			LookAndFeel, UserDefColors,
 		}
 

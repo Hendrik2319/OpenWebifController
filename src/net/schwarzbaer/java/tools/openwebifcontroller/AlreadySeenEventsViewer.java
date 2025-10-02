@@ -4,6 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Window;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
@@ -31,11 +33,12 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
+import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
-import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
@@ -68,8 +71,12 @@ class AlreadySeenEventsViewer extends StandardDialog
 		tree.setModel(treeModel = new CustomTreeModel(tree, AlreadySeenEvents.getInstance().createTreeRoot(this)));
 		tree.setCellRenderer(new TCR());
 		JScrollPane treeScrollPane = new JScrollPane(tree);
+		tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+		TreeKeyListener treeKeyListener = new TreeKeyListener();
+		tree.addKeyListener(treeKeyListener);
+		tree.addTreeSelectionListener(ev -> treeKeyListener.selected = new SelectionInfo(tree.getSelectionPath()));
 		
-		new TreeContextMenu(parent);
+		new TreeContextMenu(parent).addTo(tree);
 		
 		JToolBar toolBar = new JToolBar();
 		toolBar.setFloatable(false);
@@ -115,6 +122,101 @@ class AlreadySeenEventsViewer extends StandardDialog
 			return String.format("%s (%s)", title, episode.episodeStr);
 	}
 	
+	private void editEpisodeStr(Window window, SelectionInfo selected)
+	{
+		if (selected.episodeInfo==null)
+			return;
+		
+		String episodeStr = !selected.episodeInfo.hasEpisodeStr() ? "" : selected.episodeInfo.episodeStr;
+		String result = JOptionPane.showInputDialog(window, "Episode Text", episodeStr);
+		if (result!=null)
+		{
+			selected.episodeInfo.episodeStr = result;
+			selected.treeNode.updateTitle();
+			treeModel.fireTreeNodeUpdate(selected.treeNode);
+			tree.repaint();
+			AlreadySeenEvents.getInstance().writeToFile();
+		}
+	}
+
+	private static class SelectionInfo
+	{
+		final TreePath                 path;
+		final AbstractTreeNode         treeNode;
+		final ECSGroupTreeNode         groupTreeNode;
+		final EventCriteriaSetTreeNode ecsTreeNode;
+		final StationTreeNode          stationTreeNode;
+		final DescriptionTreeNode      descriptionTreeNode;
+		final EpisodeInfo              episodeInfo;
+		
+		SelectionInfo(TreePath path)
+		{
+			this.path = path;
+			
+			Object lastPathComp = this.path==null ? null : this.path.getLastPathComponent();
+			treeNode            = lastPathComp instanceof AbstractTreeNode         treeNode ? treeNode : null;
+			groupTreeNode       = treeNode     instanceof ECSGroupTreeNode         treeNode ? treeNode : null;
+			ecsTreeNode         = treeNode     instanceof EventCriteriaSetTreeNode treeNode ? treeNode : null;
+			stationTreeNode     = treeNode     instanceof StationTreeNode          treeNode ? treeNode : null;
+			descriptionTreeNode = treeNode     instanceof DescriptionTreeNode      treeNode ? treeNode : null;
+			episodeInfo =
+					descriptionTreeNode!=null
+						? descriptionTreeNode.episode
+						: ecsTreeNode!=null && ecsTreeNode.ecs!=null
+							? ecsTreeNode.ecs.variableData()
+							: null;
+		}
+	}
+	
+	private enum KeyFunction
+	{
+		EditEpisodeStr(KeyEvent.VK_F4),
+		;
+		private final int keyCode;
+		private final String keyLabel;
+		
+		KeyFunction(int keyCode) { this(keyCode, KeyEvent.getKeyText(keyCode)); }
+		KeyFunction(int keyCode, String keyLabel)
+		{
+			this.keyCode = keyCode;
+			this.keyLabel = Objects.requireNonNull(keyLabel);
+		}
+		
+		static KeyFunction getFromKeyCode(int keyCode)
+		{
+			for (KeyFunction val : values())
+				if (val.keyCode == keyCode)
+					return val;
+			return null;
+		}
+		
+		String addKeyLabel(String baseStr)
+		{
+			return "%s (%s)".formatted(baseStr, keyLabel);
+		}
+	}
+
+	private class TreeKeyListener implements KeyListener
+	{
+		SelectionInfo selected = new SelectionInfo(null);
+
+		@Override public void keyTyped   (KeyEvent e) {}
+		@Override public void keyReleased(KeyEvent e) {}
+
+		@Override public void keyPressed(KeyEvent e)
+		{
+			KeyFunction keyFunction = KeyFunction.getFromKeyCode(e.getKeyCode());
+			if (keyFunction==null) return;
+			
+			switch (keyFunction)
+			{
+			case EditEpisodeStr:
+				editEpisodeStr(AlreadySeenEventsViewer.this, selected);
+				break;
+			}
+		}
+	}
+
 	private class TreeContextMenu extends ContextMenu
 	{
 		private static final long serialVersionUID = -3347262887544423895L;
@@ -122,55 +224,29 @@ class AlreadySeenEventsViewer extends StandardDialog
 		private final Window window;
 		private final JMenu menuMoveToGroup;
 		private final JMenu menuRootOrder;
-		
-		private TreePath                 clickedPath;
-		private AbstractTreeNode         clickedTreeNode;
-		private ECSGroupTreeNode         clickedGroupTreeNode;
-		private EventCriteriaSetTreeNode clickedEcsTreeNode;
-		private StationTreeNode          clickedStationTreeNode;
-		private DescriptionTreeNode      clickedDescriptionTreeNode;
-		private EpisodeInfo              clickedEpisodeInfo;
+		private SelectionInfo clicked;
 		
 		TreeContextMenu(Window window)
 		{
 			this.window = window;
-			
-			clickedPath                = null;
-			clickedTreeNode            = null;
-			clickedGroupTreeNode       = null;
-			clickedEcsTreeNode         = null;
-			clickedStationTreeNode     = null;
-			clickedDescriptionTreeNode = null;
-			clickedEpisodeInfo         = null;
+			clicked = new SelectionInfo(null);
 			
 			JMenuItem miCopyStr = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Copy, e->{
-				if (clickedGroupTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clickedGroupTreeNode.groupName);
+				if (clicked.groupTreeNode!=null)
+					ClipboardTools.copyStringSelectionToClipBoard(clicked.groupTreeNode.groupName);
 				
-				if (clickedEcsTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clickedEcsTreeNode.ecs.title());
+				if (clicked.ecsTreeNode!=null)
+					ClipboardTools.copyStringSelectionToClipBoard(clicked.ecsTreeNode.ecs.title());
 				
-				if (clickedStationTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clickedStationTreeNode.station);
+				if (clicked.stationTreeNode!=null)
+					ClipboardTools.copyStringSelectionToClipBoard(clicked.stationTreeNode.station);
 				
-				if (clickedDescriptionTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clickedDescriptionTreeNode.description);
+				if (clicked.descriptionTreeNode!=null)
+					ClipboardTools.copyStringSelectionToClipBoard(clicked.descriptionTreeNode.description);
 			} ) );
 			
 			JMenuItem miEditEpisodeStr = add( OpenWebifController.createMenuItem( "##", e->{
-				if (clickedEpisodeInfo==null)
-					return;
-				
-				String episodeStr = !clickedEpisodeInfo.hasEpisodeStr() ? "" : clickedEpisodeInfo.episodeStr;
-				String result = JOptionPane.showInputDialog(this.window, "Episode Text", episodeStr);
-				if (result!=null)
-				{
-					clickedEpisodeInfo.episodeStr = result;
-					clickedTreeNode.updateTitle();
-					treeModel.fireTreeNodeUpdate(clickedTreeNode);
-					tree.repaint();
-					AlreadySeenEvents.getInstance().writeToFile();
-				}
+				editEpisodeStr(this.window, clicked);
 			} ) );
 			
 			add(OpenWebifController.createCheckBoxMenuItem("Episode Text before Title", episodeStringFirst, val -> {
@@ -180,7 +256,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			} ));
 			
 			JMenuItem miReorder = add( OpenWebifController.createMenuItem( "##", e->{
-				treeModel.reorderSiblings(clickedTreeNode);
+				treeModel.reorderSiblings(clicked.treeNode);
 				tree.repaint();
 			} ) );
 			
@@ -199,30 +275,30 @@ class AlreadySeenEventsViewer extends StandardDialog
 			updateMenuMoveToGroup();
 			
 			JMenuItem miRemoveFromGroup = add( OpenWebifController.createMenuItem( "##", e->{
-				treeModel.removeEcsTreeNodeFromGroup( clickedEcsTreeNode );
+				treeModel.removeEcsTreeNodeFromGroup( clicked.ecsTreeNode );
 				AlreadySeenEvents.getInstance().writeToFile();
 			} ) );
 			
 			JMenuItem miRenameGroup = add( OpenWebifController.createMenuItem( "##", e->{
-				String result = JOptionPane.showInputDialog(this.window, "New group name", clickedGroupTreeNode.groupName);
-				if (result==null || result.isBlank() || result.equals(clickedGroupTreeNode.groupName)) return;
+				String result = JOptionPane.showInputDialog(this.window, "New group name", clicked.groupTreeNode.groupName);
+				if (result==null || result.isBlank() || result.equals(clicked.groupTreeNode.groupName)) return;
 				if (treeModel.isExistingGroupName( result ))
 				{
 					String[] msg = {
 							"A group with name \"%s\" exists already.".formatted( result ),
 							"Please choose anonther name."
 					};
-					JOptionPane.showMessageDialog(window, msg, "Group already exists", JOptionPane.ERROR_MESSAGE);
+					JOptionPane.showMessageDialog(this.window, msg, "Group already exists", JOptionPane.ERROR_MESSAGE);
 					return;
 				}
 				
-				treeModel.renameGroup( clickedGroupTreeNode, result );
+				treeModel.renameGroup( clicked.groupTreeNode, result );
 				updateMenuMoveToGroup();
 				AlreadySeenEvents.getInstance().writeToFile();
 			} ) );
 			
 			JMenuItem miDeleteGroup = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Delete, e->{
-				treeModel.deleteGroup( clickedGroupTreeNode );
+				treeModel.deleteGroup( clicked.groupTreeNode );
 				updateMenuMoveToGroup();
 				AlreadySeenEvents.getInstance().writeToFile();
 			} ) );
@@ -234,63 +310,35 @@ class AlreadySeenEventsViewer extends StandardDialog
 			}));
 			
 			addContextMenuInvokeListener((comp, x, y) -> {
-				clickedPath = tree.getPathForLocation(x, y);
-				tree.setSelectionPath(clickedPath);
+				clicked = new SelectionInfo( tree.getPathForLocation(x, y) );
+				tree.setSelectionPath(clicked.path);
 				
-				clickedTreeNode            = null;
-				clickedGroupTreeNode       = null;
-				clickedEcsTreeNode         = null;
-				clickedStationTreeNode     = null;
-				clickedDescriptionTreeNode = null;
-				clickedEpisodeInfo         = null;
-				
-				Object lastPathComp = clickedPath==null ? null : clickedPath.getLastPathComponent();
-				if (lastPathComp instanceof AbstractTreeNode treeNode)
-					clickedTreeNode = treeNode;
-				
-				if (clickedTreeNode instanceof ECSGroupTreeNode treeNode)
-					clickedGroupTreeNode = treeNode;
-				
-				if (clickedTreeNode instanceof EventCriteriaSetTreeNode treeNode)
-					clickedEcsTreeNode = treeNode;
-				
-				if (clickedTreeNode instanceof StationTreeNode treeNode)
-					clickedStationTreeNode = treeNode;
-				
-				if (clickedTreeNode instanceof DescriptionTreeNode treeNode)
-					clickedDescriptionTreeNode = treeNode;
-				
-				if (clickedDescriptionTreeNode!=null)
-					clickedEpisodeInfo = clickedDescriptionTreeNode.episode;
-				if (clickedEcsTreeNode!=null && clickedEcsTreeNode.ecs!=null)
-					clickedEpisodeInfo = clickedEcsTreeNode.ecs.variableData();
-				
-				miEditEpisodeStr.setEnabled( clickedEpisodeInfo!=null );
-				miEditEpisodeStr.setText(
-						clickedEpisodeInfo==null || !clickedEpisodeInfo.hasEpisodeStr()
+				miEditEpisodeStr.setEnabled( clicked.episodeInfo!=null );
+				miEditEpisodeStr.setText( KeyFunction.EditEpisodeStr.addKeyLabel(
+						clicked.episodeInfo==null || !clicked.episodeInfo.hasEpisodeStr()
 							?    "Add Episode Text"
 							: "Change Episode Text"
-				);
+				) );
 				
 				miCopyStr.setEnabled(
-						clickedGroupTreeNode!=null ||
-						clickedEcsTreeNode!=null ||
-						clickedStationTreeNode!=null ||
-						clickedDescriptionTreeNode!=null
+						clicked.groupTreeNode!=null ||
+						clicked.ecsTreeNode!=null ||
+						clicked.stationTreeNode!=null ||
+						clicked.descriptionTreeNode!=null
 				);
 				miCopyStr.setText(
-						clickedGroupTreeNode!=null
+						clicked.groupTreeNode!=null
 							? "Copy group name to clipboard"
-							: clickedEcsTreeNode!=null
+							: clicked.ecsTreeNode!=null
 								? "Copy title to clipboard"
-								: clickedStationTreeNode!=null
+								: clicked.stationTreeNode!=null
 									? "Copy station name to clipboard"
-									: clickedDescriptionTreeNode!=null
+									: clicked.descriptionTreeNode!=null
 										? "Copy description to clipboard"
 										: "Copy text to clipboard"
 				);
 				
-				AbstractTreeNode parent = clickedTreeNode!=null ? clickedTreeNode.parent : null;
+				AbstractTreeNode parent = clicked.treeNode!=null ? clicked.treeNode.parent : null;
 				miReorder.setEnabled(parent!=null);
 				miReorder.setText(
 						parent instanceof RootTreeNode
@@ -306,26 +354,26 @@ class AlreadySeenEventsViewer extends StandardDialog
 											: "Reorder nodes"
 				);
 				
-				menuMoveToGroup.setEnabled(clickedEcsTreeNode!=null && !CustomTreeModel.isInGroup(clickedEcsTreeNode));
+				menuMoveToGroup.setEnabled(clicked.ecsTreeNode!=null && !CustomTreeModel.isInGroup(clicked.ecsTreeNode));
 				
-				miRemoveFromGroup.setEnabled(clickedEcsTreeNode!=null && CustomTreeModel.isInGroup(clickedEcsTreeNode));
+				miRemoveFromGroup.setEnabled(clicked.ecsTreeNode!=null && CustomTreeModel.isInGroup(clicked.ecsTreeNode));
 				miRemoveFromGroup.setText(
-						clickedEcsTreeNode!=null && CustomTreeModel.isInGroup(clickedEcsTreeNode)
-							? "Remove from group \"%s\"".formatted( CustomTreeModel.getGroupName(clickedEcsTreeNode) )
+						clicked.ecsTreeNode!=null && CustomTreeModel.isInGroup(clicked.ecsTreeNode)
+							? "Remove from group \"%s\"".formatted( CustomTreeModel.getGroupName(clicked.ecsTreeNode) )
 							: "Remove from group"
 				);
 				
-				miRenameGroup.setEnabled(clickedGroupTreeNode!=null);
+				miRenameGroup.setEnabled(clicked.groupTreeNode!=null);
 				miRenameGroup.setText(
-						clickedGroupTreeNode!=null
-							? "Rename group \"%s\"".formatted( clickedGroupTreeNode.groupName )
+						clicked.groupTreeNode!=null
+							? "Rename group \"%s\"".formatted( clicked.groupTreeNode.groupName )
 							: "Rename group"
 				);
 				
-				miDeleteGroup.setEnabled(clickedGroupTreeNode!=null);
+				miDeleteGroup.setEnabled(clicked.groupTreeNode!=null);
 				miDeleteGroup.setText(
-						clickedGroupTreeNode!=null
-							? "Delete group \"%s\"".formatted( clickedGroupTreeNode.groupName )
+						clicked.groupTreeNode!=null
+							? "Delete group \"%s\"".formatted( clicked.groupTreeNode.groupName )
 							: "Delete group"
 				);
 				
@@ -337,8 +385,6 @@ class AlreadySeenEventsViewer extends StandardDialog
 						menuItem.setSelected(order == currentOrder);
 				}
 			});
-			
-			addTo(tree);
 		}
 
 		private void updateMenuMoveToGroup()
@@ -354,7 +400,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			for (String groupName : groupNamesVec)
 			{
 				menuMoveToGroup.add( OpenWebifController.createMenuItem( groupName, e->{
-					treeModel.moveEcsTreeNodeToGroup( groupName, clickedEcsTreeNode );
+					treeModel.moveEcsTreeNodeToGroup( groupName, clicked.ecsTreeNode );
 					AlreadySeenEvents.getInstance().writeToFile();
 				} ) );
 			}
@@ -367,7 +413,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				if (groupName==null) return;
 				
 				boolean groupExists = groupNames.contains(groupName);
-				treeModel.moveEcsTreeNodeToGroup( groupName, clickedEcsTreeNode );
+				treeModel.moveEcsTreeNodeToGroup( groupName, clicked.ecsTreeNode );
 				if (groupExists)
 				{
 					String title = "Group exists";

@@ -172,12 +172,8 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 				{
 					List<Bouquet.SubService> transponderSubServices = groupedServices.get(transponderIDStr);
 					TransponderNode transponderNode = new TransponderNode(this, "Transponder %s   (%d stations)".formatted(transponderIDStr, transponderSubServices.size()));
-					transponderNode.children.addAll(
-							transponderSubServices
-								.stream()
-								.map(subservice -> new StationNode(transponderNode, subservice))
-								.toList()
-					);
+					for (Bouquet.SubService subservice : transponderSubServices)
+						transponderNode.children.add( stations.add( new StationNode(transponderNode, subservice) ) );
 					children.add(transponderNode);
 				}
 				break;

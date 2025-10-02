@@ -21,6 +21,7 @@ import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -142,18 +143,24 @@ public class BouquetsNStations extends JPanel {
 		bsTree.addTreeSelectionListener(e->{
 			TreePath[] selectedTreePaths = bsTree.getSelectionPaths();
 			
-			if (selectedTreePaths.length==1)
+			if (selectedTreePaths!=null && selectedTreePaths.length==1)
 			{
 				valuePanel.showValues(selectedTreePaths[0]);
 				updateEPGPanel(selectedTreePaths[0]);
 			}
+			else
+			{
+				valuePanel.showValues(null);
+				updateEPGPanel(null);
+			}
 			
 			selectedStationNodes.clear();
-			for (TreePath path:selectedTreePaths) {
-				Object obj = path.getLastPathComponent();
-				if (obj instanceof BSTreeNode.StationNode)
-					selectedStationNodes.add((BSTreeNode.StationNode) obj);
-			}
+			if (selectedTreePaths!=null)
+				for (TreePath path : selectedTreePaths) {
+					Object obj = path.getLastPathComponent();
+					if (obj instanceof BSTreeNode.StationNode)
+						selectedStationNodes.add((BSTreeNode.StationNode) obj);
+				}
 		});
 		
 		OpenWebifController.settings.registerSplitPaneDividers(
@@ -169,40 +176,38 @@ public class BouquetsNStations extends JPanel {
 	
 	private boolean isSameTransponder(StationID stationID)
 	{
-		if (transponderListBaseStation == null) return false;
-		if (stationID == null) return false;
-		return Objects.equals(
-				transponderListBaseStation.getNumber(4),
-				stationID                 .getNumber(4)
-		);
+		return StationID.isSameTransponder(transponderListBaseStation, stationID);
 	}
 	
 	private void updateEPGPanel(TreePath treePath)
 	{
 		Object obj = treePath.getLastPathComponent();
 		
-		if (obj instanceof BSTreeNode.StationNode stationNode)
-		{
-			if (!stationNode.isMarker())
-				singleStationEPGPanel.setEventSource( stationNode.subservice );
-			
-		}
+		if (obj instanceof BSTreeNode.StationNode stationNode && !stationNode.isMarker())
+			singleStationEPGPanel.readEPG( stationNode.subservice );
 		else if (obj instanceof BSTreeNode.BouquetNode bouquetNode)
-			singleStationEPGPanel.setEventSource( bouquetNode.bouquet );
+			singleStationEPGPanel.readEPG( bouquetNode.bouquet );
+		else
+			singleStationEPGPanel.dontReadEPG();
 	}
 
 	private class TreeContextMenu extends ContextMenu {
 		private static final long serialVersionUID = -5273880699058313222L;
 		
 		@SuppressWarnings("unused")
-		private BSTreeNode.RootNode    clickedRootNode;
-		private BSTreeNode.BouquetNode clickedBouquetNode;
-		private BSTreeNode.StationNode clickedStationNode;
+		private BSTreeNode.RootNode        clickedRootNode;
+		private BSTreeNode.BouquetNode     clickedBouquetNode;
+		private BSTreeNode.TransponderNode clickedTransponderNode;
+		private BSTreeNode.StationNode     clickedStationNode;
+		private BSTreeNode.BouquetNode     parentBouquetNode;
+
 
 		TreeContextMenu() {
-			clickedRootNode    = null;
-			clickedBouquetNode = null;
-			clickedStationNode = null;
+			clickedRootNode        = null;
+			clickedBouquetNode     = null;
+			clickedTransponderNode = null;
+			clickedStationNode     = null;
+			parentBouquetNode      = null;
 			
 			add(OpenWebifController.createMenuItem("Reload Bouquets", GrayCommandIcons.IconGroup.Reload, e->{
 				main.getBaseURLAndRunWithProgressDialog("Reload Bouquets", BouquetsNStations.this::readData);
@@ -291,6 +296,20 @@ public class BouquetsNStations extends JPanel {
 				main.openEPGDialog(clickedBouquetNode.bouquet);
 			}));
 			
+			JCheckBoxMenuItem chkbxMiGroupStations = OpenWebifController.createCheckBoxMenuItem("Group stations of bouquet by transponder", false, checked -> {
+				BSTreeNode.BouquetNode bouquetNode = clickedBouquetNode!=null ? clickedBouquetNode : parentBouquetNode;
+				if (bouquetNode==null) return;
+				bouquetNode.changeSubNodeStructure(
+						checked
+							? BSTreeNode.BouquetNode.SubNodeStructureType.GroupedByTransponder
+							: BSTreeNode.BouquetNode.SubNodeStructureType.PlainStationList
+				);
+				bsTreeModel.nodeStructureChanged(bouquetNode);
+				if (bsTree.isExpanded(bouquetNode.getPath()) && checked)
+					bouquetNode.forEachChild((node,path) -> bsTree.expandPath(path));
+			});
+			add(chkbxMiGroupStations);
+			
 			addSeparator();
 			
 			JMenuItem miLoadPicons = add(OpenWebifController.createMenuItem("Load Picons", GrayCommandIcons.IconGroup.Image, e->{
@@ -298,8 +317,7 @@ public class BouquetsNStations extends JPanel {
 					String baseURL = main.getBaseURL();
 					if (baseURL==null) return;
 					PICON_LOADER.setBaseURL(baseURL);
-					for (BSTreeNode.StationNode stationNode:clickedBouquetNode.children)
-						PICON_LOADER.addTask(stationNode.getStationID());
+					clickedBouquetNode.forEachStation(stationNode -> PICON_LOADER.addTask(stationNode.getStationID()));
 				} else if (clickedStationNode!=null) {
 					String baseURL = main.getBaseURL();
 					if (baseURL==null) return;
@@ -321,20 +339,41 @@ public class BouquetsNStations extends JPanel {
 			
 			addContextMenuInvokeListener((comp, x, y) -> {
 				TreePath clickedTreePath = bsTree.getPathForLocation(x,y);
-				clickedRootNode    = null;
-				clickedBouquetNode = null;
-				clickedStationNode = null;
+				clickedRootNode        = null;
+				clickedBouquetNode     = null;
+				clickedTransponderNode = null;
+				clickedStationNode     = null;
+				parentBouquetNode      = null;
+				
 				if (clickedTreePath!=null) {
 					Object obj = clickedTreePath.getLastPathComponent();
-					if (obj instanceof BSTreeNode.RootNode   ) clickedRootNode    = (BSTreeNode.RootNode   ) obj;
-					if (obj instanceof BSTreeNode.BouquetNode) clickedBouquetNode = (BSTreeNode.BouquetNode) obj;
-					if (obj instanceof BSTreeNode.StationNode) clickedStationNode = (BSTreeNode.StationNode) obj;
+					if (obj instanceof BSTreeNode.RootNode        rootNode       ) clickedRootNode        = rootNode       ;
+					if (obj instanceof BSTreeNode.BouquetNode     bouquetNode    ) clickedBouquetNode     = bouquetNode    ;
+					if (obj instanceof BSTreeNode.TransponderNode transponderNode) clickedTransponderNode = transponderNode;
+					if (obj instanceof BSTreeNode.StationNode     stationNode    ) clickedStationNode     = stationNode    ;
 				}
+				if (clickedStationNode!=null)
+					parentBouquetNode = clickedStationNode.bouquetNode;
+				if (clickedTransponderNode!=null)
+					parentBouquetNode = clickedTransponderNode.parent;
 				
 				miLoadPicons         .setEnabled(clickedBouquetNode!=null || (clickedStationNode!=null && !clickedStationNode.subservice.isMarker()));
 				miSwitchToStation    .setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
 				miStreamStation      .setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
 				miShowSameTransponder.setEnabled(clickedStationNode!=null && !clickedStationNode.subservice.isMarker());
+				chkbxMiGroupStations .setEnabled(clickedBouquetNode!=null || parentBouquetNode!=null);
+				
+				BSTreeNode.BouquetNode bouquetNode = clickedBouquetNode!=null ? clickedBouquetNode : parentBouquetNode;
+				chkbxMiGroupStations.setText(
+						bouquetNode == null
+							? "Group Stations of Bouquet by Transponder"
+							: "Group Stations of Bouquet \"%s\" by Transponder".formatted(bouquetNode.bouquet.name)
+				);
+				chkbxMiGroupStations.setSelected(
+						bouquetNode == null
+							? false
+							: bouquetNode.isSubNodeStructureType( BSTreeNode.BouquetNode.SubNodeStructureType.GroupedByTransponder )
+				);
 				miLoadPicons.setText(
 						clickedBouquetNode!=null ?
 								String.format("Load Picons of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
@@ -467,13 +506,10 @@ public class BouquetsNStations extends JPanel {
 	}
 
 	private void updatePlayableStates(String baseURL, BSTreeNode.BouquetNode bouquetNode) {
-		int[] indices = new int[bouquetNode.children.size()];
-		for (int i=0; i<bouquetNode.children.size(); i++) {
-			indices[i] = i;
-			BSTreeNode.StationNode stationNode = bouquetNode.children.get(i);
+		bouquetNode.forEachStation(stationNode -> {
 			stationNode.updatePlayableState(baseURL);
 			SwingUtilities.invokeLater(()->{ if (bsTreeModel!=null) bsTreeModel.nodeChanged(stationNode); });
-		}
+		});
 	}
 
 	private static class ValueContainer<ValueType> {

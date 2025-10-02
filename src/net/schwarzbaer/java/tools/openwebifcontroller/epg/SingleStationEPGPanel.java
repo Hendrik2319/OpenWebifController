@@ -127,15 +127,9 @@ public class SingleStationEPGPanel extends JSplitPane
 		if (scrollPos!=null) SwingUtilities.invokeLater(()->scrollPos.setVertical(epgOutputScrollPane));
 	}
 	
-	public void setEventSource(SubService station)
-	{
-		dataAcquisition.readEPGforService( station );
-	}
-	
-	public void setEventSource(Bouquet bouquet)
-	{
-		dataAcquisition.readEPGforBouquet( bouquet );
-	}
+	public void readEPG(SubService station) { dataAcquisition.readEPG( station ); }
+	public void readEPG(Bouquet    bouquet) { dataAcquisition.readEPG( bouquet ); }
+	public void dontReadEPG()               { dataAcquisition.dontReadEPG(); }
 	
 	static class DataAcquisition
 	{
@@ -158,14 +152,19 @@ public class SingleStationEPGPanel extends JSplitPane
 			this.leadTime_s = leadTime_s;
 		}
 
-		public void readEPGforService(SubService station)
+		public void readEPG(SubService station)
 		{
 			addTask( station==null ? null : new DataAcquisitionTask.StationTask(station, setStatusOutput, leadTime_s));
 		}
 
-		public void readEPGforBouquet(Bouquet bouquet)
+		public void readEPG(Bouquet bouquet)
 		{
 			addTask( bouquet==null ? null : new DataAcquisitionTask.BouquetTask(bouquet, setStatusOutput));
+		}
+
+		public void dontReadEPG()
+		{
+			addTask( null );
 		}
 
 		public void addTask(DataAcquisitionTask<?> task)

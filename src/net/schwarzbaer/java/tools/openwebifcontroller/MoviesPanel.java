@@ -237,7 +237,7 @@ class MoviesPanel extends JSplitPane {
 			
 			JMenu clickedMovieMenu = new JMenu("Clicked Movie");
 			add(clickedMovieMenu);
-			AlreadySeenEvents.getInstance().createMenuForMovies(clickedMovieMenu, ()->clickedMovie, null, ()->{
+			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents.getInstance().createMenuForMovies(clickedMovieMenu, ()->clickedMovie, null, ()->{
 				movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
 			});
 			
@@ -245,9 +245,11 @@ class MoviesPanel extends JSplitPane {
 			
 			JMenu selectedMovieMenu = new JMenu("Selected Movie");
 			add(selectedMovieMenu);
-			AlreadySeenEvents.getInstance().createMenuForMovies(selectedMovieMenu, null, ()->selectedMovies, ()->{
+			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents.getInstance().createMenuForMovies(selectedMovieMenu, null, ()->selectedMovies, ()->{
 				movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
 			});
+			
+			addSeparator();
 			
 			boolean showDescriptionInNameColumn = MovieTableModel.getShowDescriptionInNameColumn();
 			add(OpenWebifController.createCheckBoxMenuItem("Show description in name column", showDescriptionInNameColumn, b->{
@@ -308,6 +310,9 @@ class MoviesPanel extends JSplitPane {
 				
 				int n = selectedMovies==null ? 0 : selectedMovies.length;
 				selectedMovieMenu.setText(n == 1 ? "Selected Movie (1)" : "Selected Movies (%d)".formatted(n));
+				
+				aseMenuControlClicked .updateBeforeShowingMenu();
+				aseMenuControlSelected.updateBeforeShowingMenu();
 			});
 		}
 	}

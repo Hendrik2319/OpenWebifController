@@ -163,7 +163,7 @@ public class TimersPanel extends JSplitPane {
 				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
 			}));
 			
-			AlreadySeenEvents.MenuControl alreadySeenTimersMenu1Control = AlreadySeenEvents
+			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents
 					.getInstance()
 					.createMenuForTimers(menuClickedTimer, ()->clickedTimer, null, () -> {
 						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
@@ -194,7 +194,7 @@ public class TimersPanel extends JSplitPane {
 				main.deleteTimer(null, selectedTimers, this::handleDeleteResponse);
 			}));
 			
-			AlreadySeenEvents.MenuControl alreadySeenTimersMenu2Control = AlreadySeenEvents
+			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents
 					.getInstance()
 					.createMenuForTimers(menuSelectedTimers, null, ()->selectedTimers, () -> {
 						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
@@ -227,8 +227,8 @@ public class TimersPanel extends JSplitPane {
 				menuClickedTimer  .setText("Clicked Timer"+timerLabel);
 				menuSelectedTimers.setText("Selected Timers (%d)".formatted(selectedTimers.length));
 				
-				alreadySeenTimersMenu1Control.updateBeforeShowingMenu();
-				alreadySeenTimersMenu2Control.updateBeforeShowingMenu();
+				aseMenuControlClicked .updateBeforeShowingMenu();
+				aseMenuControlSelected.updateBeforeShowingMenu();
 			});
 		}
 

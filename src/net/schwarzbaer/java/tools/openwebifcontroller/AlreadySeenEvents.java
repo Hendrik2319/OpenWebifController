@@ -19,6 +19,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import javax.swing.JMenu;
+import javax.swing.JMenuItem;
 
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
@@ -374,32 +375,66 @@ public class AlreadySeenEvents
 
 	public MenuControl createMenuForTimers(JMenu parent, Supplier<Timer> getTimer, Supplier<Timer[]> getTimers, Runnable updateAfterMenuAction)
 	{
-		return createMenu(parent, getTimer, getTimers, GET_DATA_FROM_TIMER, updateAfterMenuAction);
+		return new SubMenu<>(parent, getTimer, getTimers, GET_DATA_FROM_TIMER, updateAfterMenuAction);
 	}
 	public MenuControl createMenuForMovies(JMenu parent, Supplier<MovieList.Movie> getMovie, Supplier<MovieList.Movie[]> getMovies, Runnable updateAfterMenuAction)
 	{
-		return createMenu(parent, getMovie, getMovies, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
+		return new SubMenu<>(parent, getMovie, getMovies, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
 	}
 	
-	private <V> MenuControl createMenu(JMenu parent, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
+	private class SubMenu<V> implements MenuControl
 	{
-		JMenu addMenu;
-		parent.add(addMenu = new JMenu("Mark as Already Seen"));
-		addMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false)));
-		addMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true )));
-		addMenu.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false)));
-		addMenu.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
+		private final JMenuItem miShowReason;
+		private final Supplier<V> getSource;
+		private final Supplier<V[]> getSources;
+		private final GetData<V> getData;
+		private V singleSource;
+
+		SubMenu(JMenu parent, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
+		{
+			this.getSource = getSource;
+			this.getSources = getSources;
+			this.getData = getData;
+			this.singleSource = null;
+			
+			JMenu addMenu;
+			parent.add(addMenu = new JMenu("Mark as Already Seen"));
+			addMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false)));
+			addMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true )));
+			addMenu.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false)));
+			addMenu.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
+			
+			miShowReason = parent.add(OpenWebifController.createMenuItem("##", e->{
+				// TODO
+			}));
+			
+//			JMenu removeMenu;
+//			parent.add(removeMenu = new JMenu("Remove Already Seen Marker"));
+//			removeMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false)));
+//			removeMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true )));
+//			removeMenu.add(OpenWebifController.createMenuItem("Station, Title"             , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false)));
+//			removeMenu.add(OpenWebifController.createMenuItem("Station, Title, Description", e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
+		}
 		
-		JMenu removeMenu;
-		parent.add(removeMenu = new JMenu("Remove Already Seen Marker"));
-		removeMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false)));
-		removeMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true )));
-		removeMenu.add(OpenWebifController.createMenuItem("Station, Title"             , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false)));
-		removeMenu.add(OpenWebifController.createMenuItem("Station, Title, Description", e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
-		
-		return () -> {
-			// t.b.d.
-		};
+		@Override
+		public void updateBeforeShowingMenu()
+		{
+			singleSource = null;
+			
+			if (getSource!=null)
+				singleSource = getSource.get();
+			
+			else if (getSources!=null)
+			{
+				V[] sources = getSources.get();
+				if (sources!=null && sources.length==1)
+					singleSource = sources[0];
+			}
+			
+			boolean isMarkedAsAlreadySeen = singleSource==null ? false : isMarkedAsAlreadySeen(singleSource, getData);
+			miShowReason.setEnabled(isMarkedAsAlreadySeen);
+			miShowReason.setText( "Show [Already Seen] Rule" + (singleSource==null ? "" : " for \"%s\"".formatted(getData.getTitle(singleSource))) );
+		}
 	}
 
 	private <V> void markAsAlreadySeen(
@@ -414,6 +449,7 @@ public class AlreadySeenEvents
 		writeToFile();
 	}
 
+	@SuppressWarnings("unused")
 	private <V> void unmarkAsAlreadySeen(
 			Supplier<V> getSource,
 			Supplier<V[]> getSources,

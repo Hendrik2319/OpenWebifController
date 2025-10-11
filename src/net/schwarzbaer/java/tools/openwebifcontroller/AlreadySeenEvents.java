@@ -119,8 +119,8 @@ public class AlreadySeenEvents
 		final String title;
 		String group;
 		EpisodeInfo episode;
-		Map<String, StationData> stations = new HashMap<>();
-		Map<String, EpisodeInfo> descriptions = new HashMap<>();
+		final Map<String, StationData> stations = new HashMap<>();
+		final Map<String, EpisodeInfo> descriptions = new HashMap<>();
 		
 		MutableECS(String title)
 		{
@@ -177,13 +177,7 @@ public class AlreadySeenEvents
 				
 				if (line.equals("[EventCriteriaSet]"))
 				{
-					if (ecs!=null)
-					{
-						if (stationData!=null)
-							ecs.stations.put(stationData.name, stationData.convertToRecord());
-						alreadySeenEvents.put(ecs.title, ecs.convertToRecord());
-					}
-					
+					saveRemainingData(ecs, stationData);
 					ecs = null;
 					stationData = null;
 					episodeInfo = null;
@@ -198,9 +192,7 @@ public class AlreadySeenEvents
 				{
 					if (line.equals("[Station]"))
 					{
-						if (stationData!=null)
-							ecs.stations.put(stationData.name, stationData.convertToRecord());
-						
+						saveRemainingStationData(ecs, stationData);
 						stationData = null;
 					}
 					
@@ -226,12 +218,7 @@ public class AlreadySeenEvents
 				}
 			}
 			
-			if (ecs!=null)
-			{
-				if (stationData!=null)
-					ecs.stations.put(stationData.name, stationData.convertToRecord());
-				alreadySeenEvents.put(ecs.title, ecs.convertToRecord());
-			}
+			saveRemainingData(ecs, stationData);
 		}
 		catch (FileNotFoundException ex) {}
 		catch (IOException ex)
@@ -242,7 +229,23 @@ public class AlreadySeenEvents
 		
 		System.out.printf("Done%n");
 	}
-	
+
+	private void saveRemainingData(MutableECS ecs, MutableStationData stationData)
+	{
+		if (ecs!=null)
+		{
+			saveRemainingStationData(ecs, stationData);
+			alreadySeenEvents.put(ecs.title, ecs.convertToRecord());
+		}
+	}
+
+	private void saveRemainingStationData(MutableECS ecs, MutableStationData stationData)
+	{
+		Objects.requireNonNull(ecs);
+		if (stationData!=null)
+			ecs.stations.put(stationData.name, stationData.convertToRecord());
+	}
+
 	private static String getValue(String line, String prefix)
 	{
 		if (line.startsWith(prefix))

@@ -40,6 +40,8 @@ import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionData;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.StationData;
@@ -51,7 +53,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 	private static final Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());
 	
 	private static enum TreeIcons {
-		Title, Description, Station, TitleWithEpisode, DescriptionWithEpisode,
+		Title, TitleEp, Station, Desc, DescEp, DescContains, DescContainsEp, DescStart, DescStartEp
 		;
 		public Icon getIcon() { return IS.getCachedIcon(this); }
 		private static IconSource.CachedIcons<TreeIcons> IS = IconSource.createCachedIcons(16, 16, "/images/AlreadySeenEventsViewerTreeIcons.png", TreeIcons.values());
@@ -112,8 +114,21 @@ class AlreadySeenEventsViewer extends StandardDialog
 		return new RootTreeNode( data, CustomTreeModel.getCurrentRootSubnodeOrder() );
 	}
 	
+	String generateTitle(String title, DescriptionData data)
+	{
+		if (data==null)
+			return generateTitle(title, (EpisodeInfo) data);
+		switch (data.operator)
+		{
+		case Equals: break;
+		case StartsWith: title = title+"..."; break;
+		case Contains: title = "..."+title+"..."; break;
+		}
+		return generateTitle(title, (EpisodeInfo) data);
+	}
+	
 	String generateTitle(String title, EpisodeInfo episode)
-	{	
+	{
 		if (episode == null || !episode.hasEpisodeStr())
 			return title;
 		if (episodeStringFirst)
@@ -161,7 +176,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			descriptionTreeNode = treeNode     instanceof DescriptionTreeNode      treeNode ? treeNode : null;
 			episodeInfo =
 					descriptionTreeNode!=null
-						? descriptionTreeNode.episode
+						? descriptionTreeNode.data
 						: ecsTreeNode!=null && ecsTreeNode.ecs!=null
 							? ecsTreeNode.ecs.variableData()
 							: null;
@@ -1123,7 +1138,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		{
 			EpisodeInfo episode = ecs.variableData();
 			if (episode!=null && episode.hasEpisodeStr())
-				return TreeIcons.TitleWithEpisode;
+				return TreeIcons.TitleEp;
 			return TreeIcons.Title;
 		}
 
@@ -1134,7 +1149,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			if (ecs.descriptions()!=null)
 			{
-				Map<String, EpisodeInfo> descriptions = ecs.descriptions();
+				Map<String, DescriptionData> descriptions = ecs.descriptions();
 				childrenVec.addAll( descriptions.keySet()
 						.stream()
 						.map(description -> new DescriptionTreeNode(this, description, descriptions.get(description)))
@@ -1160,29 +1175,37 @@ class AlreadySeenEventsViewer extends StandardDialog
 	
 	private class DescriptionTreeNode extends AbstractTreeNode
 	{
-		private final EpisodeInfo episode;
+		private final DescriptionData data;
 		private final String description;
 
-		DescriptionTreeNode(AbstractTreeNode parent, String description, EpisodeInfo episode)
+		DescriptionTreeNode(AbstractTreeNode parent, String description, DescriptionData data)
 		{
-			super(parent, generateTitle(description, episode), false, null);
+			super(parent, generateTitle(description, data), false, null);
 			this.description = description;
-			this.episode = episode;
+			this.data = data;
 			children = new AbstractTreeNode[0];
 		}
 
 		@Override
 		protected void updateTitle()
 		{
-			title = generateTitle(description, episode);
+			title = generateTitle(description, data);
 		}
 
 		@Override
 		protected TreeIcons getIcon()
 		{
-			if (episode!=null && episode.hasEpisodeStr())
-				return TreeIcons.DescriptionWithEpisode;
-			return TreeIcons.Description;
+			if (data != null)
+			{
+				DescriptionOperator operator = data.operator!=null ? data.operator : DescriptionOperator.Equals;
+				switch (operator)
+				{
+				case Equals    : return data.hasEpisodeStr() ? TreeIcons.DescEp         : TreeIcons.Desc;
+				case StartsWith: return data.hasEpisodeStr() ? TreeIcons.DescStartEp    : TreeIcons.DescStart;
+				case Contains  : return data.hasEpisodeStr() ? TreeIcons.DescContainsEp : TreeIcons.DescContains;
+				}
+			}
+			return TreeIcons.Desc;
 		}
 
 		@Override protected void determineChildren()
@@ -1216,7 +1239,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		{
 			if (stationData.descriptions()!=null)
 			{
-				Map<String, EpisodeInfo> descriptions = stationData.descriptions();
+				Map<String, DescriptionData> descriptions = stationData.descriptions();
 				children = descriptions.keySet()
 						.stream()
 						.map(description -> new DescriptionTreeNode(this, description, descriptions.get(description)))

@@ -288,7 +288,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			JMenuItem miEditDesc = add(OpenWebifController.createMenuItem("Edit Description Text", e -> {
 				if (clicked.descriptionTreeNode==null) return;
-				String newDesc = TextAreaDialog.editText(window, "title", 300, 300, true, clicked.descriptionTreeNode.description.getText());
+				String newDesc = TextAreaDialog.editText(window, "Edit Description Text", 400, 200, true, clicked.descriptionTreeNode.description.getText());
 				if (newDesc!=null)
 				{
 					boolean success = clicked.descriptionTreeNode.description.setText(newDesc);
@@ -298,6 +298,12 @@ class AlreadySeenEventsViewer extends StandardDialog
 						treeModel.fireTreeNodeUpdate(clicked.descriptionTreeNode);
 						tree.repaint();
 						AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
+					}
+					else
+					{
+						String[] msg = { "Can't change description text.", "Another description with same text already exists." };
+						String title = "Can't change";
+						JOptionPane.showMessageDialog(window, msg, title, JOptionPane.WARNING_MESSAGE);
 					}
 				}
 			}));
@@ -360,11 +366,11 @@ class AlreadySeenEventsViewer extends StandardDialog
 				}
 				if (clicked.ecsTreeNode!=null)
 				{
-					// TODO
+					// TODO: delete ecsTreeNode
 				}
 				if (clicked.stationTreeNode!=null)
 				{
-					// TODO
+					// TODO: stationTreeNode
 				}
 				if (clicked.descriptionTreeNode!=null)
 				{

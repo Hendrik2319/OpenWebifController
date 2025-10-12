@@ -1,5 +1,6 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
+import java.awt.Window;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,6 +22,7 @@ import java.util.function.Supplier;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
+import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 
@@ -433,13 +435,13 @@ public class AlreadySeenEvents
 		void updateBeforeShowingMenu();
 	}
 
-	public MenuControl createMenuForTimers(JMenu parent, Supplier<Timer> getTimer, Supplier<Timer[]> getTimers, Runnable updateAfterMenuAction)
+	public MenuControl createMenuForTimers(JMenu parent, Window window, Supplier<Timer> getTimer, Supplier<Timer[]> getTimers, Runnable updateAfterMenuAction)
 	{
-		return new SubMenu<>(parent, getTimer, getTimers, GET_DATA_FROM_TIMER, updateAfterMenuAction);
+		return new SubMenu<>(parent, window, getTimer, getTimers, GET_DATA_FROM_TIMER, updateAfterMenuAction);
 	}
-	public MenuControl createMenuForMovies(JMenu parent, Supplier<MovieList.Movie> getMovie, Supplier<MovieList.Movie[]> getMovies, Runnable updateAfterMenuAction)
+	public MenuControl createMenuForMovies(JMenu parent, Window window, Supplier<MovieList.Movie> getMovie, Supplier<MovieList.Movie[]> getMovies, Runnable updateAfterMenuAction)
 	{
-		return new SubMenu<>(parent, getMovie, getMovies, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
+		return new SubMenu<>(parent, window, getMovie, getMovies, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
 	}
 	
 	private class SubMenu<V> implements MenuControl
@@ -449,8 +451,9 @@ public class AlreadySeenEvents
 		private final Supplier<V[]> getSources;
 		private final GetData<V> getData;
 		private V singleSource;
+		private String singleSourceAlreadySeenRule;
 
-		SubMenu(JMenu parent, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
+		SubMenu(JMenu parent, Window window, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
 		{
 			this.getSource = getSource;
 			this.getSources = getSources;
@@ -465,7 +468,7 @@ public class AlreadySeenEvents
 			addMenu.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
 			
 			miShowRule = parent.add(OpenWebifController.createMenuItem("##", e->{
-				// TODO
+				TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule);
 			}));
 			
 //			JMenu removeMenu;
@@ -491,8 +494,8 @@ public class AlreadySeenEvents
 					singleSource = sources[0];
 			}
 			
-			boolean isMarkedAsAlreadySeen = singleSource==null ? false : isMarkedAsAlreadySeen(singleSource, getData);
-			miShowRule.setEnabled(isMarkedAsAlreadySeen);
+			singleSourceAlreadySeenRule = singleSource==null ? null : getRuleIfAlreadySeen(singleSource, getData);
+			miShowRule.setEnabled(singleSourceAlreadySeenRule != null);
 			miShowRule.setText( "Show [Already Seen] Rule" + (singleSource==null ? "" : " for \"%s\"".formatted(getData.getTitle(singleSource))) );
 		}
 	}
@@ -664,43 +667,44 @@ public class AlreadySeenEvents
 
 	public boolean isMarkedAsAlreadySeen(Timer timer)
 	{
-		return isMarkedAsAlreadySeen(timer, GET_DATA_FROM_TIMER);
+		return getRuleIfAlreadySeen(timer, GET_DATA_FROM_TIMER) != null;
 	}
 
 	public boolean isMarkedAsAlreadySeen(MovieList.Movie movie)
 	{
-		return isMarkedAsAlreadySeen(movie, GET_DATA_FROM_MOVIE);
+		return getRuleIfAlreadySeen(movie, GET_DATA_FROM_MOVIE) != null;
 	}
 
-	private <V> boolean isMarkedAsAlreadySeen(final V source, final GetData<V> getData)
+	private <V> String getRuleIfAlreadySeen(final V source, final GetData<V> getData)
 	{
 		if (source == null)
-			return false;
+			return null;
 		
 		final String title = getData.getTitle(source);
 		if (title == null)
-			return false;
+			return null;
 		
 		final EventCriteriaSet ecs = alreadySeenEvents.get(title);
 		if (ecs == null)
-			return false;
+			return null;
 		
 		
 		if (ecs.stations == null && ecs.descriptions == null)
-			return true;
+			return buildRule(title, null, null, null);
 		
 		
 		Map<String,DescriptionData> descriptions = null;
+		String station = null;
 		if (ecs.stations != null)
 		{
-			final String station = getData.getStation(source);
+			station = getData.getStation(source);
 			if (station != null)
 			{
 				StationData stationData = ecs.stations.get(station);
 				if (stationData != null)
 				{
 					if (stationData.descriptions == null)
-						return true;
+						return buildRule(title, station, null, null);
 					
 					descriptions = stationData.descriptions;
 				}
@@ -711,24 +715,45 @@ public class AlreadySeenEvents
 			descriptions = ecs.descriptions;
 		
 		if (descriptions == null) // ECS has no [descriptions] but [stations] and no station was found
-			return false;
+			return null;
 		
 		final String description = getData.getDescription(source);
 		if (description == null)
-			return false; // no description defined in source
+			return null; // no description defined in source
 		
 		
 		for (String descStr : descriptions.keySet())
 		{
 			DescriptionData descriptionData = descriptions.get(descStr);
-			switch (descriptionData.operator)
-			{
-			case Equals    : if (description.equals    (descStr)) return true; break;
-			case StartsWith: if (description.startsWith(descStr)) return true; break;
-			case Contains  : if (description.contains  (descStr)) return true; break;
-			}
+			if (descMeetsCriteria(description, descStr, descriptionData.operator))
+				return buildRule(title, station, descStr, descriptionData.operator);
+		}
+		return null;
+	}
+	
+	private boolean descMeetsCriteria(String sourceDesc, String ruleDesc, DescriptionOperator operator)
+	{
+		switch (operator)
+		{
+		case Equals    : if (sourceDesc.equals    (ruleDesc)) return true; break;
+		case StartsWith: if (sourceDesc.startsWith(ruleDesc)) return true; break;
+		case Contains  : if (sourceDesc.contains  (ruleDesc)) return true; break;
 		}
 		return false;
+	}
+
+	private String buildRule(String title, String station, String descStr, DescriptionOperator operator)
+	{
+		Objects.requireNonNull(title);
+		String str = "Title equals:%n\"%s\"".formatted(title);
+		
+		if (station!=null)
+			str = "%s%n%nStation is:%n\"%s\"".formatted(str, station);
+		
+		if (descStr!=null && operator!=null)
+			str = "%s%n%nDescription %s:%n\"%s\"".formatted(str, operator.title, descStr);
+		
+		return str;
 	}
 
 	AlreadySeenEventsViewer.RootTreeNode createTreeRoot(AlreadySeenEventsViewer viewer)

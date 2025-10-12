@@ -172,7 +172,7 @@ public class TimersPanel extends JSplitPane {
 			
 			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents
 					.getInstance()
-					.createMenuForTimers(menuClickedTimer, ()->clickedTimer, null, () -> {
+					.createMenuForTimers(menuClickedTimer, main.mainWindow, ()->clickedTimer, null, () -> {
 						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
 					});
 			
@@ -203,7 +203,7 @@ public class TimersPanel extends JSplitPane {
 			
 			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents
 					.getInstance()
-					.createMenuForTimers(menuSelectedTimers, null, ()->selectedTimers, () -> {
+					.createMenuForTimers(menuSelectedTimers, main.mainWindow, null, ()->selectedTimers, () -> {
 						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
 					});
 			

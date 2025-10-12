@@ -89,6 +89,13 @@ public class TimersPanel extends JSplitPane {
 		
 		setLeftComponent(tableScrollPane);
 		setRightComponent(textAreaScrollPane);
+		AlreadySeenEvents.getInstance().addChangeListener(changeType -> {
+			if (changeType == AlreadySeenEvents.ChangeListener.ChangeType.RuleSet)
+			{
+				tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
+				table.repaint();
+			}
+		});
 	}
 	
 	public static void showSelectedTimers(JTable table, Tables.SimpleGetValueTableModel<Timer,?> tableModel, ExtendedTextArea textArea, JScrollPane textAreaScrollPane)

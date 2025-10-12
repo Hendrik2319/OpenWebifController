@@ -41,7 +41,16 @@ public class AlreadySeenEvents
 	
 	enum DescriptionOperator
 	{
-		Equals, Contains, StartsWith
+		Equals,
+		Contains,
+		StartsWith("Starts with"),
+		;
+		final String title;
+		DescriptionOperator() { this(null); }
+		DescriptionOperator(String title)
+		{
+			this.title = title!=null ? title : name();
+		}
 	}
 	
 	static class DescriptionData extends EpisodeInfo
@@ -161,12 +170,29 @@ public class AlreadySeenEvents
 		}
 	}
 	
+	interface ChangeListener
+	{
+		enum ChangeType { RuleSet, EpisodeText, Grouping }
+		void somethingHasChanged(ChangeType changeType);
+	}
+	
 	private final Map<String, EventCriteriaSet> alreadySeenEvents;
+	private final Vector<ChangeListener> changeListeners;
 	
 	AlreadySeenEvents()
 	{
 		alreadySeenEvents = new HashMap<>();
+		changeListeners = new Vector<>();
 		readFromFile();
+	}
+
+	public void    addChangeListener(ChangeListener l) { changeListeners.   add(l); }
+	public void removeChangeListener(ChangeListener l) { changeListeners.remove(l); }
+	
+	void notifyChangeListeners(ChangeListener.ChangeType changeType)
+	{
+		for (ChangeListener l : changeListeners)
+			l.somethingHasChanged(changeType);
 	}
 
 	void readFromFile()
@@ -281,6 +307,12 @@ public class AlreadySeenEvents
 	}
 	
 	private static final Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());
+	
+	void writeToFileAndNotify(ChangeListener.ChangeType changeType)
+	{
+		writeToFile();
+		notifyChangeListeners(changeType);
+	}
 	
 	void writeToFile()
 	{
@@ -474,7 +506,7 @@ public class AlreadySeenEvents
 	{
 		doWithSources(getSource, getSources, t1 -> markAsAlreadySeen(t1, getData, useStation, useDescription) );
 		updateAfterMenuAction.run();
-		writeToFile();
+		writeToFileAndNotify(ChangeListener.ChangeType.RuleSet);
 	}
 
 	@SuppressWarnings("unused")
@@ -487,7 +519,7 @@ public class AlreadySeenEvents
 	{
 		doWithSources(getSource, getSources, t1 -> unmarkAsAlreadySeen(t1, getData, useStation, useDescription) );
 		updateAfterMenuAction.run();
-		writeToFile();
+		writeToFileAndNotify(ChangeListener.ChangeType.RuleSet);
 	}
 
 	private <V> void doWithSources(

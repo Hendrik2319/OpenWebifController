@@ -39,7 +39,10 @@ import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
+import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionData;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.StationData;
@@ -51,7 +54,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 	private static final Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());
 	
 	private static enum TreeIcons {
-		Title, Description, Station, TitleWithEpisode, DescriptionWithEpisode,
+		Title, TitleEp, Station, Desc, DescEp, DescContains, DescContainsEp, DescStart, DescStartEp
 		;
 		public Icon getIcon() { return IS.getCachedIcon(this); }
 		private static IconSource.CachedIcons<TreeIcons> IS = IconSource.createCachedIcons(16, 16, "/images/AlreadySeenEventsViewerTreeIcons.png", TreeIcons.values());
@@ -112,8 +115,35 @@ class AlreadySeenEventsViewer extends StandardDialog
 		return new RootTreeNode( data, CustomTreeModel.getCurrentRootSubnodeOrder() );
 	}
 	
+	String generateTitle(DescriptionChanger description)
+	{
+		if (description==null)
+			return "<null>";
+		
+		return generateTitle(
+				description.getText(),
+				description.getData()
+		);
+	}
+	
+	String generateTitle(String description, DescriptionData data)
+	{
+		if (data==null)
+			return generateTitle(description, (EpisodeInfo) data);
+		
+		String title = description;
+		switch (data.operator)
+		{
+		case Equals: break;
+		case StartsWith: title = description+"..."; break;
+		case Contains: title = "..."+description+"..."; break;
+		}
+		
+		return generateTitle(title, (EpisodeInfo) data);
+	}
+	
 	String generateTitle(String title, EpisodeInfo episode)
-	{	
+	{
 		if (episode == null || !episode.hasEpisodeStr())
 			return title;
 		if (episodeStringFirst)
@@ -135,7 +165,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			selected.treeNode.updateTitle();
 			treeModel.fireTreeNodeUpdate(selected.treeNode);
 			tree.repaint();
-			AlreadySeenEvents.getInstance().writeToFile();
+			AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.EpisodeText);
 		}
 	}
 
@@ -161,7 +191,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			descriptionTreeNode = treeNode     instanceof DescriptionTreeNode      treeNode ? treeNode : null;
 			episodeInfo =
 					descriptionTreeNode!=null
-						? descriptionTreeNode.episode
+						? descriptionTreeNode.description.getData()
 						: ecsTreeNode!=null && ecsTreeNode.ecs!=null
 							? ecsTreeNode.ecs.variableData()
 							: null;
@@ -223,7 +253,6 @@ class AlreadySeenEventsViewer extends StandardDialog
 		
 		private final Window window;
 		private final JMenu menuMoveToGroup;
-		private final JMenu menuRootOrder;
 		private SelectionInfo clicked;
 		
 		TreeContextMenu(Window window)
@@ -242,31 +271,60 @@ class AlreadySeenEventsViewer extends StandardDialog
 					ClipboardTools.copyStringSelectionToClipBoard(clicked.stationTreeNode.station);
 				
 				if (clicked.descriptionTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clicked.descriptionTreeNode.description);
+					ClipboardTools.copyStringSelectionToClipBoard(clicked.descriptionTreeNode.description.getText());
 			} ) );
 			
 			JMenuItem miEditEpisodeStr = add( OpenWebifController.createMenuItem( "##", e->{
 				editEpisodeStr(this.window, clicked);
 			} ) );
 			
-			add(OpenWebifController.createCheckBoxMenuItem("Episode Text before Title", episodeStringFirst, val -> {
+			add(OpenWebifController.createCheckBoxMenuItem("Show Episode Text before Title", episodeStringFirst, val -> {
 				episodeStringFirst = val;
 				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, episodeStringFirst);
 				rebuildTree();
 			} ));
 			
-			JMenuItem miReorder = add( OpenWebifController.createMenuItem( "##", e->{
-				treeModel.reorderSiblings(clicked.treeNode);
-				tree.repaint();
-			} ) );
+			addSeparator();
 			
-			add(menuRootOrder = OpenWebifController.createMenu("Order of subnodes of root"));
-			EnumMap<RootTreeNode.NodeOrder, JCheckBoxMenuItem> mapMiRootOrder = new EnumMap<>(RootTreeNode.NodeOrder.class);
-			for (RootTreeNode.NodeOrder order : RootTreeNode.NodeOrder.values())
+			JMenuItem miEditDesc = add(OpenWebifController.createMenuItem("Edit Description Text", e -> {
+				if (clicked.descriptionTreeNode==null) return;
+				String newDesc = TextAreaDialog.editText(window, "Edit Description Text", 400, 200, true, clicked.descriptionTreeNode.description.getText());
+				if (newDesc!=null)
+				{
+					boolean success = clicked.descriptionTreeNode.description.setText(newDesc);
+					if (success)
+					{
+						clicked.descriptionTreeNode.updateTitle();
+						treeModel.fireTreeNodeUpdate(clicked.descriptionTreeNode);
+						tree.repaint();
+						AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
+					}
+					else
+					{
+						String[] msg = { "Can't change description text.", "Another description with same text already exists." };
+						String title = "Can't change";
+						JOptionPane.showMessageDialog(window, msg, title, JOptionPane.WARNING_MESSAGE);
+					}
+				}
+			}));
+			
+			JMenu menuDescOperator = OpenWebifController.createMenu("##");
+			add(menuDescOperator);
+			EnumMap<DescriptionOperator, JCheckBoxMenuItem> menuDescOperatorItems = new EnumMap<>(DescriptionOperator.class);
+			for (DescriptionOperator op : DescriptionOperator.values())
 			{
-				JCheckBoxMenuItem checkBoxMenuItem = OpenWebifController.createCheckBoxMenuItem(order.title, false, b -> treeModel.setRootSubnodeOrder(order));
-				menuRootOrder.add(checkBoxMenuItem);
-				mapMiRootOrder.put(order, checkBoxMenuItem);
+				JCheckBoxMenuItem cmi = OpenWebifController.createCheckBoxMenuItem(op.title, false, b -> {
+					if (clicked.descriptionTreeNode!=null)
+					{
+						clicked.descriptionTreeNode.description.getData().operator = op;
+						clicked.descriptionTreeNode.updateTitle();
+						treeModel.fireTreeNodeUpdate(clicked.descriptionTreeNode);
+						tree.repaint();
+						AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
+					}
+				});
+				menuDescOperator.add( cmi );
+				menuDescOperatorItems.put(op, cmi);
 			}
 			
 			addSeparator();
@@ -276,7 +334,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			JMenuItem miRemoveFromGroup = add( OpenWebifController.createMenuItem( "##", e->{
 				treeModel.removeEcsTreeNodeFromGroup( clicked.ecsTreeNode );
-				AlreadySeenEvents.getInstance().writeToFile();
+				AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.Grouping);
 			} ) );
 			
 			JMenuItem miRenameGroup = add( OpenWebifController.createMenuItem( "##", e->{
@@ -294,16 +352,50 @@ class AlreadySeenEventsViewer extends StandardDialog
 				
 				treeModel.renameGroup( clicked.groupTreeNode, result );
 				updateMenuMoveToGroup();
-				AlreadySeenEvents.getInstance().writeToFile();
-			} ) );
-			
-			JMenuItem miDeleteGroup = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Delete, e->{
-				treeModel.deleteGroup( clicked.groupTreeNode );
-				updateMenuMoveToGroup();
-				AlreadySeenEvents.getInstance().writeToFile();
+				AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.Grouping);
 			} ) );
 			
 			addSeparator();
+			
+			JMenuItem miDeleteNode = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Delete, e->{
+				if (clicked.groupTreeNode!=null)
+				{
+					treeModel.deleteGroup( clicked.groupTreeNode );
+					updateMenuMoveToGroup();
+					AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.Grouping);
+				}
+				if (clicked.ecsTreeNode!=null)
+				{
+					// TODO: delete ecsTreeNode
+				}
+				if (clicked.stationTreeNode!=null)
+				{
+					// TODO: stationTreeNode
+				}
+				if (clicked.descriptionTreeNode!=null)
+				{
+					boolean success = treeModel.deleteDescNode(clicked.descriptionTreeNode);
+					if (success)
+						AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
+				}
+			} ) );
+			
+			addSeparator();
+			
+			JMenuItem miReorderSiblings = add( OpenWebifController.createMenuItem( "##", e->{
+				treeModel.reorderSiblings(clicked.treeNode);
+				tree.repaint();
+			} ) );
+			
+			JMenu menuRootOrder = OpenWebifController.createMenu("Order of subnodes of root");
+			add(menuRootOrder);
+			EnumMap<RootTreeNode.NodeOrder, JCheckBoxMenuItem> mapMiRootOrder = new EnumMap<>(RootTreeNode.NodeOrder.class);
+			for (RootTreeNode.NodeOrder order : RootTreeNode.NodeOrder.values())
+			{
+				JCheckBoxMenuItem checkBoxMenuItem = OpenWebifController.createCheckBoxMenuItem(order.title, false, b -> treeModel.setRootSubnodeOrder(order));
+				menuRootOrder.add(checkBoxMenuItem);
+				mapMiRootOrder.put(order, checkBoxMenuItem);
+			}
 			
 			add(OpenWebifController.createMenuItem("Rebuild Tree", GrayCommandIcons.IconGroup.Reload, e -> {
 				rebuildTree();
@@ -339,8 +431,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 				);
 				
 				AbstractTreeNode parent = clicked.treeNode!=null ? clicked.treeNode.parent : null;
-				miReorder.setEnabled(parent!=null);
-				miReorder.setText(
+				miReorderSiblings.setEnabled(parent!=null);
+				miReorderSiblings.setText(
 						parent instanceof RootTreeNode
 							? "Reorder subnodes of root"
 							: parent instanceof ECSGroupTreeNode
@@ -370,11 +462,23 @@ class AlreadySeenEventsViewer extends StandardDialog
 							: "Rename group"
 				);
 				
-				miDeleteGroup.setEnabled(clicked.groupTreeNode!=null);
-				miDeleteGroup.setText(
+				
+				miDeleteNode.setEnabled(
+						clicked.groupTreeNode!=null ||
+						//clicked.ecsTreeNode!=null ||
+						//clicked.stationTreeNode!=null ||
+						clicked.descriptionTreeNode!=null
+				);
+				miDeleteNode.setText(
 						clicked.groupTreeNode!=null
 							? "Delete group \"%s\"".formatted( clicked.groupTreeNode.groupName )
-							: "Delete group"
+							: clicked.ecsTreeNode!=null
+								? "Delete title \"%s\"".formatted( (String)clicked.ecsTreeNode.title )
+								: clicked.stationTreeNode!=null
+									? "Delete station \"%s\"".formatted( clicked.stationTreeNode.station )
+									: clicked.descriptionTreeNode!=null
+										? "Delete description \"%s\"".formatted( clicked.descriptionTreeNode.description.getText() )
+										: "Delete"
 				);
 				
 				RootTreeNode.NodeOrder currentOrder = CustomTreeModel.getCurrentRootSubnodeOrder();
@@ -384,6 +488,17 @@ class AlreadySeenEventsViewer extends StandardDialog
 					if (menuItem!=null)
 						menuItem.setSelected(order == currentOrder);
 				}
+				
+				miEditDesc      .setEnabled(clicked.descriptionTreeNode!=null);
+				menuDescOperator.setEnabled(clicked.descriptionTreeNode!=null);
+				
+				DescriptionOperator operatorOfClicked = clicked.descriptionTreeNode==null ? null : clicked.descriptionTreeNode.description.getData().operator;
+				menuDescOperator.setText(
+						operatorOfClicked==null
+							? "[Description Text Operator]"
+							: "Description %s ...".formatted(operatorOfClicked.title)
+				);
+				menuDescOperatorItems.forEach((op,cmi) -> cmi.setSelected(op == operatorOfClicked));
 			});
 		}
 
@@ -401,7 +516,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			{
 				menuMoveToGroup.add( OpenWebifController.createMenuItem( groupName, e->{
 					treeModel.moveEcsTreeNodeToGroup( groupName, clicked.ecsTreeNode );
-					AlreadySeenEvents.getInstance().writeToFile();
+					AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.Grouping);
 				} ) );
 			}
 			
@@ -426,7 +541,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				else
 					updateMenuMoveToGroup();
 				
-				AlreadySeenEvents.getInstance().writeToFile();
+				AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.Grouping);
 			} ) );
 		}
 	}
@@ -604,6 +719,21 @@ class AlreadySeenEventsViewer extends StandardDialog
 			int index = treeRoot.removeNode( groupNode );
 			if (index >= 0)
 				fireTreeNodeRemoved( treeRoot, groupNode, index );
+		}
+
+		boolean deleteDescNode(DescriptionTreeNode descNode)
+		{
+			if (descNode==null) return false;
+			
+			AbstractTreeNode parent = descNode.parent;
+			if (parent!=null)
+			{
+				int index = parent.removeNode(descNode);
+				if (index >= 0)
+					fireTreeNodeRemoved( parent, descNode, index );
+			}
+			
+			return descNode.description.removeFromMap();
 		}
 
 		@Override public void addTreeModelListener   (TreeModelListener l) { listeners.add   (l); }
@@ -1110,7 +1240,12 @@ class AlreadySeenEventsViewer extends StandardDialog
 			this.ecs = ecs;
 		}
 
-		@Override int removeNode(AbstractTreeNode node) { throw new UnsupportedOperationException(); }
+		@Override int removeNode(AbstractTreeNode node)
+		{
+			if (node instanceof DescriptionTreeNode)
+				return super.removeNode(node);
+			throw new UnsupportedOperationException();
+		}
 
 		@Override
 		protected void updateTitle()
@@ -1123,7 +1258,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		{
 			EpisodeInfo episode = ecs.variableData();
 			if (episode!=null && episode.hasEpisodeStr())
-				return TreeIcons.TitleWithEpisode;
+				return TreeIcons.TitleEp;
 			return TreeIcons.Title;
 		}
 
@@ -1134,10 +1269,10 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			if (ecs.descriptions()!=null)
 			{
-				Map<String, EpisodeInfo> descriptions = ecs.descriptions();
+				Map<String, DescriptionData> descriptions = ecs.descriptions();
 				childrenVec.addAll( descriptions.keySet()
 						.stream()
-						.map(description -> new DescriptionTreeNode(this, description, descriptions.get(description)))
+						.map(description -> new DescriptionTreeNode(this, new DescriptionChanger(description, descriptions)))
 						.sorted(SORT_BY_TITLE)
 						.toList()
 				);
@@ -1160,29 +1295,36 @@ class AlreadySeenEventsViewer extends StandardDialog
 	
 	private class DescriptionTreeNode extends AbstractTreeNode
 	{
-		private final EpisodeInfo episode;
-		private final String description;
+		private final DescriptionChanger description;
 
-		DescriptionTreeNode(AbstractTreeNode parent, String description, EpisodeInfo episode)
+		DescriptionTreeNode(AbstractTreeNode parent, DescriptionChanger description)
 		{
-			super(parent, generateTitle(description, episode), false, null);
-			this.description = description;
-			this.episode = episode;
+			super(parent, generateTitle(description), false, null);
+			this.description = Objects.requireNonNull(description);
 			children = new AbstractTreeNode[0];
 		}
 
 		@Override
 		protected void updateTitle()
 		{
-			title = generateTitle(description, episode);
+			title = generateTitle(description);
 		}
 
 		@Override
 		protected TreeIcons getIcon()
 		{
-			if (episode!=null && episode.hasEpisodeStr())
-				return TreeIcons.DescriptionWithEpisode;
-			return TreeIcons.Description;
+			DescriptionData data = description.getData();
+			if (data != null)
+			{
+				DescriptionOperator operator = data.operator!=null ? data.operator : DescriptionOperator.Equals;
+				switch (operator)
+				{
+				case Equals    : return data.hasEpisodeStr() ? TreeIcons.DescEp         : TreeIcons.Desc;
+				case StartsWith: return data.hasEpisodeStr() ? TreeIcons.DescStartEp    : TreeIcons.DescStart;
+				case Contains  : return data.hasEpisodeStr() ? TreeIcons.DescContainsEp : TreeIcons.DescContains;
+				}
+			}
+			return TreeIcons.Desc;
 		}
 
 		@Override protected void determineChildren()
@@ -1203,7 +1345,12 @@ class AlreadySeenEventsViewer extends StandardDialog
 			this.stationData = stationData;
 		}
 		
-		@Override int removeNode(AbstractTreeNode node) { throw new UnsupportedOperationException(); }
+		@Override int removeNode(AbstractTreeNode node)
+		{
+			if (node instanceof DescriptionTreeNode)
+				return super.removeNode(node);
+			throw new UnsupportedOperationException();
+		}
 
 		@Override
 		protected TreeIcons getIcon()
@@ -1216,15 +1363,56 @@ class AlreadySeenEventsViewer extends StandardDialog
 		{
 			if (stationData.descriptions()!=null)
 			{
-				Map<String, EpisodeInfo> descriptions = stationData.descriptions();
+				Map<String, DescriptionData> descriptions = stationData.descriptions();
 				children = descriptions.keySet()
 						.stream()
-						.map(description -> new DescriptionTreeNode(this, description, descriptions.get(description)))
+						.map(description -> new DescriptionTreeNode(this, new DescriptionChanger(description, descriptions)))
 						.sorted(childrenOrder)
 						.toArray(AbstractTreeNode[]::new);
 			}
 			else
 				children = new AbstractTreeNode[0];
+		}
+	}
+	
+	private static class DescriptionChanger
+	{
+		private String descText;
+		private Map<String, DescriptionData> descMap;
+		private final DescriptionData descData;
+
+		DescriptionChanger(String initialDesc, Map<String, DescriptionData> descMap)
+		{
+			this.descText = Objects.requireNonNull(initialDesc);
+			this.descMap  = Objects.requireNonNull(descMap);
+			this.descData = Objects.requireNonNull(this.descMap.get(initialDesc),"Given map (descMap) doesn't contains an entry for given key (initialDesc).");
+		}
+		
+		boolean removeFromMap()
+		{
+			return descMap.remove(descText)!=null;
+		}
+
+		DescriptionData getData()
+		{
+			return descData;
+		}
+		
+		String getText()
+		{
+			return descText;
+		}
+		
+		boolean setText(String descText)
+		{
+			if (descMap.containsKey(descText))
+				return false;
+			
+			descMap.remove( this.descText );
+			this.descText = descText;
+			descMap.put( this.descText, descData );
+			
+			return true;
 		}
 	}
 }

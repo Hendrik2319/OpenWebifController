@@ -1,5 +1,6 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
+import java.awt.Window;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -19,7 +20,9 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import javax.swing.JMenu;
+import javax.swing.JMenuItem;
 
+import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 
@@ -38,9 +41,36 @@ public class AlreadySeenEvents
 		boolean hasEpisodeStr() { return episodeStr!=null && !episodeStr.isBlank(); }
 	}
 	
+	enum DescriptionOperator
+	{
+		Equals,
+		Contains,
+		StartsWith("Starts with"),
+		;
+		final String title;
+		DescriptionOperator() { this(null); }
+		DescriptionOperator(String title)
+		{
+			this.title = title!=null ? title : name();
+		}
+	}
+	
+	static class DescriptionData extends EpisodeInfo
+	{
+		DescriptionOperator operator;
+		
+		DescriptionData()                      { this(null); }
+		DescriptionData(DescriptionData other) { this(other, other==null ? null : other.operator); }
+		DescriptionData(EpisodeInfo episodeInfo, DescriptionOperator operator)
+		{
+			super(episodeInfo);
+			this.operator = operator==null ? DescriptionOperator.Equals : operator;
+		}
+	}
+	
 	record StationData (
 			String name,
-			Map<String, EpisodeInfo> descriptions
+			Map<String, DescriptionData> descriptions
 	) {
 		static StationData create(String name, boolean createDescriptions)
 		{
@@ -70,7 +100,7 @@ public class AlreadySeenEvents
 			String title,
 			VariableECSData variableData,
 			Map<String, StationData> stations,
-			Map<String, EpisodeInfo> descriptions
+			Map<String, DescriptionData> descriptions
 	) {
 		static EventCriteriaSet create(String title, boolean createStations, boolean createDescriptions)
 		{
@@ -95,7 +125,7 @@ public class AlreadySeenEvents
 	private static class MutableStationData
 	{
 		final String name;
-		Map<String, EpisodeInfo> descriptions = new HashMap<>();
+		Map<String, DescriptionData> descriptions = new HashMap<>();
 		
 		MutableStationData(String name)
 		{
@@ -119,7 +149,7 @@ public class AlreadySeenEvents
 		String group;
 		EpisodeInfo episode;
 		final Map<String, StationData> stations = new HashMap<>();
-		final Map<String, EpisodeInfo> descriptions = new HashMap<>();
+		final Map<String, DescriptionData> descriptions = new HashMap<>();
 		
 		MutableECS(String title)
 		{
@@ -142,12 +172,29 @@ public class AlreadySeenEvents
 		}
 	}
 	
+	interface ChangeListener
+	{
+		enum ChangeType { RuleSet, EpisodeText, Grouping }
+		void somethingHasChanged(ChangeType changeType);
+	}
+	
 	private final Map<String, EventCriteriaSet> alreadySeenEvents;
+	private final Vector<ChangeListener> changeListeners;
 	
 	AlreadySeenEvents()
 	{
 		alreadySeenEvents = new HashMap<>();
+		changeListeners = new Vector<>();
 		readFromFile();
+	}
+
+	public void    addChangeListener(ChangeListener l) { changeListeners.   add(l); }
+	public void removeChangeListener(ChangeListener l) { changeListeners.remove(l); }
+	
+	void notifyChangeListeners(ChangeListener.ChangeType changeType)
+	{
+		for (ChangeListener l : changeListeners)
+			l.somethingHasChanged(changeType);
 	}
 
 	void readFromFile()
@@ -199,12 +246,13 @@ public class AlreadySeenEvents
 						stationData = new MutableStationData( decode( value ) );
 					
 					if ( (value=getValue(line, "desc = "))!=null )
-					{
-						if (stationData != null)
-							stationData.descriptions.put( decode( value ), episodeInfo = new EpisodeInfo() );
-						else
-							ecs.descriptions.put( decode( value ), episodeInfo = new EpisodeInfo() );
-					}
+						episodeInfo = setDescription(ecs, stationData, value, DescriptionOperator.Equals);
+					
+					if ( (value=getValue(line, "desc_startswith = "))!=null )
+						episodeInfo = setDescription(ecs, stationData, value, DescriptionOperator.StartsWith);
+					
+					if ( (value=getValue(line, "desc_contains = "))!=null )
+						episodeInfo = setDescription(ecs, stationData, value, DescriptionOperator.Contains);
 					
 					if ( (value=getValue(line, "group = "))!=null)
 						ecs.group = value;
@@ -227,6 +275,14 @@ public class AlreadySeenEvents
 		}
 		
 		System.out.printf("Done%n");
+	}
+
+	private EpisodeInfo setDescription(MutableECS ecs, MutableStationData stationData, String value, DescriptionOperator operator)
+	{
+		DescriptionData descriptionData = new DescriptionData(null, operator);
+		Map<String, DescriptionData> descriptions = stationData != null ? stationData.descriptions : ecs.descriptions;
+		descriptions.put( decode( value ), descriptionData );
+		return descriptionData;
 	}
 
 	private void saveRemainingData(MutableECS ecs, MutableStationData stationData)
@@ -252,6 +308,14 @@ public class AlreadySeenEvents
 		return null;
 	}
 	
+	private static final Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());
+	
+	void writeToFileAndNotify(ChangeListener.ChangeType changeType)
+	{
+		writeToFile();
+		notifyChangeListeners(changeType);
+	}
+	
 	void writeToFile()
 	{
 		File file = OpenWebifController.LocalDataFile.AlreadySeenEvents.getFileForWrite();
@@ -262,7 +326,6 @@ public class AlreadySeenEvents
 		}
 		System.out.printf("Write Already Seen Events to file \"%s\" ...%n", file.getAbsolutePath());
 		
-		Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());
 		
 		try (PrintWriter out = new PrintWriter(file, StandardCharsets.UTF_8))
 		{
@@ -286,19 +349,7 @@ public class AlreadySeenEvents
 							out.printf("episodeT = %s%n", ecs.variableData.episodeStr);
 					}
 					
-					if (ecs.descriptions != null)
-					{
-						Vector<String> descriptions = new Vector<>( ecs.descriptions.keySet() );
-						descriptions.sort(stringComparator);
-						for (String desc : descriptions)
-						{
-							out.printf("desc = %s%n", encode(desc));
-							EpisodeInfo episode = ecs.descriptions.get(desc);
-							if (episode == null) continue;
-							if (episode.hasEpisodeStr())
-								out.printf("episodeD = %s%n", episode.episodeStr);
-						}
-					}
+					writeDescriptionsMap(out, ecs.descriptions);
 					
 					if (ecs.stations != null)
 					{
@@ -310,20 +361,7 @@ public class AlreadySeenEvents
 							StationData stationData = ecs.stations.get(station);
 							out.printf("%n[Station]%n");
 							out.printf("station = %s%n", encode(station));
-							
-							if (stationData.descriptions != null)
-							{
-								Vector<String> descriptions = new Vector<>( stationData.descriptions.keySet() );
-								descriptions.sort(stringComparator);
-								for (String desc : descriptions)
-								{
-									out.printf("desc = %s%n", encode(desc));
-									EpisodeInfo episode = ecs.descriptions.get(desc);
-									if (episode == null) continue;
-									if (episode.hasEpisodeStr())
-										out.printf("episodeD = %s%n", episode.episodeStr);
-								}
-							}
+							writeDescriptionsMap(out, stationData.descriptions);
 						}
 					}
 					
@@ -338,8 +376,30 @@ public class AlreadySeenEvents
 		
 		System.out.printf("Done%n");
 	}
-	
-	
+
+	private void writeDescriptionsMap(PrintWriter out, Map<String, DescriptionData> descriptionsMap)
+	{
+		if (descriptionsMap == null) return;
+		
+		Vector<String> descriptions = new Vector<>( descriptionsMap.keySet() );
+		descriptions.sort(stringComparator);
+		for (String desc : descriptions)
+		{
+			DescriptionData descriptionData = descriptionsMap.get(desc);
+			if (descriptionData == null) continue;
+			
+			switch (descriptionData.operator)
+			{
+			case Equals    : out.print("desc"           ); break;
+			case StartsWith: out.print("desc_startswith"); break;
+			case Contains  : out.print("desc_contains"  ); break;
+			}
+			out.printf(" = %s%n", encode(desc)); 
+			
+			if (descriptionData.hasEpisodeStr())
+				out.printf("episodeD = %s%n", descriptionData.episodeStr);
+		}
+	}
 	
 	private static String encode(String str)
 	{
@@ -375,34 +435,69 @@ public class AlreadySeenEvents
 		void updateBeforeShowingMenu();
 	}
 
-	public MenuControl createMenuForTimers(JMenu parent, Supplier<Timer> getTimer, Supplier<Timer[]> getTimers, Runnable updateAfterMenuAction)
+	public MenuControl createMenuForTimers(JMenu parent, Window window, Supplier<Timer> getTimer, Supplier<Timer[]> getTimers, Runnable updateAfterMenuAction)
 	{
-		return createMenu(parent, getTimer, getTimers, GET_DATA_FROM_TIMER, updateAfterMenuAction);
+		return new SubMenu<>(parent, window, getTimer, getTimers, GET_DATA_FROM_TIMER, updateAfterMenuAction);
 	}
-	public MenuControl createMenuForMovies(JMenu parent, Supplier<MovieList.Movie> getMovie, Supplier<MovieList.Movie[]> getMovies, Runnable updateAfterMenuAction)
+	public MenuControl createMenuForMovies(JMenu parent, Window window, Supplier<MovieList.Movie> getMovie, Supplier<MovieList.Movie[]> getMovies, Runnable updateAfterMenuAction)
 	{
-		return createMenu(parent, getMovie, getMovies, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
+		return new SubMenu<>(parent, window, getMovie, getMovies, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
 	}
 	
-	private <V> MenuControl createMenu(JMenu parent, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
+	private class SubMenu<V> implements MenuControl
 	{
-		JMenu addMenu;
-		parent.add(addMenu = new JMenu("Mark as Already Seen"));
-		addMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false)));
-		addMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true )));
-		addMenu.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false)));
-		addMenu.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
+		private final JMenuItem miShowRule;
+		private final Supplier<V> getSource;
+		private final Supplier<V[]> getSources;
+		private final GetData<V> getData;
+		private V singleSource;
+		private String singleSourceAlreadySeenRule;
+
+		SubMenu(JMenu parent, Window window, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
+		{
+			this.getSource = getSource;
+			this.getSources = getSources;
+			this.getData = getData;
+			this.singleSource = null;
+			
+			JMenu addMenu;
+			parent.add(addMenu = new JMenu("Mark as Already Seen"));
+			addMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false)));
+			addMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true )));
+			addMenu.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false)));
+			addMenu.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
+			
+			miShowRule = parent.add(OpenWebifController.createMenuItem("##", e->{
+				TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule);
+			}));
+			
+//			JMenu removeMenu;
+//			parent.add(removeMenu = new JMenu("Remove Already Seen Marker"));
+//			removeMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false)));
+//			removeMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true )));
+//			removeMenu.add(OpenWebifController.createMenuItem("Station, Title"             , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false)));
+//			removeMenu.add(OpenWebifController.createMenuItem("Station, Title, Description", e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
+		}
 		
-		JMenu removeMenu;
-		parent.add(removeMenu = new JMenu("Remove Already Seen Marker"));
-		removeMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false)));
-		removeMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true )));
-		removeMenu.add(OpenWebifController.createMenuItem("Station, Title"             , e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false)));
-		removeMenu.add(OpenWebifController.createMenuItem("Station, Title, Description", e -> unmarkAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
-		
-		return () -> {
-			// t.b.d.
-		};
+		@Override
+		public void updateBeforeShowingMenu()
+		{
+			singleSource = null;
+			
+			if (getSource!=null)
+				singleSource = getSource.get();
+			
+			else if (getSources!=null)
+			{
+				V[] sources = getSources.get();
+				if (sources!=null && sources.length==1)
+					singleSource = sources[0];
+			}
+			
+			singleSourceAlreadySeenRule = singleSource==null ? null : getRuleIfAlreadySeen(singleSource, getData);
+			miShowRule.setEnabled(singleSourceAlreadySeenRule != null);
+			miShowRule.setText( "Show [Already Seen] Rule" + (singleSource==null ? "" : " for \"%s\"".formatted(getData.getTitle(singleSource))) );
+		}
 	}
 
 	private <V> void markAsAlreadySeen(
@@ -414,9 +509,10 @@ public class AlreadySeenEvents
 	{
 		doWithSources(getSource, getSources, t1 -> markAsAlreadySeen(t1, getData, useStation, useDescription) );
 		updateAfterMenuAction.run();
-		writeToFile();
+		writeToFileAndNotify(ChangeListener.ChangeType.RuleSet);
 	}
 
+	@SuppressWarnings("unused")
 	private <V> void unmarkAsAlreadySeen(
 			Supplier<V> getSource,
 			Supplier<V[]> getSources,
@@ -426,7 +522,7 @@ public class AlreadySeenEvents
 	{
 		doWithSources(getSource, getSources, t1 -> unmarkAsAlreadySeen(t1, getData, useStation, useDescription) );
 		updateAfterMenuAction.run();
-		writeToFile();
+		writeToFileAndNotify(ChangeListener.ChangeType.RuleSet);
 	}
 
 	private <V> void doWithSources(
@@ -470,7 +566,7 @@ public class AlreadySeenEvents
 		}
 		else
 		{
-			final Map<String, EpisodeInfo> descriptions;
+			final Map<String, DescriptionData> descriptions;
 			if (!useStation)
 				descriptions = ecs.descriptions;
 			else
@@ -500,7 +596,7 @@ public class AlreadySeenEvents
 				if (description == null)
 					return; // no description defined in source
 				
-				descriptions.put(description, new EpisodeInfo());
+				descriptions.put(description, new DescriptionData());
 			}
 		}
 	}
@@ -529,7 +625,7 @@ public class AlreadySeenEvents
 			return;
 		}
 		
-		final Map<String,EpisodeInfo> descriptions;
+		final Map<String,DescriptionData> descriptions;
 		if (!useStation)
 			descriptions = ecs.descriptions;
 		
@@ -571,43 +667,44 @@ public class AlreadySeenEvents
 
 	public boolean isMarkedAsAlreadySeen(Timer timer)
 	{
-		return isMarkedAsAlreadySeen(timer, GET_DATA_FROM_TIMER);
+		return getRuleIfAlreadySeen(timer, GET_DATA_FROM_TIMER) != null;
 	}
 
 	public boolean isMarkedAsAlreadySeen(MovieList.Movie movie)
 	{
-		return isMarkedAsAlreadySeen(movie, GET_DATA_FROM_MOVIE);
+		return getRuleIfAlreadySeen(movie, GET_DATA_FROM_MOVIE) != null;
 	}
 
-	private <V> boolean isMarkedAsAlreadySeen(final V source, final GetData<V> getData)
+	private <V> String getRuleIfAlreadySeen(final V source, final GetData<V> getData)
 	{
 		if (source == null)
-			return false;
+			return null;
 		
 		final String title = getData.getTitle(source);
 		if (title == null)
-			return false;
+			return null;
 		
 		final EventCriteriaSet ecs = alreadySeenEvents.get(title);
 		if (ecs == null)
-			return false;
+			return null;
 		
 		
 		if (ecs.stations == null && ecs.descriptions == null)
-			return true;
+			return buildRule(title, null, null, null);
 		
 		
-		Map<String,EpisodeInfo> descriptions = null;
+		Map<String,DescriptionData> descriptions = null;
+		String station = null;
 		if (ecs.stations != null)
 		{
-			final String station = getData.getStation(source);
+			station = getData.getStation(source);
 			if (station != null)
 			{
 				StationData stationData = ecs.stations.get(station);
 				if (stationData != null)
 				{
 					if (stationData.descriptions == null)
-						return true;
+						return buildRule(title, station, null, null);
 					
 					descriptions = stationData.descriptions;
 				}
@@ -617,14 +714,46 @@ public class AlreadySeenEvents
 		if (descriptions == null)
 			descriptions = ecs.descriptions;
 		
-		if (descriptions == null)
-			return false;
+		if (descriptions == null) // ECS has no [descriptions] but [stations] and no station was found
+			return null;
 		
 		final String description = getData.getDescription(source);
 		if (description == null)
-			return false; // no description defined in source
+			return null; // no description defined in source
 		
-		return descriptions.containsKey(description);
+		
+		for (String descStr : descriptions.keySet())
+		{
+			DescriptionData descriptionData = descriptions.get(descStr);
+			if (descMeetsCriteria(description, descStr, descriptionData.operator))
+				return buildRule(title, station, descStr, descriptionData.operator);
+		}
+		return null;
+	}
+	
+	private boolean descMeetsCriteria(String sourceDesc, String ruleDesc, DescriptionOperator operator)
+	{
+		switch (operator)
+		{
+		case Equals    : if (sourceDesc.equals    (ruleDesc)) return true; break;
+		case StartsWith: if (sourceDesc.startsWith(ruleDesc)) return true; break;
+		case Contains  : if (sourceDesc.contains  (ruleDesc)) return true; break;
+		}
+		return false;
+	}
+
+	private String buildRule(String title, String station, String descStr, DescriptionOperator operator)
+	{
+		Objects.requireNonNull(title);
+		String str = "Title equals:%n\"%s\"".formatted(title);
+		
+		if (station!=null)
+			str = "%s%n%nStation is:%n\"%s\"".formatted(str, station);
+		
+		if (descStr!=null && operator!=null)
+			str = "%s%n%nDescription %s:%n\"%s\"".formatted(str, operator.title, descStr);
+		
+		return str;
 	}
 
 	AlreadySeenEventsViewer.RootTreeNode createTreeRoot(AlreadySeenEventsViewer viewer)

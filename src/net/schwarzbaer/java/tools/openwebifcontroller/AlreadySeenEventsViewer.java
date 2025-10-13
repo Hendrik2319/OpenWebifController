@@ -291,8 +291,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 				String newDesc = TextAreaDialog.editText(window, "Edit Description Text", 400, 200, true, clicked.descriptionTreeNode.description.getText());
 				if (newDesc!=null)
 				{
-					boolean success = clicked.descriptionTreeNode.description.setText(newDesc);
-					if (success)
+					DescriptionChanger.Response response = clicked.descriptionTreeNode.description.setText(newDesc);
+					if (response.success)
 					{
 						clicked.descriptionTreeNode.updateTitle();
 						treeModel.fireTreeNodeUpdate(clicked.descriptionTreeNode);
@@ -301,7 +301,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 					}
 					else
 					{
-						String[] msg = { "Can't change description text.", "Another description with same text already exists." };
+						String[] msg = { "Can't change description text:", response.reasonWhyNot };
 						String title = "Can't change";
 						JOptionPane.showMessageDialog(window, msg, title, JOptionPane.WARNING_MESSAGE);
 					}
@@ -1403,16 +1403,30 @@ class AlreadySeenEventsViewer extends StandardDialog
 			return descText;
 		}
 		
-		boolean setText(String descText)
+		record Response(boolean success, String reasonWhyNot)
 		{
+			Response(boolean success) { this(success, null); }
+		}
+		
+		Response setText(String descText)
+		{
+			if (descText==null)
+				return new Response(false, "<Null> is not allowed as description text.");
+			
+			if (descText.isEmpty())
+				return new Response(false, "An empty string (\"\") is not allowed as description text.");
+			
+			if (descText.isBlank())
+				return new Response(false, "A blank string (\"%s\") is not allowed as description text.".formatted(descText));
+			
 			if (descMap.containsKey(descText))
-				return false;
+				return new Response(false, "Anbother rule with same description text (\"%s\") already exists.".formatted(descText));
 			
 			descMap.remove( this.descText );
 			this.descText = descText;
 			descMap.put( this.descText, descData );
 			
-			return true;
+			return new Response(true);
 		}
 	}
 }

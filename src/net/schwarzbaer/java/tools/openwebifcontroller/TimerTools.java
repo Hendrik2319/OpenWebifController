@@ -125,17 +125,23 @@ public class TimerTools
 	public static String generateShortInfo(String indent, Timer timer, boolean withName)
 	{
 		StringBuilder sb = new StringBuilder();
-		if (timer!=null) {
+		if (timer!=null)
+		{
 			if (withName)
 				sb.append(String.format("%sName:%n%s%n%n", indent, timer.name));
 			sb.append(String.format("%sDescription:%n%s%n%n", indent, timer.description));
 			sb.append(String.format("%sExtended Description:%n%s%n%n", indent, timer.descriptionextended));
 			sb.append(String.format("%sLog Entries: %d%n", indent, timer.logentries.size()));
-			for (int i=0; i<timer.logentries.size(); i++) {
+			for (int i=0; i<timer.logentries.size(); i++)
+			{
 				LogEntry entry = timer.logentries.get(i);
 				String timeStr = OpenWebifController.dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
 				sb.append(String.format("%s    [%d] %s <Type:%d> \"%s\"%n", indent, i+1, timeStr, entry.type, entry.text));
 			}
+			sb.append(String.format("%n"));
+			String rule = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(timer);
+			if (rule!=null)
+				sb.append(String.format("%sIs Already Seen:%n[%n%s%n]%n", indent, rule));
 		}
 		return sb.toString();
 	}

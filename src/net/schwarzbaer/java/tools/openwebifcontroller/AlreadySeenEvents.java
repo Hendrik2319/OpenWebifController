@@ -665,15 +665,11 @@ public class AlreadySeenEvents
 		
 	}
 
-	public boolean isMarkedAsAlreadySeen(Timer timer)
-	{
-		return getRuleIfAlreadySeen(timer, GET_DATA_FROM_TIMER) != null;
-	}
+	public boolean isMarkedAsAlreadySeen(Timer           timer) { return getRuleIfAlreadySeen(timer) != null; }
+	public boolean isMarkedAsAlreadySeen(MovieList.Movie movie) { return getRuleIfAlreadySeen(movie) != null; }
 
-	public boolean isMarkedAsAlreadySeen(MovieList.Movie movie)
-	{
-		return getRuleIfAlreadySeen(movie, GET_DATA_FROM_MOVIE) != null;
-	}
+	public String getRuleIfAlreadySeen(Timer           timer) { return getRuleIfAlreadySeen(timer, GET_DATA_FROM_TIMER); }
+	public String getRuleIfAlreadySeen(MovieList.Movie movie) { return getRuleIfAlreadySeen(movie, GET_DATA_FROM_MOVIE); }
 
 	private <V> String getRuleIfAlreadySeen(final V source, final GetData<V> getData)
 	{

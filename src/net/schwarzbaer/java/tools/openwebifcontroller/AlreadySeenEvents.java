@@ -11,18 +11,22 @@ import java.io.PrintWriter;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Vector;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
+import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 
@@ -451,7 +455,7 @@ public class AlreadySeenEvents
 		private final Supplier<V[]> getSources;
 		private final GetData<V> getData;
 		private V singleSource;
-		private String singleSourceAlreadySeenRule;
+		private RuleOutput singleSourceAlreadySeenRule;
 
 		SubMenu(JMenu parent, Window window, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
 		{
@@ -468,7 +472,7 @@ public class AlreadySeenEvents
 			addMenu.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true )));
 			
 			miShowRule = parent.add(OpenWebifController.createMenuItem("##", e->{
-				TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule);
+				TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule.toString());
 			}));
 			
 //			JMenu removeMenu;
@@ -668,10 +672,10 @@ public class AlreadySeenEvents
 	public boolean isMarkedAsAlreadySeen(Timer           timer) { return getRuleIfAlreadySeen(timer) != null; }
 	public boolean isMarkedAsAlreadySeen(MovieList.Movie movie) { return getRuleIfAlreadySeen(movie) != null; }
 
-	public String getRuleIfAlreadySeen(Timer           timer) { return getRuleIfAlreadySeen(timer, GET_DATA_FROM_TIMER); }
-	public String getRuleIfAlreadySeen(MovieList.Movie movie) { return getRuleIfAlreadySeen(movie, GET_DATA_FROM_MOVIE); }
+	public RuleOutput getRuleIfAlreadySeen(Timer           timer) { return getRuleIfAlreadySeen(timer, GET_DATA_FROM_TIMER); }
+	public RuleOutput getRuleIfAlreadySeen(MovieList.Movie movie) { return getRuleIfAlreadySeen(movie, GET_DATA_FROM_MOVIE); }
 
-	private <V> String getRuleIfAlreadySeen(final V source, final GetData<V> getData)
+	private <V> RuleOutput getRuleIfAlreadySeen(final V source, final GetData<V> getData)
 	{
 		if (source == null)
 			return null;
@@ -738,18 +742,55 @@ public class AlreadySeenEvents
 		return false;
 	}
 
-	private String buildRule(String title, String station, String descStr, DescriptionOperator operator)
+	private RuleOutput buildRule(String title, String station, String descStr, DescriptionOperator operator)
 	{
 		Objects.requireNonNull(title);
-		String str = "Title equals:%n\"%s\"".formatted(title);
+		RuleOutput ruleOutput = new RuleOutput();
+		ruleOutput.add("Title equals", title);
 		
 		if (station!=null)
-			str = "%s%n%nStation is:%n\"%s\"".formatted(str, station);
+			ruleOutput.add("Station is", station);
 		
 		if (descStr!=null && operator!=null)
-			str = "%s%n%nDescription %s:%n\"%s\"".formatted(str, operator.title, descStr);
+			ruleOutput.add("Description %s".formatted(operator.title), descStr);
 		
-		return str;
+		return ruleOutput;
+	}
+	
+	static class RuleOutput
+	{
+		record Pair(String label, String value) {}
+		
+		private final List<Pair> pairs = new ArrayList<>();
+		
+		void add(String label, String value)
+		{
+			pairs.add(new Pair(
+					Objects.requireNonNull(label),
+					Objects.requireNonNull(value)
+			));
+		}
+
+		@Override
+		public String toString()
+		{
+			return toString("");
+		}
+
+		public String toString(String indent)
+		{
+			
+			return pairs
+					.stream()
+					.map(pair -> "%s%s:%n%s    \"%s\"".formatted(indent, pair.label, indent, pair.value))
+					.collect(Collectors.joining("%n".formatted()));
+		}
+
+		public void writeIntoOutput(ValueListOutput out, int indentLevel)
+		{
+			for (Pair pair : pairs)
+				out.add(indentLevel, pair.label, pair.value);
+		}
 	}
 
 	AlreadySeenEventsViewer.RootTreeNode createTreeRoot(AlreadySeenEventsViewer viewer)

@@ -139,9 +139,9 @@ public class TimerTools
 				sb.append(String.format("%s    [%d] %s <Type:%d> \"%s\"%n", indent, i+1, timeStr, entry.type, entry.text));
 			}
 			sb.append(String.format("%n"));
-			String rule = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(timer);
+			AlreadySeenEvents.RuleOutput rule = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(timer);
 			if (rule!=null)
-				sb.append(String.format("%sIs Already Seen:%n[%n%s%n]%n", indent, rule));
+				sb.append(String.format("%sIs Already Seen:%n%s%n", indent, rule.toString(indent+"    ")));
 		}
 		return sb.toString();
 	}

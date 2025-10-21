@@ -43,6 +43,7 @@ public class AlreadySeenEvents
 		EpisodeInfo(EpisodeInfo other) { this.episodeStr = other==null ? null : other.episodeStr; }
 		
 		boolean hasEpisodeStr() { return episodeStr!=null && !episodeStr.isBlank(); }
+		String  getEpisodeStr() { return hasEpisodeStr() ? episodeStr : null; }
 	}
 	
 	enum DescriptionOperator
@@ -690,7 +691,7 @@ public class AlreadySeenEvents
 		
 		
 		if (ecs.stations == null && ecs.descriptions == null)
-			return buildRule(title, null, null, null);
+			return buildRule(title, null, null, null, ecs.variableData.getEpisodeStr());
 		
 		
 		Map<String,DescriptionData> descriptions = null;
@@ -704,7 +705,7 @@ public class AlreadySeenEvents
 				if (stationData != null)
 				{
 					if (stationData.descriptions == null)
-						return buildRule(title, station, null, null);
+						return buildRule(title, station, null, null, null);
 					
 					descriptions = stationData.descriptions;
 				}
@@ -726,7 +727,7 @@ public class AlreadySeenEvents
 		{
 			DescriptionData descriptionData = descriptions.get(descStr);
 			if (descMeetsCriteria(description, descStr, descriptionData.operator))
-				return buildRule(title, station, descStr, descriptionData.operator);
+				return buildRule(title, station, descStr, descriptionData.operator, descriptionData.getEpisodeStr());
 		}
 		return null;
 	}
@@ -742,7 +743,7 @@ public class AlreadySeenEvents
 		return false;
 	}
 
-	private RuleOutput buildRule(String title, String station, String descStr, DescriptionOperator operator)
+	private RuleOutput buildRule(String title, String station, String descStr, DescriptionOperator operator, String episodeStr)
 	{
 		Objects.requireNonNull(title);
 		RuleOutput ruleOutput = new RuleOutput();
@@ -753,6 +754,9 @@ public class AlreadySeenEvents
 		
 		if (descStr!=null && operator!=null)
 			ruleOutput.add("Description %s".formatted(operator.title), descStr);
+		
+		if (episodeStr!=null)
+			ruleOutput.add("Is Episode", episodeStr);
 		
 		return ruleOutput;
 	}

@@ -50,8 +50,13 @@ public enum UserDefColors
 	TXTCOLOR_Event_Seen(Category.TimerEvent, "Timer \"Seen\"", true, true, 0x00619B),
 	
 	BGCOLOR_Movie_Seen(Category.MovieTable, "Movie \"Seen\"", false, true, 0xDFF1FF),
+	
+	TXTCOLOR_DescStartsWith(Category.AlreadySeenEvents, "Description Starts With", true, true, 0x00A400),
+	TXTCOLOR_DescContains  (Category.AlreadySeenEvents, "Description Contains"   , true, true, 0x006DFF),
 	;
-	private static final String NULL_AS_STRING = "<NULL>";
+	
+	private static final int    VALUE_LENGTH = 6;
+	private static final String NULL_AS_STRING = "<NULL>"; // has to have length of VALUE_LENGTH
 	
 	public enum Category
 	{
@@ -59,6 +64,7 @@ public enum UserDefColors
 		TimerState("Timer State"),
 		TimerEvent("Timer Event"),
 		MovieTable("Movie Table"),
+		AlreadySeenEvents("Already Seen Events"),
 		;
 		public final String label;
 		Category(String label)
@@ -85,7 +91,7 @@ public enum UserDefColors
 	public final boolean isNullable;
 	public final Integer defaultValue;
 	private      Color color;
-
+	
 	UserDefColors(Category category, String label, boolean isForText, boolean isNullable, Integer defaultValue)
 	{
 		this.category = Objects.requireNonNull(category);
@@ -112,9 +118,18 @@ public enum UserDefColors
 	}
 	private void setValue(Integer value)
 	{
-		this.color = value==null ? null : new Color(value);
+		this.color = value==null ? null : new Color(value.intValue());
 	}
 	
+	
+	boolean notEqualsDefaultValue()
+	{
+		if (defaultValue==null || color==null)
+			return defaultValue!=null || color!=null;
+		
+		return (color.getRGB() & 0xFFFFFF) != defaultValue.intValue();
+	}
+
 	
 	private void resetToDefault(boolean updateSettings)
 	{
@@ -133,12 +148,13 @@ public enum UserDefColors
 	
 	private static void readFromString(String str)
 	{
+		resetAllToDefault(false);
 		if (str!=null)
 			str.lines().forEach(line -> {
-				if (line.length() > 6)
+				if (line.length() > VALUE_LENGTH)
 				{
-					String name = line.substring(6);
-					String valueStr = line.substring(0, 6);
+					String name = line.substring(VALUE_LENGTH);
+					String valueStr = line.substring(0, VALUE_LENGTH);
 					
 					UserDefColors udc;
 					try { udc = valueOf( name ); }
@@ -159,14 +175,18 @@ public enum UserDefColors
 	{
 		return Arrays
 			.stream(values())
-			.map(udc -> udc.color==null ? "%s%s%n".formatted(NULL_AS_STRING, udc.name()) : "%06X%s%n".formatted(udc.color.getRGB()&0xFFFFFF, udc.name()))
-			.collect(Collectors.joining());
+			.filter( UserDefColors::notEqualsDefaultValue )
+			.map(
+					udc -> udc.color==null
+						?  "%s%s".formatted(NULL_AS_STRING, udc.name())
+						: ("%0"+VALUE_LENGTH+"X%s").formatted(udc.color.getRGB()&0xFFFFFF, udc.name())
+			)
+			.collect(Collectors.joining("%n".formatted()));
 	}
 	
 	
 	public static void readFromSettings()
 	{
-		resetAllToDefault(false);
 		readFromString( OpenWebifController.settings.getString(OpenWebifController.AppSettings.ValueKey.UserDefColors, null) );
 		
 	}
@@ -198,7 +218,6 @@ public enum UserDefColors
 			System.err.printf("IOException while reading UserDefColors from file \"%s\": %s%n", file.getAbsolutePath(), ex.getMessage());
 		}
 		
-		resetAllToDefault(false);
 		readFromString(str); 
 		writeToSettings();
 	}
@@ -223,6 +242,7 @@ public enum UserDefColors
 			System.err.printf("IOException while writing UserDefColors to file \"%s\": %s%n", file.getAbsolutePath(), ex.getMessage());
 		}
 	}
+	
 	
 	public static class EditDialog extends StandardDialog
 	{

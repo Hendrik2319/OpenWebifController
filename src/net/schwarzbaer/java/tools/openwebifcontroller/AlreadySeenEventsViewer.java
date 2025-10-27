@@ -1,6 +1,7 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Window;
@@ -551,15 +552,19 @@ class AlreadySeenEventsViewer extends StandardDialog
 		private static final long serialVersionUID = 849724659340192701L;
 
 		@Override
-		public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus)
+		public Component getTreeCellRendererComponent(JTree tree, Object value, boolean isSelected, boolean isExpanded, boolean isLeaf, int rowIndex, boolean hasFocus)
 		{
-			Component rendcomp = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+			Component rendcomp = super.getTreeCellRendererComponent(tree, value, isSelected, isExpanded, isLeaf, rowIndex, hasFocus);
 			
 			if (value instanceof AbstractTreeNode treeNode)
 			{
 				TreeIcons icon = treeNode.getIcon();
 				if (icon!=null)
 					setIcon(icon.getIcon());
+				
+				Color textColor = treeNode.getTextColor();
+				textColor = isSelected ? getTextSelectionColor() : textColor==null ? getTextNonSelectionColor() : textColor;
+				setForeground(textColor);
 			}
 			
 			return rendcomp;
@@ -1012,6 +1017,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 		protected abstract void determineChildren();
 		protected abstract TreeIcons getIcon();
+		protected Color getTextColor() { return null; }
 		protected void updateTitle() {}
 		
 		protected void checkChildren()
@@ -1325,6 +1331,23 @@ class AlreadySeenEventsViewer extends StandardDialog
 				}
 			}
 			return TreeIcons.Desc;
+		}
+
+		@Override
+		protected Color getTextColor()
+		{
+			DescriptionData data = description.getData();
+			if (data != null)
+			{
+				DescriptionOperator operator = data.operator!=null ? data.operator : DescriptionOperator.Equals;
+				switch (operator)
+				{
+				case Equals    : break;
+				case StartsWith: return UserDefColors.TXTCOLOR_DescStartsWith.getColor();
+				case Contains  : return UserDefColors.TXTCOLOR_DescContains  .getColor();
+				}
+			}
+			return null;
 		}
 
 		@Override protected void determineChildren()

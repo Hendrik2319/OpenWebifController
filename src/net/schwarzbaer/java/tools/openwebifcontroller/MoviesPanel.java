@@ -750,7 +750,10 @@ class MoviesPanel extends JSplitPane {
 				MovieList.Movie movie = getRow(rowM);
 				rendComp.wasDeleted = deletedMovies.contains(movie);
 				
-				rendComp.configureAsTableCellRendererComponent(table, value, isSelected, hasFocus);
+				Color BGCOLOR_Movie_Seen = UserDefColors.BGCOLOR_Movie_Seen.getColor();
+				Supplier<Color> getCustomBackground = BGCOLOR_Movie_Seen!=null && AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(movie) ? ()->BGCOLOR_Movie_Seen : null;
+				
+				rendComp.configureAsTableCellRendererComponent(table, value, isSelected, hasFocus, getCustomBackground, null);
 				return rendComp;
 			}
 			
@@ -834,6 +837,10 @@ class MoviesPanel extends JSplitPane {
 				
 				if (!isSelected && deletedMovies.contains(movie))
 					getCustomForeground = ()->COLOR_DELETED;
+				
+				Color BGCOLOR_Movie_Seen = UserDefColors.BGCOLOR_Movie_Seen.getColor();
+				if (BGCOLOR_Movie_Seen!=null && AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(movie))
+					getCustomBackground = ()->BGCOLOR_Movie_Seen;
 				
 				Component rendComp = label;
 				String valueStr = value == null ? "" : value.toString();

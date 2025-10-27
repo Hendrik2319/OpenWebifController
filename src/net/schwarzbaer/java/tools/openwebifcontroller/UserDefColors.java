@@ -48,6 +48,8 @@ public enum UserDefColors
 	BGCOLOR_State_Deleted_Seen    (Category.TimerState, "\"Deleted\""    +" (Seen)", false, true, null),
 	
 	TXTCOLOR_Event_Seen(Category.TimerEvent, "Timer \"Seen\"", true, true, 0x00619B),
+	
+	BGCOLOR_Movie_Seen(Category.MovieTable, "Movie \"Seen\"", false, true, 0xDFF1FF),
 	;
 	private static final String NULL_AS_STRING = "<NULL>";
 	
@@ -56,6 +58,7 @@ public enum UserDefColors
 		TimerType ("Timer Type"),
 		TimerState("Timer State"),
 		TimerEvent("Timer Event"),
+		MovieTable("Movie Table"),
 		;
 		public final String label;
 		Category(String label)

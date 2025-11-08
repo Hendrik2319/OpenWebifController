@@ -691,7 +691,7 @@ public class AlreadySeenEvents
 		
 		
 		if (ecs.stations == null && ecs.descriptions == null)
-			return buildRule(title, null, null, null, ecs.variableData.getEpisodeStr());
+			return new RuleOutput(title, null, null, null, ecs.variableData.getEpisodeStr());
 		
 		
 		Map<String,DescriptionData> descriptions = null;
@@ -705,7 +705,7 @@ public class AlreadySeenEvents
 				if (stationData != null)
 				{
 					if (stationData.descriptions == null)
-						return buildRule(title, station, null, null, null);
+						return new RuleOutput(title, station, null, null, null);
 					
 					descriptions = stationData.descriptions;
 				}
@@ -727,7 +727,7 @@ public class AlreadySeenEvents
 		{
 			DescriptionData descriptionData = descriptions.get(descStr);
 			if (descMeetsCriteria(description, descStr, descriptionData.operator))
-				return buildRule(title, station, descStr, descriptionData.operator, descriptionData.getEpisodeStr());
+				return new RuleOutput(title, station, descStr, descriptionData.operator, descriptionData.getEpisodeStr());
 		}
 		return null;
 	}
@@ -742,34 +742,40 @@ public class AlreadySeenEvents
 		}
 		return false;
 	}
-
-	private RuleOutput buildRule(String title, String station, String descStr, DescriptionOperator operator, String episodeStr)
-	{
-		Objects.requireNonNull(title);
-		RuleOutput ruleOutput = new RuleOutput();
-		ruleOutput.add("Title equals", title);
-		
-		if (station!=null)
-			ruleOutput.add("Station is", station);
-		
-		if (descStr!=null && operator!=null)
-			ruleOutput.add("Description %s".formatted(operator.title), descStr);
-		
-		if (episodeStr!=null)
-			ruleOutput.add("Is Episode", episodeStr);
-		
-		return ruleOutput;
-	}
 	
 	static class RuleOutput
 	{
-		record Pair(String label, String value) {}
+		private record Pair(String label, String value) {}
 		
-		private final List<Pair> pairs = new ArrayList<>();
+		private final List<Pair> output = new ArrayList<>();
+		final String title;
+		final String station;
+		final String descStr;
+		final DescriptionOperator operator;
+		final String episodeStr;
 		
-		void add(String label, String value)
+		RuleOutput(String title, String station, String descStr, DescriptionOperator operator, String episodeStr)
 		{
-			pairs.add(new Pair(
+			this.title = Objects.requireNonNull(title);
+			this.station = station;
+			this.descStr = descStr;
+			this.operator = operator;
+			this.episodeStr = episodeStr;
+			addOutput("Title equals", title);
+			
+			if (station!=null)
+				addOutput("Station is", station);
+			
+			if (descStr!=null && operator!=null)
+				addOutput("Description %s".formatted(operator.title), descStr);
+			
+			if (episodeStr!=null)
+				addOutput("Is Episode", episodeStr);
+		}
+		
+		private void addOutput(String label, String value)
+		{
+			output.add(new Pair(
 					Objects.requireNonNull(label),
 					Objects.requireNonNull(value)
 			));
@@ -784,7 +790,7 @@ public class AlreadySeenEvents
 		public String toString(String indent)
 		{
 			
-			return pairs
+			return output
 					.stream()
 					.map(pair -> "%s%s:%n%s    \"%s\"".formatted(indent, pair.label, indent, pair.value))
 					.collect(Collectors.joining("%n".formatted()));
@@ -792,7 +798,7 @@ public class AlreadySeenEvents
 
 		public void writeIntoOutput(ValueListOutput out, int indentLevel)
 		{
-			for (Pair pair : pairs)
+			for (Pair pair : output)
 				out.add(indentLevel, pair.label, pair.value);
 		}
 	}

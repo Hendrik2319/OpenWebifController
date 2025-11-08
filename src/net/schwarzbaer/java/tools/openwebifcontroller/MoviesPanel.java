@@ -644,22 +644,31 @@ class MoviesPanel extends JSplitPane {
 		
 		private static final Color COLOR_DELETED = new Color(0xC0C0C0);
 		
-		// Column Widths: [280, 50, 109, 450, 59, 108]
+		// Column Widths: [400, 60, 50, 60, 110, 76, 110, 450]
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<MovieList.Movie>, SwingConstants {
-			Name    (config("Name"    ,  String.class, 280, null).setValFunc(MovieTableModel::getRowName)),
-			Progress(config("Progress",    Long.class,  60, null).setValFunc(m->m.lastseen         )),
-			Length  (config("Length"  , Integer.class,  50, null).setValFunc(m->m.length_s         ).setToStringR(m->m.lengthStr        )),
-			Size    (config("Size"    ,    Long.class,  60, null).setValFunc(m->m.filesize         ).setToStringR(m->m.filesize_readable)),
-			Time    (config("Time"    ,    Long.class, 110, null).setValFunc(m->m.recordingtime    ).setToStringR(m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false))),
-			Seen    (config("Seen"    , Boolean.class,  50, null).setValFunc(AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen)),
-			Station (config("Station" ,  String.class, 110, null).setValFunc(m->m.servicename      )),
-			File    (config("File"    ,  String.class, 450, null).setValFunc(m->m.filename_stripped)),
+			Name    (config("Name"    ,  String.class, 400,   null).setValFunc(MovieTableModel::getRowName)),
+			Progress(config("Progress",    Long.class,  60,   null).setValFunc(m->m.lastseen         )),
+			Length  (config("Length"  , Integer.class,  50,   null).setValFunc(m->m.length_s         ).setToStringR(m->m.lengthStr        )),
+			Size    (config("Size"    ,    Long.class,  60,   null).setValFunc(m->m.filesize         ).setToStringR(m->m.filesize_readable)),
+			Time    (config("Time"    ,    Long.class, 110,   null).setValFunc(m->m.recordingtime    ).setToStringR(m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false))),
+			Seen    (config("Seen"    ,  String.class,  75, CENTER).setValFunc(m->toString(AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(m)))),
+			Station (config("Station" ,  String.class, 110,   null).setValFunc(m->m.servicename      )),
+			File    (config("File"    ,  String.class, 450,   null).setValFunc(m->m.filename_stripped)),
 			;
 			
 			private final Tables.SimplifiedColumnConfig2<MovieTableModel, MovieList.Movie, ?> cfg;
 			ColumnID(Tables.SimplifiedColumnConfig2<MovieTableModel, MovieList.Movie, ?> cfg) { this.cfg = cfg; }
 			@Override public Tables.SimplifiedColumnConfig getColumnConfig() { return this.cfg; }
 			@Override public Function<MovieList.Movie, ?> getGetValue() { return cfg.getValue; }
+			
+			private static String toString(AlreadySeenEvents.RuleOutput ruleOutput)
+			{
+				if (ruleOutput == null)
+					return null;
+				if (ruleOutput.episodeStr == null)
+					return "Seen";
+				return "[%s]".formatted(ruleOutput.episodeStr);
+			}
 			
 			private static <T> Tables.SimplifiedColumnConfig2<MovieTableModel, MovieList.Movie, T> config(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment)
 			{

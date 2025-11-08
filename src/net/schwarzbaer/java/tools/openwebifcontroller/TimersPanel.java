@@ -509,10 +509,11 @@ public class TimersPanel extends JSplitPane {
 	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
 	{
 		// Column Widths: [90, 70, 50, 170, 60, 60, 220, 110, 220, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
+		// Column Widths: [90, 70, 75, 170, 60, 60, 220, 110, 220, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants {
 			type               (config("Type"                 , Timer.Type .class,  90, CENTER).setValFunc(t->t.type               )),
 			state_             (config("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((m,t)->m.timerStateGuesser.getState(t))),
-			seen               (config("Seen"                 , Boolean    .class,  50, null  ).setValFunc(AlreadySeenEvents.getInstance()::isMarkedAsAlreadySeen).setToString(b->b?"Seen":null)),
+			seen               (config("Seen"                 , String     .class,  75, CENTER).setValFunc(t->toString(AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(t)))),
 			begin_date         (config("Begin"                , Long       .class, 170, null  ).setValFunc(t->t.begin              ).setToString(t->formatDate(t*1000,  true,  true, false,  true, false))),
 			end                (config("End"                  , Long       .class,  60, null  ).setValFunc(t->t.end                ).setToString(t->formatDate(t*1000, false, false, false,  true, false))),
 			duration           (config("Duration"             , Double     .class,  60, null  ).setValFunc(t->t.duration           ).setToString(DateTimeFormatter::getDurationStr)),
@@ -555,6 +556,15 @@ public class TimersPanel extends JSplitPane {
 			ColumnID(Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, ?> cfg) { this.cfg = cfg; }
 			@Override public Tables.SimplifiedColumnConfig getColumnConfig() { return this.cfg; }
 			@Override public Function<Timer, ?> getGetValue() { return cfg.getValue; }
+			
+			private static String toString(AlreadySeenEvents.RuleOutput ruleOutput)
+			{
+				if (ruleOutput == null)
+					return null;
+				if (ruleOutput.episodeStr == null)
+					return "Seen";
+				return "[%s]".formatted(ruleOutput.episodeStr);
+			}
 			
 			private static <T> Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, T> config(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment)
 			{

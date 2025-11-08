@@ -525,7 +525,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 				menuMoveToGroup.addSeparator();
 			
 			menuMoveToGroup.add( OpenWebifController.createMenuItem( "New group ...", e->{
-				String groupName = JOptionPane.showInputDialog(window, "Group name", "");
+				String suggestedName = clicked.ecsTreeNode==null || clicked.ecsTreeNode.ecs==null ? "" : clicked.ecsTreeNode.ecs.title();
+				String groupName = JOptionPane.showInputDialog(window, "Group name", suggestedName);
 				if (groupName==null) return;
 				
 				boolean groupExists = groupNames.contains(groupName);

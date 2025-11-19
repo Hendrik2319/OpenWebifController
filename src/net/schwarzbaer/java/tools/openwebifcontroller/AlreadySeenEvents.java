@@ -46,30 +46,32 @@ public class AlreadySeenEvents
 		String  getEpisodeStr() { return hasEpisodeStr() ? episodeStr : null; }
 	}
 	
-	enum DescriptionOperator
+	enum TextOperator
 	{
-		Equals,
-		Contains,
-		StartsWith("Starts with"),
+		Equals    (""             ),
+		Contains  (" [contains]"  ),
+		StartsWith(" [startswith]", "Starts with"),
 		;
+		private final String paramName;
 		final String title;
-		DescriptionOperator() { this(null); }
-		DescriptionOperator(String title)
+		TextOperator(String paramName) { this(paramName, null); }
+		TextOperator(String paramName, String title)
 		{
+			this.paramName = Objects.requireNonNull(paramName);
 			this.title = title!=null ? title : name();
 		}
 	}
 	
 	static class DescriptionData extends EpisodeInfo
 	{
-		DescriptionOperator operator;
+		TextOperator operator;
 		
 		DescriptionData()                      { this(null); }
 		DescriptionData(DescriptionData other) { this(other, other==null ? null : other.operator); }
-		DescriptionData(EpisodeInfo episodeInfo, DescriptionOperator operator)
+		DescriptionData(EpisodeInfo episodeInfo, TextOperator operator)
 		{
 			super(episodeInfo);
-			this.operator = operator==null ? DescriptionOperator.Equals : operator;
+			this.operator = operator==null ? TextOperator.Equals : operator;
 		}
 	}
 	
@@ -250,14 +252,20 @@ public class AlreadySeenEvents
 					if ( (value=getValue(line, "station = "))!=null && stationData==null )
 						stationData = new MutableStationData( decode( value ) );
 					
+					for (TextOperator op : TextOperator.values())
+						if ( (value=getValue(line, "desc%s = ".formatted(op.paramName)))!=null )
+							episodeInfo = setDescription(ecs, stationData, value, op);
+					
+					// START: will be removed in next commit
 					if ( (value=getValue(line, "desc = "))!=null )
-						episodeInfo = setDescription(ecs, stationData, value, DescriptionOperator.Equals);
+						episodeInfo = setDescription(ecs, stationData, value, TextOperator.Equals);
 					
 					if ( (value=getValue(line, "desc_startswith = "))!=null )
-						episodeInfo = setDescription(ecs, stationData, value, DescriptionOperator.StartsWith);
+						episodeInfo = setDescription(ecs, stationData, value, TextOperator.StartsWith);
 					
 					if ( (value=getValue(line, "desc_contains = "))!=null )
-						episodeInfo = setDescription(ecs, stationData, value, DescriptionOperator.Contains);
+						episodeInfo = setDescription(ecs, stationData, value, TextOperator.Contains);
+					// END
 					
 					if ( (value=getValue(line, "group = "))!=null)
 						ecs.group = value;
@@ -282,7 +290,7 @@ public class AlreadySeenEvents
 		System.out.printf("Done%n");
 	}
 
-	private EpisodeInfo setDescription(MutableECS ecs, MutableStationData stationData, String value, DescriptionOperator operator)
+	private EpisodeInfo setDescription(MutableECS ecs, MutableStationData stationData, String value, TextOperator operator)
 	{
 		DescriptionData descriptionData = new DescriptionData(null, operator);
 		Map<String, DescriptionData> descriptions = stationData != null ? stationData.descriptions : ecs.descriptions;
@@ -393,13 +401,7 @@ public class AlreadySeenEvents
 			DescriptionData descriptionData = descriptionsMap.get(desc);
 			if (descriptionData == null) continue;
 			
-			switch (descriptionData.operator)
-			{
-			case Equals    : out.print("desc"           ); break;
-			case StartsWith: out.print("desc_startswith"); break;
-			case Contains  : out.print("desc_contains"  ); break;
-			}
-			out.printf(" = %s%n", encode(desc)); 
+			out.printf("desc%s = %s%n", descriptionData.operator.paramName, encode(desc)); 
 			
 			if (descriptionData.hasEpisodeStr())
 				out.printf("episodeD = %s%n", descriptionData.episodeStr);
@@ -732,7 +734,7 @@ public class AlreadySeenEvents
 		return null;
 	}
 	
-	private boolean descMeetsCriteria(String sourceDesc, String ruleDesc, DescriptionOperator operator)
+	private boolean descMeetsCriteria(String sourceDesc, String ruleDesc, TextOperator operator)
 	{
 		switch (operator)
 		{
@@ -751,10 +753,10 @@ public class AlreadySeenEvents
 		final String title;
 		final String station;
 		final String descStr;
-		final DescriptionOperator operator;
+		final TextOperator operator;
 		final String episodeStr;
 		
-		RuleOutput(String title, String station, String descStr, DescriptionOperator operator, String episodeStr)
+		RuleOutput(String title, String station, String descStr, TextOperator operator, String episodeStr)
 		{
 			this.title = Objects.requireNonNull(title);
 			this.station = station;

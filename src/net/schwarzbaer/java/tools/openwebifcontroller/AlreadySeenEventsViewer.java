@@ -43,10 +43,10 @@ import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionData;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.StationData;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.TextOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.VariableECSData;
 
 class AlreadySeenEventsViewer extends StandardDialog
@@ -311,8 +311,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			JMenu menuDescOperator = OpenWebifController.createMenu("##");
 			add(menuDescOperator);
-			EnumMap<DescriptionOperator, JCheckBoxMenuItem> menuDescOperatorItems = new EnumMap<>(DescriptionOperator.class);
-			for (DescriptionOperator op : DescriptionOperator.values())
+			EnumMap<TextOperator, JCheckBoxMenuItem> menuDescOperatorItems = new EnumMap<>(TextOperator.class);
+			for (TextOperator op : TextOperator.values())
 			{
 				JCheckBoxMenuItem cmi = OpenWebifController.createCheckBoxMenuItem(op.title, false, b -> {
 					if (clicked.descriptionTreeNode!=null)
@@ -493,7 +493,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 				miEditDesc      .setEnabled(clicked.descriptionTreeNode!=null);
 				menuDescOperator.setEnabled(clicked.descriptionTreeNode!=null);
 				
-				DescriptionOperator operatorOfClicked = clicked.descriptionTreeNode==null ? null : clicked.descriptionTreeNode.description.getData().operator;
+				TextOperator operatorOfClicked = clicked.descriptionTreeNode==null ? null : clicked.descriptionTreeNode.description.getData().operator;
 				menuDescOperator.setText(
 						operatorOfClicked==null
 							? "[Description Text Operator]"
@@ -1323,7 +1323,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			DescriptionData data = description.getData();
 			if (data != null)
 			{
-				DescriptionOperator operator = data.operator!=null ? data.operator : DescriptionOperator.Equals;
+				TextOperator operator = data.operator!=null ? data.operator : TextOperator.Equals;
 				switch (operator)
 				{
 				case Equals    : return data.hasEpisodeStr() ? TreeIcons.DescEp         : TreeIcons.Desc;
@@ -1340,7 +1340,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			DescriptionData data = description.getData();
 			if (data != null)
 			{
-				DescriptionOperator operator = data.operator!=null ? data.operator : DescriptionOperator.Equals;
+				TextOperator operator = data.operator!=null ? data.operator : TextOperator.Equals;
 				switch (operator)
 				{
 				case Equals    : break;

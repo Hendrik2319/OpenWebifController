@@ -7,12 +7,14 @@ import java.awt.Dimension;
 import java.awt.Window;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Vector;
@@ -1276,13 +1278,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			if (ecs.descriptions()!=null)
 			{
-				Map<String, DescriptionData> descriptions = ecs.descriptions();
-				childrenVec.addAll( descriptions.keySet()
-						.stream()
-						.map(description -> new DescriptionTreeNode(this, new DescriptionChanger(description, descriptions)))
-						.sorted(SORT_BY_TITLE)
-						.toList()
-				);
+				childrenVec.addAll( createDescriptionTreeNodes(this, ecs.descriptions().standard, false) );
+				childrenVec.addAll( createDescriptionTreeNodes(this, ecs.descriptions().extended, true ) );
 			}
 			
 			if (ecs.stations()!=null)
@@ -1300,21 +1297,34 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 	
+	private List<DescriptionTreeNode> createDescriptionTreeNodes(AbstractTreeNode parent, Map<String, DescriptionData> descriptions, boolean isExtDesc)
+	{
+		return descriptions.keySet()
+				.stream()
+				.map(description -> new DescriptionTreeNode(parent, new DescriptionChanger(description, descriptions), isExtDesc))
+				.sorted(AbstractTreeNode.SORT_BY_TITLE)
+				.toList();
+	}
+	
 	private class DescriptionTreeNode extends AbstractTreeNode
 	{
 		private final DescriptionChanger description;
+		private final boolean isExtDesc;
 
-		DescriptionTreeNode(AbstractTreeNode parent, DescriptionChanger description)
+		DescriptionTreeNode(AbstractTreeNode parent, DescriptionChanger description, boolean isExtDesc)
 		{
-			super(parent, generateTitle(description), false, null);
+			super(parent, "###", false, null);
+			this.isExtDesc = isExtDesc;
 			this.description = Objects.requireNonNull(description);
 			children = new AbstractTreeNode[0];
+			updateTitle();
 		}
 
 		@Override
 		protected void updateTitle()
 		{
-			title = generateTitle(description);
+			String prefix = isExtDesc ? "[E] " : "";
+			title = prefix + generateTitle(description);
 		}
 
 		@Override
@@ -1387,12 +1397,10 @@ class AlreadySeenEventsViewer extends StandardDialog
 		{
 			if (stationData.descriptions()!=null)
 			{
-				Map<String, DescriptionData> descriptions = stationData.descriptions();
-				children = descriptions.keySet()
-						.stream()
-						.map(description -> new DescriptionTreeNode(this, new DescriptionChanger(description, descriptions)))
-						.sorted(childrenOrder)
-						.toArray(AbstractTreeNode[]::new);
+				List<DescriptionTreeNode> list = new ArrayList<>();
+				list.addAll(createDescriptionTreeNodes(this, stationData.descriptions().standard, false) );
+				list.addAll(createDescriptionTreeNodes(this, stationData.descriptions().extended, true ) );
+				children = list.toArray(AbstractTreeNode[]::new);
 			}
 			else
 				children = new AbstractTreeNode[0];

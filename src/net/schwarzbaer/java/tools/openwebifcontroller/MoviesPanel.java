@@ -237,7 +237,7 @@ class MoviesPanel extends JSplitPane {
 			
 			JMenu clickedMovieMenu = new JMenu("Clicked Movie");
 			add(clickedMovieMenu);
-			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents.getInstance().createMenuForMovies(clickedMovieMenu, main.mainWindow, ()->clickedMovie, null, ()->{
+			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents.getInstance().createMenuForMovie(clickedMovieMenu, main.mainWindow, ()->clickedMovie, ()->{
 				movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
 			});
 			
@@ -245,7 +245,7 @@ class MoviesPanel extends JSplitPane {
 			
 			JMenu selectedMovieMenu = new JMenu("Selected Movie");
 			add(selectedMovieMenu);
-			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents.getInstance().createMenuForMovies(selectedMovieMenu, main.mainWindow, null, ()->selectedMovies, ()->{
+			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents.getInstance().createMenuForMovies(selectedMovieMenu, main.mainWindow, ()->selectedMovies, ()->{
 				movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
 			});
 			

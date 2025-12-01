@@ -480,7 +480,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 								: clicked.stationTreeNode!=null
 									? "Delete station \"%s\"".formatted( clicked.stationTreeNode.station )
 									: clicked.descriptionTreeNode!=null
-										? "Delete description \"%s\"".formatted( clicked.descriptionTreeNode.description.getText() )
+										? "Delete description \"%s\"".formatted( clicked.descriptionTreeNode.description.getReducedText(50) )
 										: "Delete"
 				);
 				
@@ -1433,6 +1433,15 @@ class AlreadySeenEventsViewer extends StandardDialog
 		String getText()
 		{
 			return descText;
+		}
+		
+		String getReducedText(int maxLength)
+		{
+			if (descText.length() <= maxLength)
+				return descText;
+			
+			int cutLength = Math.min( Math.max( maxLength-3, 4 ), maxLength );
+			return "%s...".formatted( descText.substring(0, cutLength) );
 		}
 		
 		record Response(boolean success, String reasonWhyNot)

@@ -151,12 +151,12 @@ class TimersDialog extends JDialog {
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Toggle", e->{
 				if (clickedTimer==null) return;
-				OpenWebifController.toggleTimer(null, clickedTimer, TimersDialog.this, logWindow, response -> handleToggleResponse(clickedTimer, response));
+				OpenWebifController.toggleTimer(null, clickedTimer, TimersDialog.this, logWindow, this::handleToggleResponse);
 			}));
 			
 			menuClickedTimer.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
-				OpenWebifController.deleteTimer(null, clickedTimer, TimersDialog.this, logWindow, response -> handleDeleteResponse(clickedTimer, response));
+				OpenWebifController.deleteTimer(null, clickedTimer, TimersDialog.this, logWindow, this::handleDeleteResponse);
 			}));
 			
 			JMenu menuSelectedTimers;

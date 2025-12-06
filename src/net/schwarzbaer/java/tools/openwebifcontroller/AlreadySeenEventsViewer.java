@@ -172,6 +172,27 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 
+	private void reorderSiblings(SelectionInfo selected)
+	{
+		treeModel.reorderSiblings(selected.treeNode);
+		tree.repaint();
+	}
+
+	private void copyNodeTitle(SelectionInfo selectionInfo)
+	{
+		if (selectionInfo.groupTreeNode!=null)
+			ClipboardTools.copyStringSelectionToClipBoard(selectionInfo.groupTreeNode.groupName);
+		
+		if (selectionInfo.ecsTreeNode!=null)
+			ClipboardTools.copyStringSelectionToClipBoard(selectionInfo.ecsTreeNode.ecs.title());
+		
+		if (selectionInfo.stationTreeNode!=null)
+			ClipboardTools.copyStringSelectionToClipBoard(selectionInfo.stationTreeNode.station);
+		
+		if (selectionInfo.descriptionTreeNode!=null)
+			ClipboardTools.copyStringSelectionToClipBoard(selectionInfo.descriptionTreeNode.description.getText());
+	}
+
 	private static class SelectionInfo
 	{
 		final TreePath                 path;
@@ -203,22 +224,61 @@ class AlreadySeenEventsViewer extends StandardDialog
 	
 	private enum KeyFunction
 	{
-		EditEpisodeStr(KeyEvent.VK_F4),
+		EditEpisodeStr (KeyEvent.VK_F4),
+		ReorderSiblings(KeyEvent.VK_F5),
+		CopyNodeTitle(KeyEvent.VK_C, false, true, false, false, "Ctrl+C"),
 		;
 		private final int keyCode;
+		private final boolean withShift;
+		private final boolean withCtrl;
+		private final boolean withAlt;
+		private final boolean withAltGr;
 		private final String keyLabel;
 		
-		KeyFunction(int keyCode) { this(keyCode, KeyEvent.getKeyText(keyCode)); }
-		KeyFunction(int keyCode, String keyLabel)
-		{
-			this.keyCode = keyCode;
-			this.keyLabel = Objects.requireNonNull(keyLabel);
+		KeyFunction(int keyCode) { this(keyCode, false, false, false, false, getKeyText(keyCode, false, false, false, false)); }
+		KeyFunction(
+				int keyCode,
+				boolean withShift,
+				boolean withCtrl ,
+				boolean withAlt  ,
+				boolean withAltGr,
+				String keyLabel
+		) {
+			this.keyCode   = keyCode;
+			this.withShift = withShift;
+			this.withCtrl  = withCtrl;
+			this.withAlt   = withAlt;
+			this.withAltGr = withAltGr;
+			this.keyLabel  = Objects.requireNonNull(keyLabel);
 		}
 		
-		static KeyFunction getFromKeyCode(int keyCode)
+		static String getKeyText(
+				int keyCode,
+				boolean withShift,
+				boolean withCtrl ,
+				boolean withAlt  ,
+				boolean withAltGr
+		) {
+			StringBuilder sb = new StringBuilder();
+			if (withCtrl ) sb.append("Ctrl+");
+			if (withAlt  ) sb.append("Alt+");
+			if (withShift) sb.append("Shift+");
+			if (withAltGr) sb.append("AltGr+");
+			sb.append(KeyEvent.getKeyText(keyCode));
+			return sb.toString();
+		}
+		static KeyFunction getFrom(int keyCode, int modifiersEx)
 		{
+			boolean withShift = (modifiersEx & KeyEvent.SHIFT_DOWN_MASK    ) != 0;
+			boolean withCtrl  = (modifiersEx & KeyEvent.CTRL_DOWN_MASK     ) != 0;
+			boolean withAlt   = (modifiersEx & KeyEvent.ALT_DOWN_MASK      ) != 0;
+			boolean withAltGr = (modifiersEx & KeyEvent.ALT_GRAPH_DOWN_MASK) != 0;
 			for (KeyFunction val : values())
-				if (val.keyCode == keyCode)
+				if ( (val.keyCode   == keyCode  ) &&
+					 (val.withShift == withShift) &&
+					 (val.withCtrl  == withCtrl ) &&
+					 (val.withAlt   == withAlt  ) &&
+					 (val.withAltGr == withAltGr) )
 					return val;
 			return null;
 		}
@@ -238,13 +298,21 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 		@Override public void keyPressed(KeyEvent e)
 		{
-			KeyFunction keyFunction = KeyFunction.getFromKeyCode(e.getKeyCode());
+			KeyFunction keyFunction = KeyFunction.getFrom(e.getKeyCode(), e.getModifiersEx());
 			if (keyFunction==null) return;
 			
 			switch (keyFunction)
 			{
 			case EditEpisodeStr:
 				editEpisodeStr(AlreadySeenEventsViewer.this, selected);
+				break;
+				
+			case ReorderSiblings:
+				reorderSiblings(selected);
+				break;
+				
+			case CopyNodeTitle:
+				copyNodeTitle(selected);
 				break;
 			}
 		}
@@ -264,17 +332,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			clicked = new SelectionInfo(null);
 			
 			JMenuItem miCopyStr = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Copy, e->{
-				if (clicked.groupTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clicked.groupTreeNode.groupName);
-				
-				if (clicked.ecsTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clicked.ecsTreeNode.ecs.title());
-				
-				if (clicked.stationTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clicked.stationTreeNode.station);
-				
-				if (clicked.descriptionTreeNode!=null)
-					ClipboardTools.copyStringSelectionToClipBoard(clicked.descriptionTreeNode.description.getText());
+				copyNodeTitle(clicked);
 			} ) );
 			
 			JMenuItem miEditEpisodeStr = add( OpenWebifController.createMenuItem( "##", e->{
@@ -386,8 +444,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			addSeparator();
 			
 			JMenuItem miReorderSiblings = add( OpenWebifController.createMenuItem( "##", e->{
-				treeModel.reorderSiblings(clicked.treeNode);
-				tree.repaint();
+				reorderSiblings(clicked);
 			} ) );
 			
 			JMenu menuRootOrder = OpenWebifController.createMenu("Order of subnodes of root");
@@ -421,7 +478,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 						clicked.stationTreeNode!=null ||
 						clicked.descriptionTreeNode!=null
 				);
-				miCopyStr.setText(
+				miCopyStr.setText( KeyFunction.CopyNodeTitle.addKeyLabel(
 						clicked.groupTreeNode!=null
 							? "Copy group name to clipboard"
 							: clicked.ecsTreeNode!=null
@@ -431,11 +488,11 @@ class AlreadySeenEventsViewer extends StandardDialog
 									: clicked.descriptionTreeNode!=null
 										? "Copy description to clipboard"
 										: "Copy text to clipboard"
-				);
+				) );
 				
 				AbstractTreeNode parent = clicked.treeNode!=null ? clicked.treeNode.parent : null;
 				miReorderSiblings.setEnabled(parent!=null);
-				miReorderSiblings.setText(
+				miReorderSiblings.setText( KeyFunction.ReorderSiblings.addKeyLabel(
 						parent instanceof RootTreeNode
 							? "Reorder subnodes of root"
 							: parent instanceof ECSGroupTreeNode
@@ -447,7 +504,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 										: parent instanceof DescriptionTreeNode
 											? "Reorder subnodes of description \"%s\"".formatted( parent.title )
 											: "Reorder nodes"
-				);
+				) );
 				
 				menuMoveToGroup.setEnabled(clicked.ecsTreeNode!=null && !CustomTreeModel.isInGroup(clicked.ecsTreeNode));
 				

@@ -820,6 +820,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		out.add(level, "Description");
 		out.add(level+1, "", event.shortdesc);
 		out.add(level+1, "", event.longdesc );
+		
+		AlreadySeenEvents.RuleOutput rule = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(event);
+		if (rule!=null)
+		{
+			out.addEmptyLine();
+			out.add(level, "Is Already Seen");
+			rule.writeIntoOutput(out, level+1);
+		}
 	}
 
 	public interface LogWindowInterface {

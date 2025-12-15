@@ -24,9 +24,11 @@ import java.util.stream.Collectors;
 
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
 
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 
@@ -452,6 +454,13 @@ public class AlreadySeenEvents
 		@Override public String getDescription    (MovieList.Movie m) { return m.description; }
 		@Override public String getExtDescription (MovieList.Movie m) { return m.descriptionExtended; }
 	};
+	private final static GetData<EPGevent> GET_DATA_FROM_EPGEVENT = new GetData<>()
+	{
+		@Override public String getTitle          (EPGevent m) { return m.title;        }
+		@Override public String getStation        (EPGevent m) { return m.station_name; }
+		@Override public String getDescription    (EPGevent m) { return m.shortdesc;    }
+		@Override public String getExtDescription (EPGevent m) { return m.longdesc;     }
+	};
 	
 	public interface MenuControl {
 		void updateBeforeShowingMenu();
@@ -459,23 +468,33 @@ public class AlreadySeenEvents
 
 	public MenuControl createMenuForTimer(JMenu parent, Window window, Supplier<Timer> getTimer, Runnable updateAfterMenuAction)
 	{
-		return new SubMenu<>(parent, window, getTimer, null, GET_DATA_FROM_TIMER, updateAfterMenuAction);
+		return new SubMenu<>(parent::add, window, getTimer, null, GET_DATA_FROM_TIMER, updateAfterMenuAction);
 	}
 	public MenuControl createMenuForTimers(JMenu parent, Window window, Supplier<Timer[]> getTimers, Runnable updateAfterMenuAction)
 	{
-		return new SubMenu<>(parent, window, null, getTimers, GET_DATA_FROM_TIMER, updateAfterMenuAction);
+		return new SubMenu<>(parent::add, window, null, getTimers, GET_DATA_FROM_TIMER, updateAfterMenuAction);
 	}
 	public MenuControl createMenuForMovie(JMenu parent, Window window, Supplier<MovieList.Movie> getMovie, Runnable updateAfterMenuAction)
 	{
-		return new SubMenu<>(parent, window, getMovie, null, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
+		return new SubMenu<>(parent::add, window, getMovie, null, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
 	}
 	public MenuControl createMenuForMovies(JMenu parent, Window window, Supplier<MovieList.Movie[]> getMovies, Runnable updateAfterMenuAction)
 	{
-		return new SubMenu<>(parent, window, null, getMovies, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
+		return new SubMenu<>(parent::add, window, null, getMovies, GET_DATA_FROM_MOVIE, updateAfterMenuAction);
+	}
+	public MenuControl createMenuForEPGevent(JPopupMenu parent, Window window, Supplier<EPGevent> getEPGevent, Runnable updateAfterMenuAction)
+	{
+		return new SubMenu<>(parent::add, window, getEPGevent, null, GET_DATA_FROM_EPGEVENT, updateAfterMenuAction);
+	}
+	
+	private interface ParentMenu
+	{
+		JMenuItem add(JMenuItem menuItem);
 	}
 	
 	private class SubMenu<V> implements MenuControl
 	{
+		private final JMenu menuAdd;
 		private final JMenuItem miShowRule;
 		private final Supplier<V> getSource;
 		private final Supplier<V[]> getSources;
@@ -483,21 +502,20 @@ public class AlreadySeenEvents
 		private V singleSource;
 		private RuleOutput singleSourceAlreadySeenRule;
 
-		SubMenu(JMenu parent, Window window, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
+		SubMenu(ParentMenu parent, Window window, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
 		{
 			this.getSource = getSource;
 			this.getSources = getSources;
 			this.getData = getData;
 			this.singleSource = null;
 			
-			JMenu addMenu;
-			parent.add(addMenu = new JMenu("Mark as Already Seen"));
-			addMenu.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false, false)));
-			addMenu.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true , false)));
-			addMenu.add(OpenWebifController.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false, true )));
-			addMenu.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false, false)));
-			addMenu.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true , false)));
-			addMenu.add(OpenWebifController.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false, true )));
+			parent.add(menuAdd = new JMenu("Mark as Already Seen"));
+			menuAdd.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false, false)));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true , false)));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false, true )));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false, false)));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true , false)));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false, true )));
 			
 			miShowRule = parent.add(OpenWebifController.createMenuItem("##", e->{
 				TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule.toString());
@@ -522,6 +540,8 @@ public class AlreadySeenEvents
 			singleSourceAlreadySeenRule = singleSource==null ? null : getRuleIfAlreadySeen(singleSource, getData);
 			miShowRule.setEnabled(singleSourceAlreadySeenRule != null);
 			miShowRule.setText( "Show [Already Seen] Rule" + (singleSource==null ? "" : " for \"%s\"".formatted(getData.getTitle(singleSource))) );
+			
+			menuAdd.setText( "Mark%s as Already Seen".formatted(singleSource==null ? "" : " \"%s\"".formatted(getData.getTitle(singleSource))) );
 		}
 	}
 
@@ -618,9 +638,11 @@ public class AlreadySeenEvents
 
 	public boolean isMarkedAsAlreadySeen(Timer           timer) { return getRuleIfAlreadySeen(timer) != null; }
 	public boolean isMarkedAsAlreadySeen(MovieList.Movie movie) { return getRuleIfAlreadySeen(movie) != null; }
+	public boolean isMarkedAsAlreadySeen(EPGevent        event) { return getRuleIfAlreadySeen(event) != null; }
 
 	public RuleOutput getRuleIfAlreadySeen(Timer           timer) { return getRuleIfAlreadySeen(timer, GET_DATA_FROM_TIMER); }
 	public RuleOutput getRuleIfAlreadySeen(MovieList.Movie movie) { return getRuleIfAlreadySeen(movie, GET_DATA_FROM_MOVIE); }
+	public RuleOutput getRuleIfAlreadySeen(EPGevent        event) { return getRuleIfAlreadySeen(event, GET_DATA_FROM_EPGEVENT); }
 
 	private <V> RuleOutput getRuleIfAlreadySeen(final V source, final GetData<V> getData)
 	{
@@ -695,19 +717,19 @@ public class AlreadySeenEvents
 		return false;
 	}
 	
-	static class RuleOutput
+	public static class RuleOutput
 	{
 		private record Pair(String label, String value) {}
 		
 		private final List<Pair> output = new ArrayList<>();
-		final String title;
-		final String station;
-		final String descStr;
-		final boolean isExtDesc;
-		final TextOperator operator;
-		final String episodeStr;
+		public  final String title;
+		public  final String station;
+		public  final String descStr;
+		public  final boolean isExtDesc;
+		public  final TextOperator operator;
+		public  final String episodeStr;
 		
-		RuleOutput(String title, String station, String descStr, boolean isExtDesc, TextOperator operator, String episodeStr)
+		private RuleOutput(String title, String station, String descStr, boolean isExtDesc, TextOperator operator, String episodeStr)
 		{
 			this.title = Objects.requireNonNull(title);
 			this.station = station;

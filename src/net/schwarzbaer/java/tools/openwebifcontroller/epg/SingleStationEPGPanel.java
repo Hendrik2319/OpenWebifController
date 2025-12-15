@@ -5,6 +5,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Point;
+import java.awt.Window;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -40,6 +41,7 @@ import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimerTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
@@ -55,9 +57,14 @@ public class SingleStationEPGPanel extends JSplitPane
 	private final DataAcquisition dataAcquisition;
 	private final Tables.SimplifiedRowSorter epgTableRowSorter;
 
-	public SingleStationEPGPanel(EPG epg, TimerDataUpdateNotifier timerNotifier, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, EPGDialog.TimerCommands timerCommands)
+	private EPGevent selectedEvent;
+	private Timer selectedTimer;
+
+	public SingleStationEPGPanel(EPG epg, TimerDataUpdateNotifier timerNotifier, Supplier<String> getBaseURL, Consumer<String> setStatusOutput, EPGDialog.TimerCommands timerCommands, Window window)
 	{
 		super(JSplitPane.HORIZONTAL_SPLIT, true);
+		selectedEvent = null;
+		selectedTimer = null;
 		
 		epgTable = new JTable(epgTableModel = new EPGTableModel(timerNotifier));
 		epgTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
@@ -68,7 +75,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		epgTableModel.setColumnWidths(epgTable);
 		epgTableModel.setCellRenderers();
 		
-		new EPGTableContextMenu(getBaseURL, timerCommands);
+		new EPGTableContextMenu(window, getBaseURL, timerCommands);
 		
 		JScrollPane tableScrollPane = new JScrollPane(epgTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
@@ -86,38 +93,44 @@ public class SingleStationEPGPanel extends JSplitPane
 		epgTable.getSelectionModel().addListSelectionListener(e -> {
 			int rowV = epgTable.getSelectedRow();
 			int rowM = rowV<0 ? -1 : epgTable.convertRowIndexToModel(rowV);
-			EPGevent event = rowM<0 ? null : epgTableModel.getRow(rowM);
-			Timer timer = epgTableModel.getEventTimer(event);
-			
-			if (event == null)
-			{
-				showEPGOutput(null);
-				return;
-			}
-			
-			ValueListOutput out = new ValueListOutput();
-			String output;
-			if (timer==null)
-			{
-				OpenWebifController.generateOutput(out, 0, event);
-				output = out.generateOutput();
-			}
-			else
-			{
-				out.add(0, "EPG Event");
-				OpenWebifController.generateOutput(out, 1, event);
-				out.add(0, "Timer");
-				TimerTools.generateDetailsOutput(out, 1, timer);
-				output = out.generateOutput();
-				output += TimerTools.generateShortInfo(ValueListOutput.DEFAULT_INDENT, timer, false);
-			}
-			showEPGOutput(output);
+			selectedEvent = rowM<0 ? null : epgTableModel.getRow(rowM);
+			selectedTimer = epgTableModel.getEventTimer(selectedEvent);
+			showEPGOutput();
 		});
 		
 		dataAcquisition = new DataAcquisition(
 				epgTableModel, epg, getBaseURL, setStatusOutput, 4*60*60,
 				str -> SwingUtilities.invokeLater(()->showEPGOutput(str))
 		);
+	}
+
+	private void showEPGOutput()
+	{
+		if (selectedEvent == null)
+		{
+			showEPGOutput(null);
+		}
+		else
+		{
+			ValueListOutput out = new ValueListOutput();
+			String output;
+			if (selectedTimer==null)
+			{
+				OpenWebifController.generateOutput(out, 0, selectedEvent);
+				output = out.generateOutput();
+			}
+			else
+			{
+				out.add(0, "EPG Event");
+				OpenWebifController.generateOutput(out, 1, selectedEvent);
+				out.addEmptyLine();
+				out.add(0, "Timer");
+				TimerTools.generateDetailsOutput(out, 1, selectedTimer);
+				output = out.generateOutput();
+				output += TimerTools.generateShortInfo(ValueListOutput.DEFAULT_INDENT, selectedTimer, false);
+			}
+			showEPGOutput(output);
+		}
 	}
 
 	private void showEPGOutput(String str)
@@ -341,7 +354,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		
 	//	private EPGevent selectedEvent;
 
-		EPGTableContextMenu(Supplier<String> getBaseURL, EPGDialog.TimerCommands timerCommands)
+		EPGTableContextMenu(Window window, Supplier<String> getBaseURL, EPGDialog.TimerCommands timerCommands)
 		{
 			this.getBaseURL = Objects.requireNonNull(getBaseURL);
 			this.timerCommands = Objects.requireNonNull(timerCommands);
@@ -353,6 +366,16 @@ public class SingleStationEPGPanel extends JSplitPane
 			add(miAddRecordNSwitchTimer = OpenWebifController.createMenuItem("Add Record'N'Switch Timer", GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.RecordNSwitch)));
 			add(miToggleTimer           = OpenWebifController.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
 			add(miDeleteTimer           = OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			
+			addSeparator();
+			
+			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents
+					.getInstance()
+					.createMenuForEPGevent(this, window, ()->clickedEvent, () -> {
+						epgTableModel.fireTableColumnUpdate(EPGTableModel.ColumnID.Seen);
+						if (clickedEvent == selectedEvent)
+							showEPGOutput();
+					});
 			
 			addSeparator();
 			
@@ -390,6 +413,8 @@ public class SingleStationEPGPanel extends JSplitPane
 				miAddRecordNSwitchTimer.setText(!isEventOK || clickedEvent.title==null ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", clickedEvent.title));
 				miToggleTimer          .setText(clickedEventTimer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", clickedEventTimer.name));
 				miDeleteTimer          .setText(clickedEventTimer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", clickedEventTimer.name));
+				
+				aseMenuControlClicked.updateBeforeShowingMenu();
 			});
 			
 			addTo(epgTable);
@@ -457,6 +482,7 @@ public class SingleStationEPGPanel extends JSplitPane
 			End          (config("End"              , Long      .class,  60,   null).setValFunc(   EPGTableModel::getEnd     ).setToStringR(EPGTableModel::getEndDisplayStr  )),
 			Duration     (config("Duration"         , Long      .class,  60,   null).setValFunc(   ev  -> ev.duration_sec    ).setToStringR(ev -> ev.duration_sec==null ? "" : DateTimeFormatter.getDurationStr(ev.duration_sec))),
 			Timer        (config("Timer"            , Timer.Type.class,  90, CENTER).setValFunc((m,ev) -> getTimerType(m,ev) )),
+			Seen         (config("Seen"             , String    .class,  75, CENTER).setValFunc(   ev  -> toString(AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(ev)))),
 			Genre        (config("Genre"            , Long      .class, 350,   LEFT).setValFunc(   ev  -> ev.genreid         ).setToStringR(ev -> " [%03d] %s".formatted(ev.genreid, ev.genre))),
 			ShortDesc    (config("Short Description", String    .class, 250,   null).setValFunc(   ev  -> ev.shortdesc       )),
 			LongDesc     (config("Long Description" , String    .class, 250,   null).setValFunc(   ev  -> ev.longdesc        )),
@@ -490,6 +516,15 @@ public class SingleStationEPGPanel extends JSplitPane
 			{
 				Timer timer = model.getEventTimer(event);
 				return timer==null ? null : timer.type;
+			}
+			
+			private static String toString(AlreadySeenEvents.RuleOutput ruleOutput)
+			{
+				if (ruleOutput == null)
+					return null;
+				if (ruleOutput.episodeStr == null)
+					return "Seen";
+				return "[%s]".formatted(ruleOutput.episodeStr);
 			}
 		}
 		

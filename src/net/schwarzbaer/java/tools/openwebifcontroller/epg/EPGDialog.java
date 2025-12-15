@@ -37,6 +37,7 @@ import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
@@ -265,7 +266,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		//epgViewHorizScrollBar.setValues(epgView.getRowOffsetY(), epgView.getRowViewHeight(), 0, epgView.getContentHeight());
 		
 		StationContextMenu stationContextMenu = externCommands==null ? null : new StationContextMenu(externCommands, baseURL);
-		EventContextMenu     eventContextMenu = externCommands==null ? null : new   EventContextMenu(externCommands, baseURL, epgView);
+		EventContextMenu     eventContextMenu = externCommands==null ? null : new   EventContextMenu(externCommands, baseURL, epgView, parent);
 		new EPGViewMouseHandler(this, epgView, epgViewHorizScrollBar, epgViewVertScrollBar, eventContextMenu, stationContextMenu, this.stations);
 		
 		JButton closeButton = OpenWebifController.createButton("Close", true, e->closeDialog());
@@ -490,7 +491,9 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		private EPGViewEvent event;
 		private EPGView.Timer timer;
 
-		EventContextMenu(TimerCommands externCommands, String baseURL, EPGView epgView) {
+		private final AlreadySeenEvents.MenuControl aseMenuControlClicked;
+
+		EventContextMenu(TimerCommands externCommands, String baseURL, EPGView epgView, Window window) {
 			this.externCommands = externCommands;
 			this.baseURL = baseURL;
 			this.epgView = epgView;
@@ -501,6 +504,16 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			add(miAddRecordNSwitchTimer = OpenWebifController.createMenuItem("Add Record'N'Switch Timer", e->addTimer(Timers.Timer.Type.RecordNSwitch)));
 			add(miToggleTimer        = OpenWebifController.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
 			add(miDeleteTimer        = OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			
+			addSeparator();
+			
+			aseMenuControlClicked = AlreadySeenEvents
+					.getInstance()
+					.createMenuForEPGevent(this, window, ()->event==null ? null : event.event, () -> {
+						if (event!=null)
+							event.updateASEData();
+						epgView.repaint();
+					});
 		}
 		
 		private void addTimer(Timers.Timer.Type type) { externCommands.addTimer   (baseURL, event.event.sref, event.event.id.intValue(), type); }
@@ -528,6 +541,8 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			miAddRecordNSwitchTimer.setText(!isEventOK || this.event.title==null ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", this.event.title));
 			miToggleTimer          .setText(timer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", timer.name));
 			miDeleteTimer          .setText(timer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", timer.name));
+			
+			aseMenuControlClicked.updateBeforeShowingMenu();
 		}
 	}
 

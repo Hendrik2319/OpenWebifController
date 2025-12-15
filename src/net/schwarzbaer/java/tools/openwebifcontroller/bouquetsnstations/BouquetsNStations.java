@@ -112,7 +112,8 @@ public class BouquetsNStations extends JPanel {
 				Objects.requireNonNull( timerDataUpdateNotifier ),
 				this.main::getBaseURL,
 				str -> statusLine.showMessage(str, 2000),
-				this.main
+				this.main,
+				this.main.mainWindow
 		);
 		
 		JTabbedPane rightPanel = new JTabbedPane();

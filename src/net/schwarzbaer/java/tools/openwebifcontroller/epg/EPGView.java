@@ -11,6 +11,7 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
 import java.io.PrintStream;
 import java.util.Calendar;
 import java.util.Comparator;
@@ -23,11 +24,14 @@ import javax.swing.BorderFactory;
 import javax.swing.border.Border;
 
 import net.schwarzbaer.java.lib.gui.Canvas;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
+import net.schwarzbaer.java.lib.gui.ImageTools;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
 class EPGView extends Canvas {
@@ -56,6 +60,11 @@ class EPGView extends Canvas {
 	
 	private static final int HEADERHEIGHT = 20;
 	private static final int STATIONWIDTH = 100;
+	
+	private static final BufferedImage EYE_IMAGE = ImageTools.convert(
+			GrayCommandIcons.Visible.getImageFromSource(),
+			ImageTools.keepAlpha( rgb -> 0xFF9300 )
+	);
 	
 	private final Calendar calendar;
 	private final long baseTimeOffset_s;
@@ -258,12 +267,14 @@ class EPGView extends Canvas {
 		final int begin_s_based;
 		final int   end_s_based;
 		final EPGevent event;
+		private AlreadySeenEvents.RuleOutput ruleIfAlreadySeen;
 	
 		EPGViewEvent(String title, int begin_s_based, int end_s_based, EPGevent event) {
 			this.title = title;
 			this.begin_s_based = begin_s_based;
 			this.  end_s_based =   end_s_based;
 			this.event = event;
+			ruleIfAlreadySeen = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(event);
 		}
 	
 		boolean covers(int time_s_based) {
@@ -273,6 +284,11 @@ class EPGView extends Canvas {
 		@Override
 		public String toString() {
 			return String.format("%s, %d-%d", title, begin_s_based, end_s_based);
+		}
+
+		public void updateASEData()
+		{
+			ruleIfAlreadySeen = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(event);
 		}
 		
 	}
@@ -565,8 +581,12 @@ class EPGView extends Canvas {
 			if (event.title!=null)
 			{
 				g2.setColor(COLOR_EVENT_TEXT);
-				int textX = xBegin+1+eventTextOffsetX;
-				if (textX < x0_+STATIONWIDTH+2) textX = x0_+STATIONWIDTH+2;
+				int textX = Math.max( xBegin+1+eventTextOffsetX, x0_+STATIONWIDTH+2 );
+				if (event.ruleIfAlreadySeen!=null)
+				{
+					g2.drawImage(EYE_IMAGE, textX, rowY + (rowHeight-16)/2, null);
+					textX += 18;
+				}
 				g2.drawString(event.title, textX, rowY+rowTextOffsetY);
 			}
 		}

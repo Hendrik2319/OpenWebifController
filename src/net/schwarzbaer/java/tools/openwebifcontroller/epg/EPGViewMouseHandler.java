@@ -12,10 +12,8 @@ import java.util.Vector;
 import javax.swing.JScrollBar;
 
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
-import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
-import net.schwarzbaer.java.tools.openwebifcontroller.TimerTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.EventContextMenu;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.StationContextMenu;
 
@@ -165,24 +163,8 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 		switch (e.getButton()) {
 		case MouseEvent.BUTTON1:
 			if (hoveredEvent!=null) {
-				String text;
 				EPGView.Timer timer = epgView.getTimer(hoveredEvent.event.sref, hoveredEvent.event.id);
-				if (timer!=null)
-				{
-					ValueListOutput out = new ValueListOutput();
-					out.add(0, "EPG Event");
-					OpenWebifController.generateOutput(out, 1, hoveredEvent.event);
-					out.add(0, "Timer");
-					TimerTools.generateDetailsOutput(out, 1, timer.timer);
-					text = out.generateOutput();
-					text += TimerTools.generateShortInfo(ValueListOutput.DEFAULT_INDENT, timer.timer, false);
-				}
-				else
-				{
-					ValueListOutput out = new ValueListOutput();
-					OpenWebifController.generateOutput(out, 0, hoveredEvent.event);
-					text = out.generateOutput();
-				}
+				String text = OpenWebifController.generateOutput(hoveredEvent.event, timer==null ? null : timer.timer);
 				TextAreaDialog.showText(parent, hoveredEvent.title, 700, 500, true, text);
 			}
 			break;

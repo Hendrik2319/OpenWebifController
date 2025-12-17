@@ -830,6 +830,28 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		}
 	}
 
+	public static String generateOutput(EPGevent event, Timers.Timer timer)
+	{
+		ValueListOutput out = new ValueListOutput();
+		String output;
+		if (timer == null)
+		{
+			generateOutput(out, 0, event);
+			output = out.generateOutput();
+		}
+		else
+		{
+			out.add(0, "EPG Event");
+			generateOutput(out, 1, event);
+			out.addEmptyLine();
+			out.add(0, "Timer");
+			TimerTools.generateDetailsOutput(out, 1, timer);
+			output = out.generateOutput();
+			output += "\r\n"+TimerTools.generateShortInfo(ValueListOutput.DEFAULT_INDENT, timer, false);
+		}
+		return output;
+	}
+
 	public interface LogWindowInterface {
 		void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight);
 	}

@@ -32,7 +32,6 @@ import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.Tables;
-import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
@@ -106,31 +105,7 @@ public class SingleStationEPGPanel extends JSplitPane
 
 	private void showEPGOutput()
 	{
-		if (selectedEvent == null)
-		{
-			showEPGOutput(null);
-		}
-		else
-		{
-			ValueListOutput out = new ValueListOutput();
-			String output;
-			if (selectedTimer==null)
-			{
-				OpenWebifController.generateOutput(out, 0, selectedEvent);
-				output = out.generateOutput();
-			}
-			else
-			{
-				out.add(0, "EPG Event");
-				OpenWebifController.generateOutput(out, 1, selectedEvent);
-				out.addEmptyLine();
-				out.add(0, "Timer");
-				TimerTools.generateDetailsOutput(out, 1, selectedTimer);
-				output = out.generateOutput();
-				output += TimerTools.generateShortInfo(ValueListOutput.DEFAULT_INDENT, selectedTimer, false);
-			}
-			showEPGOutput(output);
-		}
+		showEPGOutput(selectedEvent==null ? null : OpenWebifController.generateOutput(selectedEvent, selectedTimer));
 	}
 
 	private void showEPGOutput(String str)

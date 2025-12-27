@@ -31,6 +31,7 @@ import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory;
 
 public class AlreadySeenEvents
 {
@@ -780,7 +781,7 @@ public class AlreadySeenEvents
 		}
 	}
 
-	AlreadySeenEventsViewer.RootTreeNode createTreeRoot(AlreadySeenEventsViewer viewer)
+	TreeNodeFactory.RootTreeNode createTreeRoot(AlreadySeenEventsViewer viewer)
 	{
 		return viewer.createTreeRoot(alreadySeenEvents);
 	}

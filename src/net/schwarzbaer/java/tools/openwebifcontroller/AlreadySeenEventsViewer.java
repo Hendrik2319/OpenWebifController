@@ -52,6 +52,13 @@ import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCri
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.StationData;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.TextOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.VariableECSData;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.AbstractTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.DescriptionTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.ECSGroupTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.EventCriteriaSetTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.NewNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.RootTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.StationTreeNode;
 
 class AlreadySeenEventsViewer extends StandardDialog
 {
@@ -65,15 +72,14 @@ class AlreadySeenEventsViewer extends StandardDialog
 		private static IconSource.CachedIcons<TreeIcons> IS = IconSource.createCachedIcons(16, 16, "/images/AlreadySeenEventsViewerTreeIcons.png", TreeIcons.values());
 	}
 	
-	private boolean episodeStringFirst;
 	private final JTree tree;
 	private CustomTreeModel treeModel;
+	private final TreeNodeFactory factory;
 
 	private AlreadySeenEventsViewer(Window parent, String title)
 	{
 		super(parent, title, ModalityType.APPLICATION_MODAL, false);
-		
-		episodeStringFirst = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, false);
+		factory = new TreeNodeFactory();
 		
 		tree = new JTree();
 		tree.setModel(treeModel = new CustomTreeModel(tree, AlreadySeenEvents.getInstance().createTreeRoot(this)));
@@ -117,44 +123,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 
 	RootTreeNode createTreeRoot(Map<String, EventCriteriaSet> data)
 	{
-		return new RootTreeNode( data, CustomTreeModel.getCurrentRootSubnodeOrder() );
-	}
-	
-	String generateTitle(DescriptionChanger description)
-	{
-		if (description==null)
-			return "<null>";
-		
-		return generateTitle(
-				description.getText(),
-				description.getData()
-		);
-	}
-	
-	String generateTitle(String description, DescriptionData data)
-	{
-		if (data==null)
-			return generateTitle(description, (EpisodeInfo) data);
-		
-		String title = description;
-		switch (data.operator)
-		{
-		case Equals: break;
-		case StartsWith: title = description+"..."; break;
-		case Contains: title = "..."+description+"..."; break;
-		}
-		
-		return generateTitle(title, (EpisodeInfo) data);
-	}
-	
-	String generateTitle(String title, EpisodeInfo episode)
-	{
-		if (episode == null || !episode.hasEpisodeStr())
-			return title;
-		if (episodeStringFirst)
-			return String.format("(%s) %s", episode.episodeStr, title);
-		else
-			return String.format("%s (%s)", title, episode.episodeStr);
+		return factory.createRootTreeNode( data, CustomTreeModel.getCurrentRootSubnodeOrder() );
 	}
 	
 	private void editEpisodeStr(Window window, SelectionInfo selected)
@@ -343,9 +312,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 				editEpisodeStr(this.window, clicked);
 			} ) );
 			
-			add(OpenWebifController.createCheckBoxMenuItem("Show Episode Text before Title", episodeStringFirst, val -> {
-				episodeStringFirst = val;
-				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, episodeStringFirst);
+			add(OpenWebifController.createCheckBoxMenuItem("Show Episode Text before Title", factory.episodeStringFirst, val -> {
+				factory.setEpisodeStringFirst(val);
 				rebuildTree();
 			} ));
 			
@@ -1103,12 +1071,78 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 
+	static class TreeNodeFactory
+	{
+		private boolean episodeStringFirst;
+		
+		TreeNodeFactory()
+		{
+			episodeStringFirst = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, false);
+		}
+		
+		void setEpisodeStringFirst(Boolean val)
+		{
+			episodeStringFirst = val;
+			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, episodeStringFirst);
+		}
+		
+		RootTreeNode createRootTreeNode(Map<String, EventCriteriaSet> data, RootTreeNode.NodeOrder currentRootSubnodeOrder)
+		{
+			return new RootTreeNode(data, currentRootSubnodeOrder);
+		}
+		
+		String generateTitle(DescriptionChanger description)
+		{
+			if (description==null)
+				return "<null>";
+			
+			return generateTitle(
+					description.getText(),
+					description.getData()
+			);
+		}
+		
+		String generateTitle(String description, DescriptionData data)
+		{
+			if (data==null)
+				return generateTitle(description, (EpisodeInfo) data);
+			
+			String title = description;
+			switch (data.operator)
+			{
+			case Equals: break;
+			case StartsWith: title = description+"..."; break;
+			case Contains: title = "..."+description+"..."; break;
+			}
+			
+			return generateTitle(title, (EpisodeInfo) data);
+		}
+		
+		String generateTitle(String title, EpisodeInfo episode)
+		{
+			if (episode == null || !episode.hasEpisodeStr())
+				return title;
+			if (episodeStringFirst)
+				return String.format("(%s) %s", episode.episodeStr, title);
+			else
+				return String.format("%s (%s)", title, episode.episodeStr);
+		}
+		
+		private List<DescriptionTreeNode> createDescriptionTreeNodes(AbstractTreeNode parent, Map<String, DescriptionData> descriptions, boolean isExtDesc)
+		{
+			return descriptions.keySet()
+					.stream()
+					.map(description -> new DescriptionTreeNode(parent, new DescriptionChanger(description, descriptions), isExtDesc))
+					.sorted(AbstractTreeNode.SORT_BY_TITLE)
+					.toList();
+		}
+		
 	record NewNode<NodeType extends AbstractTreeNode> (
 			int index,
 			NodeType node
 	) {}
 
-	private abstract class AbstractTreeNode implements TreeNode
+	abstract class AbstractTreeNode implements TreeNode
 	{
 		static final Comparator<AbstractTreeNode> SORT_BY_TITLE = Comparator.comparing(node -> node.title, stringComparator);
 		
@@ -1381,7 +1415,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 	
-	private class ECSGroupTreeNode extends AbstractTreeNode implements EventCriteriaSetTreeNode.HostNode
+	class ECSGroupTreeNode extends AbstractTreeNode implements EventCriteriaSetTreeNode.HostNode
 	{
 		private final Vector<EventCriteriaSet> ecsList;
 		private       String groupName;
@@ -1438,7 +1472,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 
-	private class EventCriteriaSetTreeNode extends AbstractTreeNode
+	class EventCriteriaSetTreeNode extends AbstractTreeNode
 	{
 		private static final Comparator<AbstractTreeNode> ORDER = Comparator
 				.<AbstractTreeNode,Integer>comparing( node -> {
@@ -1508,17 +1542,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 			children = childrenVec.toArray(AbstractTreeNode[]::new);
 		}
 	}
-	
-	private List<DescriptionTreeNode> createDescriptionTreeNodes(AbstractTreeNode parent, Map<String, DescriptionData> descriptions, boolean isExtDesc)
-	{
-		return descriptions.keySet()
-				.stream()
-				.map(description -> new DescriptionTreeNode(parent, new DescriptionChanger(description, descriptions), isExtDesc))
-				.sorted(AbstractTreeNode.SORT_BY_TITLE)
-				.toList();
-	}
-	
-	private class DescriptionTreeNode extends AbstractTreeNode
+
+	class DescriptionTreeNode extends AbstractTreeNode
 	{
 		private final DescriptionChanger description;
 		private final boolean isExtDesc;
@@ -1526,8 +1551,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 		DescriptionTreeNode(AbstractTreeNode parent, DescriptionChanger description, boolean isExtDesc)
 		{
 			super(parent, "###", false, null);
-			this.isExtDesc = isExtDesc;
 			this.description = Objects.requireNonNull(description);
+			this.isExtDesc = isExtDesc;
 			children = new AbstractTreeNode[0];
 			updateTitle();
 		}
@@ -1579,7 +1604,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 
-	private class StationTreeNode extends AbstractTreeNode
+	class StationTreeNode extends AbstractTreeNode
 	{
 		private final StationData stationData;
 		private final String station;
@@ -1617,6 +1642,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			else
 				children = new AbstractTreeNode[0];
 		}
+	}
 	}
 	
 	private static class DescriptionChanger

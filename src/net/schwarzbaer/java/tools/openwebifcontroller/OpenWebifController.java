@@ -74,6 +74,8 @@ import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.lib.system.Settings;
 import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.MessageControl;

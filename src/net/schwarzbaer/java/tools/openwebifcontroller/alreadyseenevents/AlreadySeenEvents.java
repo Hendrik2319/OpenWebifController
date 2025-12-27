@@ -1,4 +1,4 @@
-package net.schwarzbaer.java.tools.openwebifcontroller;
+package net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents;
 
 import java.awt.Window;
 import java.io.BufferedReader;
@@ -31,7 +31,8 @@ import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory;
 
 public class AlreadySeenEvents
 {
@@ -193,7 +194,7 @@ public class AlreadySeenEvents
 		}
 	}
 	
-	interface ChangeListener
+	public interface ChangeListener
 	{
 		enum ChangeType { RuleSet, EpisodeText, Grouping }
 		void somethingHasChanged(ChangeType changeType);

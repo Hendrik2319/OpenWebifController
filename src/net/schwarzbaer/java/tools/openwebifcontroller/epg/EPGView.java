@@ -31,8 +31,8 @@ import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
 
 class EPGView extends Canvas {
 	private static final long serialVersionUID = 8667640106638383774L;

@@ -53,6 +53,7 @@ import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.TreeIcons;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
 
 class MoviesPanel extends JSplitPane {
 	private static final long serialVersionUID = 3435419463730240276L;

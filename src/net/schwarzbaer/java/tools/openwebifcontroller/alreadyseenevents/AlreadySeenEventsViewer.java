@@ -1,4 +1,4 @@
-package net.schwarzbaer.java.tools.openwebifcontroller;
+package net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -45,22 +45,24 @@ import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionData;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionMaps;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.StationData;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.TextOperator;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.VariableECSData;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.AbstractTreeNode;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.DescriptionTreeNode;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.ECSGroupTreeNode;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.EventCriteriaSetTreeNode;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.NewNode;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.RootTreeNode;
-import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEventsViewer.TreeNodeFactory.StationTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.UserDefColors;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionMaps;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeInfo;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EventCriteriaSet;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.StationData;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.TextOperator;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.VariableECSData;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory.AbstractTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory.DescriptionTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory.ECSGroupTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory.EventCriteriaSetTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory.NewNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory.RootTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory.StationTreeNode;
 
-class AlreadySeenEventsViewer extends StandardDialog
+public class AlreadySeenEventsViewer extends StandardDialog
 {
 	private static final long serialVersionUID = 6089627717117385916L;
 	private static final Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());
@@ -116,7 +118,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		tree.setModel(treeModel = new CustomTreeModel(tree, AlreadySeenEvents.getInstance().createTreeRoot(this)));
 	}
 	
-	static void showViewer(Window parent, String title)
+	public static void showViewer(Window parent, String title)
 	{
 		new AlreadySeenEventsViewer(parent, title).showDialog();
 	}

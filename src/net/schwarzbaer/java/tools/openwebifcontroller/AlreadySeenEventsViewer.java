@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.Vector;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import javax.swing.Icon;
 import javax.swing.JCheckBoxMenuItem;
@@ -45,6 +46,7 @@ import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionData;
+import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.DescriptionMaps;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.AlreadySeenEvents.StationData;
@@ -197,6 +199,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 	{
 		final TreePath                 path;
 		final AbstractTreeNode         treeNode;
+		final RootTreeNode             rootTreeNode;
 		final ECSGroupTreeNode         groupTreeNode;
 		final EventCriteriaSetTreeNode ecsTreeNode;
 		final StationTreeNode          stationTreeNode;
@@ -209,6 +212,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			Object lastPathComp = this.path==null ? null : this.path.getLastPathComponent();
 			treeNode            = lastPathComp instanceof AbstractTreeNode         treeNode ? treeNode : null;
+			rootTreeNode        = treeNode     instanceof RootTreeNode             treeNode ? treeNode : null;
 			groupTreeNode       = treeNode     instanceof ECSGroupTreeNode         treeNode ? treeNode : null;
 			ecsTreeNode         = treeNode     instanceof EventCriteriaSetTreeNode treeNode ? treeNode : null;
 			stationTreeNode     = treeNode     instanceof StationTreeNode          treeNode ? treeNode : null;
@@ -349,7 +353,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			
 			JMenuItem miEditDesc = add(OpenWebifController.createMenuItem("Edit Description Text", e -> {
 				if (clicked.descriptionTreeNode==null) return;
-				String newDesc = TextAreaDialog.editText(window, "Edit Description Text", 400, 200, true, clicked.descriptionTreeNode.description.getText());
+				String newDesc = TextAreaDialog.editText(this.window, "Edit Description Text", 400, 200, true, clicked.descriptionTreeNode.description.getText());
 				if (newDesc!=null)
 				{
 					DescriptionChanger.Response response = clicked.descriptionTreeNode.description.setText(newDesc);
@@ -364,7 +368,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 					{
 						String[] msg = { "Can't change description text:", response.reasonWhyNot };
 						String title = "Can't change";
-						JOptionPane.showMessageDialog(window, msg, title, JOptionPane.WARNING_MESSAGE);
+						JOptionPane.showMessageDialog(this.window, msg, title, JOptionPane.WARNING_MESSAGE);
 					}
 				}
 			}));
@@ -417,6 +421,29 @@ class AlreadySeenEventsViewer extends StandardDialog
 			} ) );
 			
 			addSeparator();
+			
+			JMenuItem miAddNode = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Add , e->{
+				if (clicked.rootTreeNode!=null)
+				{
+					createNewECSNode(null);
+				}
+				if (clicked.groupTreeNode!=null)
+				{
+					createNewECSNode(clicked.groupTreeNode);
+				}
+				if (clicked.ecsTreeNode!=null)
+				{
+					//createNewDescNode(clicked.ecsTreeNode, clicked.ecsTreeNode.ecs.descriptions());
+					// TODO: add descriptionTreeNode
+				}
+				if (clicked.stationTreeNode!=null)
+				{
+					// TODO: add descriptionTreeNode
+				}
+				//if (clicked.descriptionTreeNode!=null)
+				//{
+				//}
+			} ) ); 
 			
 			JMenuItem miDeleteNode = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clicked.groupTreeNode!=null)
@@ -522,6 +549,24 @@ class AlreadySeenEventsViewer extends StandardDialog
 							: "Rename group"
 				);
 				
+				miAddNode.setEnabled(
+						clicked.rootTreeNode !=null ||
+						clicked.groupTreeNode!=null ||
+						( clicked.ecsTreeNode    !=null && clicked.ecsTreeNode    .ecs        .descriptions()!=null ) ||
+						( clicked.stationTreeNode!=null && clicked.stationTreeNode.stationData.descriptions()!=null ) //||
+						//clicked.descriptionTreeNode!=null
+				);
+				miAddNode.setText(
+						clicked.rootTreeNode!=null || clicked.groupTreeNode!=null
+							? "Add title"
+							: clicked.ecsTreeNode!=null && clicked.ecsTreeNode.ecs.descriptions()!=null 
+								? "Add description"
+								: clicked.stationTreeNode!=null && clicked.stationTreeNode.stationData.descriptions()!=null
+									? "Add description"
+									//: clicked.descriptionTreeNode!=null
+										//? "Add ???"
+										: "Add node"
+				);
 				
 				miDeleteNode.setEnabled(
 						clicked.groupTreeNode!=null ||
@@ -560,6 +605,86 @@ class AlreadySeenEventsViewer extends StandardDialog
 				);
 				menuDescOperatorItems.forEach((op,cmi) -> cmi.setSelected(op == operatorOfClicked));
 			});
+		}
+
+		private void createNewECSNode(ECSGroupTreeNode groupTreeNode)
+		{
+			String title = askUserForTitleForNewECSNode();
+			if (title!=null)
+			{
+				treeModel.createNewECSNode(title, groupTreeNode);
+				AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
+			}
+		}
+
+		@SuppressWarnings("unused")
+		private void createNewDescNode(AbstractTreeNode parent, DescriptionMaps descriptions)
+		{
+			Boolean isExtDesc = askUserIfNewDescNodeIsExt();
+			if (isExtDesc!=null)
+			{
+				Map<String, DescriptionData> descriptionsMap = isExtDesc.booleanValue() ? descriptions.extended : descriptions.standard;
+				String title = askUserForTitleForNewDescNode( descriptionsMap );
+				
+			}
+			// TODO: add descriptionTreeNode
+			//parent.insertNode(parent)
+			// TODO Auto-generated method stub
+			
+		}
+
+		private Boolean askUserIfNewDescNodeIsExt()
+		{
+			String title = "New description";
+			String message = "Is new description an extended description or a standard description?";
+			String[] options = { "Extended", "Standard", "Cancel" };
+			int result = JOptionPane.showOptionDialog(window, message, title, JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+			switch (result) {
+			case 0:  return true;
+			case 1:  return false;
+			default: return null;
+			}
+		}
+
+		private String askUserForTitleForNewDescNode(Map<String, DescriptionData> descriptions)
+		{
+			return askUser(
+					"New description",
+					"Pleasae enter a description for new DescriptionNode:",
+					str -> !descriptions.containsKey(str),
+					"Already exists",
+					"Sorry, this description already exists."
+			);
+		}
+
+		private String askUserForTitleForNewECSNode()
+		{
+			return askUser(
+					"New ECSNode",
+					"Pleasae enter a title for new ECSNode:",
+					str -> !treeModel.treeRoot.data.containsKey(str),
+					"Already exists",
+					"Sorry, this title already exists."
+			);
+		}
+
+		private String askUser(String inputTitle, Object inputMsg, Predicate<String> isAllowed, String notAllowedTitle, Object notAllowedMsg)
+		{
+			String string = "";
+			boolean isStrAllowed = false;
+			
+			while (!isStrAllowed && string!=null)
+			{
+				string = JOptionPane.showInputDialog(window, inputMsg, inputTitle, JOptionPane.QUESTION_MESSAGE);
+				if (string!=null)
+				{
+					isStrAllowed = isAllowed.test(string);
+					if (!isStrAllowed)
+						JOptionPane.showMessageDialog(window, notAllowedMsg, notAllowedTitle, JOptionPane.INFORMATION_MESSAGE);
+				}
+			}
+			
+			return string;
 		}
 
 		private void updateMenuMoveToGroup()
@@ -645,6 +770,29 @@ class AlreadySeenEventsViewer extends StandardDialog
 			this.tree = tree;
 			this.treeRoot = treeRoot;
 			listeners = new Vector<>();
+		}
+
+		void createNewECSNode(String title, ECSGroupTreeNode groupTreeNode)
+		{
+			if (treeRoot.data.containsKey(title))
+				throw new IllegalStateException();
+			
+			EventCriteriaSet ecs = EventCriteriaSet.create(title, false, false);
+			treeRoot.data.put(title, ecs);
+			
+			EventCriteriaSetTreeNode.HostNode parent;
+			if (groupTreeNode==null)
+			{
+				ecs.variableData().group = null;
+				parent = treeRoot;
+			}
+			else
+			{
+				ecs.variableData().group = groupTreeNode.groupName;
+				parent = groupTreeNode;
+			}
+			NewNode<EventCriteriaSetTreeNode> newNode = parent.createECSNode( ecs );
+			fireTreeNodeInserted(newNode.node.parent, newNode.node, newNode.index);
 		}
 
 		void setRootSubnodeOrder(RootTreeNode.NodeOrder order)
@@ -751,7 +899,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 			}
 			
 			node.ecs.variableData().group = groupName;
-			NewNode<EventCriteriaSetTreeNode> newNode = groupNode.createChild( node.ecs );
+			NewNode<EventCriteriaSetTreeNode> newNode = groupNode.createECSNode( node.ecs );
 			fireTreeNodeInserted(groupNode, newNode.node, newNode.index);
 		}
 
@@ -1122,7 +1270,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 	
-	class RootTreeNode extends AbstractTreeNode
+	class RootTreeNode extends AbstractTreeNode implements EventCriteriaSetTreeNode.HostNode
 	{
 		private static final Comparator<AbstractTreeNode> ORDER_GROUPS_FIRST = Comparator
 				.<AbstractTreeNode,Integer>comparing( node -> {
@@ -1185,7 +1333,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 			return new NewNode<>( insertIndex, groupNode );
 		}
 		
-		NewNode<EventCriteriaSetTreeNode> createECSNode(EventCriteriaSet ecs)
+		@Override
+		public NewNode<EventCriteriaSetTreeNode> createECSNode(EventCriteriaSet ecs)
 		{
 			EventCriteriaSetTreeNode ecsNode = new EventCriteriaSetTreeNode(this, ecs);
 			
@@ -1232,7 +1381,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 	
-	private class ECSGroupTreeNode extends AbstractTreeNode
+	private class ECSGroupTreeNode extends AbstractTreeNode implements EventCriteriaSetTreeNode.HostNode
 	{
 		private final Vector<EventCriteriaSet> ecsList;
 		private       String groupName;
@@ -1267,7 +1416,8 @@ class AlreadySeenEventsViewer extends StandardDialog
 			return null;
 		}
 
-		NewNode<EventCriteriaSetTreeNode> createChild(EventCriteriaSet ecs)
+		@Override
+		public NewNode<EventCriteriaSetTreeNode> createECSNode(EventCriteriaSet ecs)
 		{
 			EventCriteriaSetTreeNode ecsNode = new EventCriteriaSetTreeNode(this, ecs);
 			ecsList.add(ecs);
@@ -1297,6 +1447,11 @@ class AlreadySeenEventsViewer extends StandardDialog
 					return 2;
 				} )
 				.thenComparing(SORT_BY_TITLE);
+		
+		interface HostNode
+		{
+			NewNode<EventCriteriaSetTreeNode> createECSNode(EventCriteriaSet ecs);
+		}
 		
 		private final EventCriteriaSet ecs;
 
@@ -1467,7 +1622,7 @@ class AlreadySeenEventsViewer extends StandardDialog
 	private static class DescriptionChanger
 	{
 		private String descText;
-		private Map<String, DescriptionData> descMap;
+		private final Map<String, DescriptionData> descMap;
 		private final DescriptionData descData;
 
 		DescriptionChanger(String initialDesc, Map<String, DescriptionData> descMap)

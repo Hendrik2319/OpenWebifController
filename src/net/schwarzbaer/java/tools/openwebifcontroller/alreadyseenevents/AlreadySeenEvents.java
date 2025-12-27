@@ -32,7 +32,6 @@ import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
-import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeNodeFactory;
 
 public class AlreadySeenEvents
 {

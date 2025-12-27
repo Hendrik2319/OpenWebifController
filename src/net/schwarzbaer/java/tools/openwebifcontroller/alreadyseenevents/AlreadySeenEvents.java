@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Vector;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -209,10 +210,30 @@ public class AlreadySeenEvents
 		readFromFile();
 	}
 
+	void forEachECS(BiConsumer<String, EventCriteriaSet> action)
+	{
+		alreadySeenEvents.forEach(action);
+	}
+	
+	boolean containsECS(String title)
+	{
+		return alreadySeenEvents.containsKey(title);
+	}
+
+	EventCriteriaSet createECS(String title)
+	{
+		if (alreadySeenEvents.containsKey(title))
+			throw new IllegalArgumentException();
+		
+		EventCriteriaSet ecs = EventCriteriaSet.create(title, false, false);
+		alreadySeenEvents.put(title, ecs);
+		return ecs;
+	}
+
 	public void    addChangeListener(ChangeListener l) { changeListeners.   add(l); }
 	public void removeChangeListener(ChangeListener l) { changeListeners.remove(l); }
 	
-	void notifyChangeListeners(ChangeListener.ChangeType changeType)
+	private void notifyChangeListeners(ChangeListener.ChangeType changeType)
 	{
 		for (ChangeListener l : changeListeners)
 			l.somethingHasChanged(changeType);
@@ -500,7 +521,6 @@ public class AlreadySeenEvents
 		private final Supplier<V> getSource;
 		private final Supplier<V[]> getSources;
 		private final GetData<V> getData;
-		private V singleSource;
 		private RuleOutput singleSourceAlreadySeenRule;
 
 		SubMenu(ParentMenu parent, Window window, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
@@ -508,7 +528,6 @@ public class AlreadySeenEvents
 			this.getSource = getSource;
 			this.getSources = getSources;
 			this.getData = getData;
-			this.singleSource = null;
 			
 			parent.add(menuAdd = new JMenu("Mark as Already Seen"));
 			menuAdd.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false, false)));
@@ -519,14 +538,15 @@ public class AlreadySeenEvents
 			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false, true )));
 			
 			miShowRule = parent.add(OpenWebifController.createMenuItem("##", e->{
-				TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule.toString());
+				if (singleSourceAlreadySeenRule != null)
+					TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule.toString());
 			}));
 		}
 		
 		@Override
 		public void updateBeforeShowingMenu()
 		{
-			singleSource = null;
+			V singleSource = null;
 			
 			if (getSource!=null)
 				singleSource = getSource.get();
@@ -540,9 +560,8 @@ public class AlreadySeenEvents
 			
 			singleSourceAlreadySeenRule = singleSource==null ? null : getRuleIfAlreadySeen(singleSource, getData);
 			miShowRule.setEnabled(singleSourceAlreadySeenRule != null);
-			miShowRule.setText( "Show [Already Seen] Rule" + (singleSource==null ? "" : " for \"%s\"".formatted(getData.getTitle(singleSource))) );
-			
-			menuAdd.setText( "Mark%s as Already Seen".formatted(singleSource==null ? "" : " \"%s\"".formatted(getData.getTitle(singleSource))) );
+			miShowRule.setText( "Show [Already Seen] Rule%s".formatted(singleSource==null ? "" : " for \"%s\"".formatted(getData.getTitle(singleSource))) );
+			menuAdd   .setText( "Mark%s as Already Seen"    .formatted(singleSource==null ? "" : " \"%s\""    .formatted(getData.getTitle(singleSource))) );
 		}
 	}
 
@@ -779,10 +798,5 @@ public class AlreadySeenEvents
 			for (Pair pair : output)
 				out.add(indentLevel, pair.label, pair.value);
 		}
-	}
-
-	TreeNodeFactory.RootTreeNode createTreeRoot(AlreadySeenEventsViewer viewer)
-	{
-		return viewer.createTreeRoot(alreadySeenEvents);
 	}
 }

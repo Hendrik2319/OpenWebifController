@@ -46,12 +46,12 @@ class TreeNodeFactory
 		OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.AlreadySeenEventsViewer_EpisodeStringFirst, isEpisodeStringFirst());
 	}
 	
-	RootTreeNode createRootTreeNode(Map<String, EventCriteriaSet> data, RootTreeNode.NodeOrder currentRootSubnodeOrder)
+	RootTreeNode createRootTreeNode(RootTreeNode.NodeOrder currentRootSubnodeOrder)
 	{
-		return new RootTreeNode(data, currentRootSubnodeOrder);
+		return new RootTreeNode(currentRootSubnodeOrder);
 	}
 	
-	String generateTitle(DescriptionChanger description)
+	private String generateTitle(DescriptionChanger description)
 	{
 		if (description==null)
 			return "<null>";
@@ -62,7 +62,7 @@ class TreeNodeFactory
 		);
 	}
 	
-	String generateTitle(String description, DescriptionData data)
+	private String generateTitle(String description, DescriptionData data)
 	{
 		if (data==null)
 			return generateTitle(description, (EpisodeInfo) data);
@@ -78,7 +78,7 @@ class TreeNodeFactory
 		return generateTitle(title, (EpisodeInfo) data);
 	}
 	
-	String generateTitle(String title, EpisodeInfo episode)
+	private String generateTitle(String title, EpisodeInfo episode)
 	{
 		if (episode == null || !episode.hasEpisodeStr())
 			return title;
@@ -112,7 +112,7 @@ class TreeNodeFactory
 		protected       AbstractTreeNode[] children;
 		protected       Comparator<AbstractTreeNode> childrenOrder;
 		
-		AbstractTreeNode(AbstractTreeNode parent, String title, boolean allowsChildren, Comparator<AbstractTreeNode> childrenOrder)
+		protected AbstractTreeNode(AbstractTreeNode parent, String title, boolean allowsChildren, Comparator<AbstractTreeNode> childrenOrder)
 		{
 			this.parent = parent;
 			this.title = title;
@@ -288,13 +288,11 @@ class TreeNodeFactory
 			}
 		}
 		
-		final Map<String, EventCriteriaSet> data;
 		final Map<String, ECSGroupTreeNode> groupNodes;
 		
-		RootTreeNode(Map<String, EventCriteriaSet> data, NodeOrder subnodeOrder)
+		protected RootTreeNode(NodeOrder subnodeOrder)
 		{
 			super(null, "Already Seen Events", true, Objects.requireNonNull(subnodeOrder).order);
-			this.data = data;
 			groupNodes = new HashMap<>();
 		}
 		
@@ -355,7 +353,7 @@ class TreeNodeFactory
 			groupNodes.clear();
 			Vector<EventCriteriaSetTreeNode> ungroupedECSNodes = new Vector<>();
 			
-			data.forEach((title, ecs) -> {
+			AlreadySeenEvents.getInstance().forEachECS((title, ecs) -> {
 				VariableECSData variableData = ecs.variableData();
 				if (variableData!=null && variableData.hasGroup())
 				{
@@ -380,7 +378,7 @@ class TreeNodeFactory
 		private final Vector<EventCriteriaSet> ecsList;
 		String groupName;
 		
-		ECSGroupTreeNode(RootTreeNode parent, String groupName)
+		protected ECSGroupTreeNode(RootTreeNode parent, String groupName)
 		{
 			super(parent, groupName, true, SORT_BY_TITLE);
 			this.groupName = groupName;
@@ -449,7 +447,7 @@ class TreeNodeFactory
 		
 		final EventCriteriaSet ecs;
 		
-		EventCriteriaSetTreeNode(AbstractTreeNode parent, EventCriteriaSet ecs)
+		protected EventCriteriaSetTreeNode(AbstractTreeNode parent, EventCriteriaSet ecs)
 		{
 			super(parent, generateTitle(ecs.title(), ecs.variableData()), ecs.stations()!=null || ecs.descriptions()!=null, ORDER);
 			this.ecs = ecs;
@@ -508,7 +506,7 @@ class TreeNodeFactory
 		final DescriptionChanger description;
 		private final boolean isExtDesc;
 		
-		DescriptionTreeNode(AbstractTreeNode parent, DescriptionChanger description, boolean isExtDesc)
+		protected DescriptionTreeNode(AbstractTreeNode parent, DescriptionChanger description, boolean isExtDesc)
 		{
 			super(parent, "###", false, null);
 			this.description = Objects.requireNonNull(description);
@@ -569,7 +567,7 @@ class TreeNodeFactory
 		final StationData stationData;
 		final String station;
 		
-		StationTreeNode(EventCriteriaSetTreeNode parent, String station, StationData stationData)
+		protected StationTreeNode(EventCriteriaSetTreeNode parent, String station, StationData stationData)
 		{
 			super(parent, station, stationData.descriptions()!=null, SORT_BY_TITLE);
 			this.station = station;

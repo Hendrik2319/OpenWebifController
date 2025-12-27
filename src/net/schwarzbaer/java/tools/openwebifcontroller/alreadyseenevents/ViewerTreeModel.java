@@ -30,20 +30,16 @@ class ViewerTreeModel implements TreeModel
 	final RootTreeNode treeRoot;
 	private final Vector<TreeModelListener> listeners;
 
-	ViewerTreeModel(JTree tree, RootTreeNode treeRoot)
+	ViewerTreeModel(JTree tree, TreeNodeFactory factory)
 	{
 		this.tree = tree;
-		this.treeRoot = treeRoot;
+		this.treeRoot = factory.createRootTreeNode( getCurrentRootSubnodeOrder() );
 		listeners = new Vector<>();
 	}
 
 	void createNewECSNode(String title, ECSGroupTreeNode groupTreeNode)
 	{
-		if (treeRoot.data.containsKey(title))
-			throw new IllegalStateException();
-		
-		EventCriteriaSet ecs = EventCriteriaSet.create(title, false, false);
-		treeRoot.data.put(title, ecs);
+		EventCriteriaSet ecs = AlreadySeenEvents.getInstance().createECS(title);
 		
 		EventCriteriaSetTreeNode.HostNode parent;
 		if (groupTreeNode==null)
@@ -243,7 +239,7 @@ class ViewerTreeModel implements TreeModel
 		);
 	}
 
-	void fireAllSubNodesUpdate(AbstractTreeNode parent)
+	private void fireAllSubNodesUpdate(AbstractTreeNode parent)
 	{
 		if (parent == null) return;
 		
@@ -257,7 +253,7 @@ class ViewerTreeModel implements TreeModel
 		);
 	}
 
-	void fireTreeNodeRemoved(AbstractTreeNode parent, AbstractTreeNode treeNode, int oldNodeIndex)
+	private void fireTreeNodeRemoved(AbstractTreeNode parent, AbstractTreeNode treeNode, int oldNodeIndex)
 	{
 		if (parent == null) return;
 		if (treeNode == null) return;
@@ -275,7 +271,7 @@ class ViewerTreeModel implements TreeModel
 		);
 	}
 
-	void fireTreeNodeInserted(AbstractTreeNode parent, AbstractTreeNode treeNode, int index)
+	private void fireTreeNodeInserted(AbstractTreeNode parent, AbstractTreeNode treeNode, int index)
 	{
 		if (parent == null) return;
 		if (treeNode == null) return;
@@ -293,7 +289,7 @@ class ViewerTreeModel implements TreeModel
 		);
 	}
 
-	void fireTreeStructureChanged(AbstractTreeNode treeNode)
+	private void fireTreeStructureChanged(AbstractTreeNode treeNode)
 	{
 		fireTreeModelEvent(
 				new TreeModelEvent(this, AbstractTreeNode.getPath(treeNode), null, null),

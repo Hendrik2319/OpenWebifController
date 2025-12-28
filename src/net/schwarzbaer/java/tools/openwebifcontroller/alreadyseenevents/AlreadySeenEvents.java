@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
@@ -454,29 +455,31 @@ public class AlreadySeenEvents
 		return URLDecoder.decode(str, StandardCharsets.UTF_8);
 	}
 
-	private interface GetData<V>
+	private static abstract class GetData<V>
 	{
-		String getTitle          (V value);
-		String getStation        (V value);
-		String getDescription    (V value);
-		String getExtDescription (V value);
+		final String sourceLabel;
+		GetData(String sourceLabel) { this.sourceLabel = sourceLabel; }
+		abstract String getTitle          (V value);
+		abstract String getStation        (V value);
+		abstract String getDescription    (V value);
+		abstract String getExtDescription (V value);
 	}
 	
-	private final static GetData<Timer> GET_DATA_FROM_TIMER = new GetData<>()
+	private final static GetData<Timer> GET_DATA_FROM_TIMER = new GetData<>("timer")
 	{
 		@Override public String getTitle          (Timer t) { return t.name;        }
 		@Override public String getStation        (Timer t) { return t.servicename; }
 		@Override public String getDescription    (Timer t) { return t.description; }
 		@Override public String getExtDescription (Timer t) { return t.descriptionextended; }
 	};
-	private final static GetData<MovieList.Movie> GET_DATA_FROM_MOVIE = new GetData<>()
+	private final static GetData<MovieList.Movie> GET_DATA_FROM_MOVIE = new GetData<>("movie")
 	{
 		@Override public String getTitle          (MovieList.Movie m) { return m.eventname;   }
 		@Override public String getStation        (MovieList.Movie m) { return m.servicename; }
 		@Override public String getDescription    (MovieList.Movie m) { return m.description; }
 		@Override public String getExtDescription (MovieList.Movie m) { return m.descriptionExtended; }
 	};
-	private final static GetData<EPGevent> GET_DATA_FROM_EPGEVENT = new GetData<>()
+	private final static GetData<EPGevent> GET_DATA_FROM_EPGEVENT = new GetData<>("EPG event")
 	{
 		@Override public String getTitle          (EPGevent m) { return m.title;        }
 		@Override public String getStation        (EPGevent m) { return m.station_name; }
@@ -514,8 +517,9 @@ public class AlreadySeenEvents
 		JMenuItem add(JMenuItem menuItem);
 	}
 	
-	private class SubMenu<V> implements MenuControl
+	private class SubMenu<V> implements MenuControl, UserInteraction
 	{
+		private final Window window;
 		private final JMenu menuAdd;
 		private final JMenuItem miShowRule;
 		private final Supplier<V> getSource;
@@ -525,17 +529,18 @@ public class AlreadySeenEvents
 
 		SubMenu(ParentMenu parent, Window window, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
 		{
+			this.window = Objects.requireNonNull( window );
 			this.getSource = getSource;
 			this.getSources = getSources;
-			this.getData = getData;
+			this.getData = Objects.requireNonNull( getData );
 			
 			parent.add(menuAdd = new JMenu("Mark as Already Seen"));
-			menuAdd.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false, false)));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, true , false)));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, false, false, true )));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false, false)));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , true , false)));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(getSource, getSources, getData, updateAfterMenuAction, true , false, true )));
+			menuAdd.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, false, false)));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, true , false)));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, false, true )));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , false, false)));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , true , false)));
+			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , false, true )));
 			
 			miShowRule = parent.add(OpenWebifController.createMenuItem("##", e->{
 				if (singleSourceAlreadySeenRule != null)
@@ -543,6 +548,12 @@ public class AlreadySeenEvents
 			}));
 		}
 		
+		@Override
+		public void showMessage(String title, String... msgLines)
+		{
+			JOptionPane.showMessageDialog(window, msgLines, title, JOptionPane.INFORMATION_MESSAGE);
+		}
+
 		@Override
 		public void updateBeforeShowingMenu()
 		{
@@ -569,11 +580,13 @@ public class AlreadySeenEvents
 			Supplier<V> getSource,
 			Supplier<V[]> getSources,
 			GetData<V> getData,
+			UserInteraction userInteraction,
 			Runnable updateAfterMenuAction,
-			boolean useStation, boolean useDescription, boolean useExtDescription)
-	{
-		doWithSources(getSource, getSources, t1 -> markAsAlreadySeen(t1, getData, useStation, useDescription, useExtDescription) );
-		updateAfterMenuAction.run();
+			boolean useStation, boolean useDescription, boolean useExtDescription
+	) {
+		doWithSources(getSource, getSources, t1 -> markAsAlreadySeen(t1, getData, userInteraction, useStation, useDescription, useExtDescription) );
+		if (updateAfterMenuAction!=null)
+			updateAfterMenuAction.run();
 		writeToFileAndNotify(ChangeListener.ChangeType.RuleSet);
 	}
 
@@ -592,10 +605,16 @@ public class AlreadySeenEvents
 					action.accept(source);
 		}
 	}
+	
+	private interface UserInteraction
+	{
+		void showMessage(String title, String... msgLines);
+	}
 
 	private <V>void markAsAlreadySeen(
 			final V source,
 			final GetData<V> getData,
+			final UserInteraction userInteraction,
 			final boolean useStation,
 			final boolean useDescription,
 			final boolean useExtDescription
@@ -605,7 +624,14 @@ public class AlreadySeenEvents
 		
 		final String title = getData.getTitle(source);
 		if (title == null)
+		{
+			userInteraction.showMessage(
+					"Can't mark as \"already seen\"",
+					"Sorry, can't mark %s as \"already seen\",".formatted(getData.sourceLabel),
+					"because this %s don't have a title."      .formatted(getData.sourceLabel)
+			);
 			return; // no title defined in source
+		}
 		
 		final EventCriteriaSet ecs = alreadySeenEvents.computeIfAbsent(title, k -> EventCriteriaSet.create(title, useStation, (useDescription || useExtDescription) && !useStation));
 		
@@ -613,8 +639,26 @@ public class AlreadySeenEvents
 		{
 			if (ecs.stations != null || ecs.descriptions != null)
 			{
-				// replace station event criteria set or description based event criteria set with general event criteria set
-				alreadySeenEvents.put(title, EventCriteriaSet.create(title, false, false));
+				boolean noStations     = ecs.stations    ==null || ecs.stations    .isEmpty();
+				boolean noDescriptions = ecs.descriptions==null || ecs.descriptions.isEmpty();
+				
+				if ( noStations && noDescriptions )
+					// replace station event criteria set or description based event criteria set with general event criteria set
+					alreadySeenEvents.put(title, EventCriteriaSet.create(title, false, false));
+				else
+				{
+					String definedItems =
+							!noStations && !noDescriptions ? "stations and descriptions"
+							: !noStations ? "stations"
+							: !noDescriptions ? "descriptions"
+							: "????";
+					userInteraction.showMessage(
+							"Can't mark as \"already seen\"",
+							"Sorry, can't mark %s as \"already seen\",".formatted( getData.sourceLabel ),
+							"because you want me to create a criteria set with only a title,",
+							"but there are already some %s defined for this title.".formatted( definedItems )
+					);
+				}
 			}
 		}
 		else
@@ -626,9 +670,24 @@ public class AlreadySeenEvents
 			{
 				final String station = getData.getStation(source);
 				if (station == null)
+				{
+					userInteraction.showMessage(
+							"Can't mark as \"already seen\"",
+							"Sorry, can't mark %s as \"already seen\","    .formatted(getData.sourceLabel),
+							"because this %s don't have a station defined.".formatted(getData.sourceLabel)
+					);
 					return; // no station defined in source
+				}
 				if (ecs.stations == null)
+				{
+					userInteraction.showMessage(
+							"Can't mark as \"already seen\"",
+							"Sorry, can't mark %s as \"already seen\","    .formatted(getData.sourceLabel),
+							"because a criteria set for this title exists",
+							"and don't allow stations as a criterion."
+					);
 					return; // event criteria set is stationless  ->  station is not needed as criteria
+				}
 				
 				StationData stationData = ecs.stations.computeIfAbsent(station, k -> StationData.create(station, useDescription));
 				if (!useDescription && !useExtDescription && stationData.descriptions != null )
@@ -644,11 +703,35 @@ public class AlreadySeenEvents
 				// case (useDescription && useExtDescription) is not allowed -> standard description will be preferred then
 				
 				if (descriptions == null)
+				{
+					userInteraction.showMessage(
+							"Can't mark as \"already seen\"",
+							"Sorry, can't mark %s as \"already seen\","    .formatted(getData.sourceLabel),
+							"because a criteria set for this title exists",
+							"and don't allow descriptions as a criterion."
+					);
 					return; // ecs or station is descriptionless -> can't add description as criteria
+				}
 				
-				final String description = useDescription ? getData.getDescription(source) : getData.getExtDescription(source);
+				final String description;
+				if      (useDescription   ) description = getData.   getDescription(source);
+				else if (useExtDescription) description = getData.getExtDescription(source);
+				else throw new IllegalStateException();
+				
 				if (description == null)
+				{
+					String str;  
+					if      (useDescription   ) str = "a description";
+					else if (useExtDescription) str = "an extended description";
+					else throw new IllegalStateException();
+					
+					userInteraction.showMessage(
+							"Can't mark as \"already seen\"",
+							"Sorry, can't mark %s as \"already seen\",".formatted( getData.sourceLabel ),
+							"because this %s don't have %s defined."   .formatted( getData.sourceLabel, str )
+					);
 					return; // no description defined in source
+				}
 				
 				Map <String, DescriptionData> descMap = useDescription ? descriptions.standard : descriptions.extended;
 				descMap.put(description, new DescriptionData());

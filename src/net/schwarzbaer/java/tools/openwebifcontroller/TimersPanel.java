@@ -298,16 +298,18 @@ public class TimersPanel extends JSplitPane {
 	public void readData(String baseURL, ProgressView pd) {
 		if (baseURL==null) return;
 		timers = Timers.read(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));
-		timerStateGuesser.clearGuessedStates();
-		tableModel = timers==null ? new TimersTableModel(timerStateGuesser) : new TimersTableModel(timers.timers, timerStateGuesser);
-		table.setModel(tableModel);
-		tableRowSorter.setModel(tableModel);
-		tableModel.setTable(table);
-		tableModel.setColumnWidths(table);
-		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-		tableModel.setAllDefaultRenderers();
-		table.repaint();
-		timerDataUpdateNotifier.notifyTimersWereUpdated(timers);
+		OpenWebifController.callInGUIThread(() -> {
+			timerStateGuesser.clearGuessedStates();
+			tableModel = timers==null ? new TimersTableModel(timerStateGuesser) : new TimersTableModel(timers.timers, timerStateGuesser);
+			table.setModel(tableModel);
+			tableRowSorter.setModel(tableModel);
+			tableModel.setTable(table);
+			tableModel.setColumnWidths(table);
+			table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+			tableModel.setAllDefaultRenderers();
+			table.repaint();
+			timerDataUpdateNotifier.notifyTimersWereUpdated(timers);
+		});
 	}
 	
 	public static class TimerStateGuesser

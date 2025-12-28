@@ -547,12 +547,14 @@ public class BouquetsNStations extends JPanel {
 		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: "+taskTitle));
 		
 		if (bouquetData!=null) {
-			PICON_LOADER.clear();
-			PICON_LOADER.setBaseURL(baseURL);
-			bsTreeRoot = new BSTreeNode.RootNode(bouquetData);
-			bsTreeModel = new DefaultTreeModel(bsTreeRoot, true);
-			bsTree.setModel(bsTreeModel);
-			PICON_LOADER.setTreeModel(bsTreeModel,bsTreeRoot);
+			OpenWebifController.callInGUIThread(() -> {
+				PICON_LOADER.clear();
+				PICON_LOADER.setBaseURL(baseURL);
+				bsTreeRoot = new BSTreeNode.RootNode(bouquetData);
+				bsTreeModel = new DefaultTreeModel(bsTreeRoot, true);
+				bsTree.setModel(bsTreeModel);
+				PICON_LOADER.setTreeModel(bsTreeModel,bsTreeRoot);
+			});
 		}
 	}
 	

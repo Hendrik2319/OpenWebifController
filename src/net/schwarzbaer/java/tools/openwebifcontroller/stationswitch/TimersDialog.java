@@ -140,7 +140,10 @@ class TimersDialog extends JDialog {
 			add(OpenWebifController.createMenuItem("CleanUp Timers", GrayCommandIcons.IconGroup.Delete, e->{
 				OpenWebifController.cleanUpTimers(null, TimersDialog.this, logWindow, (baseURL, pd) -> {
 					if (updateData!=null)
-						setData(updateData.get(baseURL, pd));
+					{
+						Vector<Timer> data = updateData.get(baseURL, pd);
+						OpenWebifController.callInGUIThread(() -> setData(data));
+					}
 				});
 			}));
 			

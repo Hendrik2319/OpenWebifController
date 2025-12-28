@@ -582,7 +582,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		ProgressDialog.runWithProgressDialog(parent, title, 400, action);
 	}
 	
-	public Consumer<String> createProgressTaskFcn(ProgressView pd, String moduleTitle) {
+	public static Consumer<String> createProgressTaskFcn(ProgressView pd, String moduleTitle) {
 		return taskTitle -> setIndeterminateProgressTask(pd, moduleTitle+": "+taskTitle);
 	}
 	public static void setIndeterminateProgressTask(ProgressView pd, String taskTitle) {
@@ -590,6 +590,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			pd.setTaskTitle(taskTitle);
 			pd.setIndeterminate(true);
 		});
+	}
+	
+	public static void callInGUIThread(Runnable task)
+	{
+		if (SwingUtilities.isEventDispatchThread())
+			task.run();
+		else
+			SwingUtilities.invokeLater(task);
 	}
 
 	@Override

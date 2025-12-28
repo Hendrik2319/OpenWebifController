@@ -473,23 +473,24 @@ class MoviesPanel extends JSplitPane {
 	void readInitialMovieList(String baseURL, ProgressView pd) {
 		MovieList movieList = getMovieList(baseURL, null, pd);
 		
-		if (movieList!=null) {
-			locationsRoot = LocationTreeNode.create(movieList);
-			locationsTreeModel = new DefaultTreeModel(locationsRoot, true);
-			locationsTree.setModel(locationsTreeModel);
-			if (locationsRoot!=null) {
-				selectedTreePath = locationsRoot.getTreePath(movieList.directory);
-				selectedTreeNode = null;
-				locationsTree.expandPath(selectedTreePath);
-				if (selectedTreePath!=null) {
-					Object obj = selectedTreePath.getLastPathComponent();
-					if (obj instanceof LocationTreeNode)
-						selectedTreeNode = (LocationTreeNode) obj;
+		if (movieList!=null)
+			OpenWebifController.callInGUIThread(() -> {
+				locationsRoot = LocationTreeNode.create(movieList);
+				locationsTreeModel = new DefaultTreeModel(locationsRoot, true);
+				locationsTree.setModel(locationsTreeModel);
+				if (locationsRoot!=null) {
+					selectedTreePath = locationsRoot.getTreePath(movieList.directory);
+					selectedTreeNode = null;
+					locationsTree.expandPath(selectedTreePath);
+					if (selectedTreePath!=null) {
+						Object obj = selectedTreePath.getLastPathComponent();
+						if (obj instanceof LocationTreeNode)
+							selectedTreeNode = (LocationTreeNode) obj;
+					}
+					//locationsTree.setSelectionPath(treePath);
+					updateMovieTableModel(movieList.movies);
 				}
-				//locationsTree.setSelectionPath(treePath);
-				updateMovieTableModel(movieList.movies);
-			}
-		}
+			});
 	}
 	
 	private static class LocationTreeCellRenderer extends DefaultTreeCellRenderer {

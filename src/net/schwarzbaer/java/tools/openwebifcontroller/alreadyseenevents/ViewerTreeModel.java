@@ -2,6 +2,7 @@ package net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Vector;
 import java.util.function.BiConsumer;
 
@@ -13,9 +14,11 @@ import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.VariableECSData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.AbstractTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionChanger;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.ECSGroupTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.EventCriteriaSetTreeNode;
@@ -37,23 +40,32 @@ class ViewerTreeModel implements TreeModel
 		listeners = new Vector<>();
 	}
 
-	void createNewECSNode(String title, ECSGroupTreeNode groupTreeNode)
+	<ParentNode extends AbstractTreeNode & EventCriteriaSetTreeNode.HostNode>
+	void createNewECSNode(ParentNode parent, String title)
 	{
+		if (AlreadySeenEvents.getInstance().containsECS(title))
+			throw new IllegalArgumentException();
+		
 		EventCriteriaSet ecs = AlreadySeenEvents.getInstance().createECS(title);
 		
-		EventCriteriaSetTreeNode.HostNode parent;
-		if (groupTreeNode==null)
-		{
-			ecs.variableData().group = null;
-			parent = treeRoot;
-		}
-		else
-		{
+		if (parent instanceof ECSGroupTreeNode groupTreeNode)
 			ecs.variableData().group = groupTreeNode.groupName;
-			parent = groupTreeNode;
-		}
+		
 		NewNode<EventCriteriaSetTreeNode> newNode = parent.createECSNode( ecs );
-		fireTreeNodeInserted(newNode.node().parent, newNode.node(), newNode.index());
+		fireTreeNodeInserted(parent, newNode.node(), newNode.index());
+	}
+
+	<ParentNode extends AbstractTreeNode & DescriptionTreeNode.HostNode>
+	void createNewDescNode(ParentNode parent, String description, boolean isExtDesc, Map<String, DescriptionData> descriptions)
+	{
+		if (descriptions.containsKey(description))
+			throw new IllegalArgumentException();
+		
+		AlreadySeenEvents.getInstance().createDesc(descriptions, description);
+		DescriptionChanger descChanger = new DescriptionChanger(description, descriptions);
+		
+		NewNode<DescriptionTreeNode> newNode = parent.createDescNode(descChanger, isExtDesc);
+		fireTreeNodeInserted(parent, newNode.node(), newNode.index());
 	}
 
 	void setRootSubnodeOrder(RootTreeNode.NodeOrder order)

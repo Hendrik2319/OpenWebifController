@@ -231,6 +231,16 @@ public class AlreadySeenEvents
 		return ecs;
 	}
 
+	DescriptionData createDesc(Map<String, DescriptionData> descMap, String description)
+	{
+		if (descMap.containsKey(description))
+			throw new IllegalArgumentException();
+		
+		DescriptionData descData = new DescriptionData();
+		descMap.put(description, descData);
+		return descData;
+	}
+
 	public void    addChangeListener(ChangeListener l) { changeListeners.   add(l); }
 	public void removeChangeListener(ChangeListener l) { changeListeners.remove(l); }
 	

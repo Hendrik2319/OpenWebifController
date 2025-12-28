@@ -19,6 +19,7 @@ import javax.swing.tree.TreePath;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.UserDefColors;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionMaps;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.StationData;
@@ -301,17 +302,12 @@ class TreeNodeFactory
 			setChildrenOrder(Objects.requireNonNull(subnodeOrder).order);
 		}
 		
-		@Override
-		int removeNode(AbstractTreeNode node)
+		Collection<String> getGroupNames()
 		{
-			int index = super.removeNode(node);
-			
-			if (index>=0 && node instanceof ECSGroupTreeNode groupNode)
-				groupNodes.remove(groupNode.groupName);
-			
-			return index;
+			checkChildren();
+			return groupNodes.keySet();
 		}
-		
+
 		NewNode<ECSGroupTreeNode> createGroupNode(String groupName)
 		{
 			if (groupNodes.containsKey(groupName))
@@ -335,12 +331,17 @@ class TreeNodeFactory
 			return new NewNode<>( insertIndex, ecsNode );
 		}
 		
-		Collection<String> getGroupNames()
+		@Override
+		int removeNode(AbstractTreeNode node)
 		{
-			checkChildren();
-			return groupNodes.keySet();
+			int index = super.removeNode(node);
+			
+			if (index>=0 && node instanceof ECSGroupTreeNode groupNode)
+				groupNodes.remove(groupNode.groupName);
+			
+			return index;
 		}
-		
+
 		@Override
 		protected TreeIcons getIcon()
 		{
@@ -386,11 +387,16 @@ class TreeNodeFactory
 		}
 		
 		@Override
-		protected void updateTitle()
+		public NewNode<EventCriteriaSetTreeNode> createECSNode(EventCriteriaSet ecs)
 		{
-			title = groupName;
+			EventCriteriaSetTreeNode ecsNode = new EventCriteriaSetTreeNode(this, ecs);
+			ecsList.add(ecs);
+			
+			int insertIndex = insertNode(ecsNode);
+			
+			return new NewNode<>(insertIndex, ecsNode);
 		}
-		
+
 		@Override
 		int removeNode(AbstractTreeNode node)
 		{
@@ -403,20 +409,15 @@ class TreeNodeFactory
 		}
 		
 		@Override
+		protected void updateTitle()
+		{
+			title = groupName;
+		}
+
+		@Override
 		protected TreeIcons getIcon()
 		{
 			return null;
-		}
-		
-		@Override
-		public NewNode<EventCriteriaSetTreeNode> createECSNode(EventCriteriaSet ecs)
-		{
-			EventCriteriaSetTreeNode ecsNode = new EventCriteriaSetTreeNode(this, ecs);
-			ecsList.add(ecs);
-			
-			int insertIndex = insertNode(ecsNode);
-			
-			return new NewNode<>(insertIndex, ecsNode);
 		}
 		
 		@Override
@@ -430,7 +431,7 @@ class TreeNodeFactory
 		}
 	}
 	
-	class EventCriteriaSetTreeNode extends AbstractTreeNode
+	class EventCriteriaSetTreeNode extends AbstractTreeNode implements DescriptionTreeNode.HostNode
 	{
 		private static final Comparator<AbstractTreeNode> ORDER = Comparator
 				.<AbstractTreeNode,Integer>comparing( node -> {
@@ -450,9 +451,25 @@ class TreeNodeFactory
 		protected EventCriteriaSetTreeNode(AbstractTreeNode parent, EventCriteriaSet ecs)
 		{
 			super(parent, generateTitle(ecs.title(), ecs.variableData()), ecs.stations()!=null || ecs.descriptions()!=null, ORDER);
-			this.ecs = ecs;
+			this.ecs = Objects.requireNonNull( ecs );
 		}
 		
+		@Override
+		public NewNode<DescriptionTreeNode> createDescNode(DescriptionChanger description, boolean isExtDesc)
+		{
+			DescriptionTreeNode newNode = new DescriptionTreeNode(this, description, isExtDesc);
+			
+			int index = insertNode(newNode);
+			
+			return new NewNode<>(index, newNode);
+		}
+
+		@Override
+		public DescriptionMaps getDescriptions()
+		{
+			return ecs.descriptions();
+		}
+
 		@Override int removeNode(AbstractTreeNode node)
 		{
 			if (node instanceof DescriptionTreeNode)
@@ -503,6 +520,12 @@ class TreeNodeFactory
 	
 	class DescriptionTreeNode extends AbstractTreeNode
 	{
+		interface HostNode
+		{
+			NewNode<DescriptionTreeNode> createDescNode(DescriptionChanger description, boolean isExtDesc);
+			DescriptionMaps getDescriptions();
+		}
+		
 		final DescriptionChanger description;
 		private final boolean isExtDesc;
 		
@@ -562,7 +585,7 @@ class TreeNodeFactory
 		}
 	}
 	
-	class StationTreeNode extends AbstractTreeNode
+	class StationTreeNode extends AbstractTreeNode implements DescriptionTreeNode.HostNode
 	{
 		final StationData stationData;
 		final String station;
@@ -570,10 +593,26 @@ class TreeNodeFactory
 		protected StationTreeNode(EventCriteriaSetTreeNode parent, String station, StationData stationData)
 		{
 			super(parent, station, stationData.descriptions()!=null, SORT_BY_TITLE);
-			this.station = station;
-			this.stationData = stationData;
+			this.station     = Objects.requireNonNull( station     );
+			this.stationData = Objects.requireNonNull( stationData );
 		}
 		
+		@Override
+		public NewNode<DescriptionTreeNode> createDescNode(DescriptionChanger description, boolean isExtDesc)
+		{
+			DescriptionTreeNode newNode = new DescriptionTreeNode(this, description, isExtDesc);
+			
+			int index = insertNode(newNode);
+			
+			return new NewNode<>(index, newNode);
+		}
+
+		@Override
+		public DescriptionMaps getDescriptions()
+		{
+			return stationData.descriptions();
+		}
+
 		@Override int removeNode(AbstractTreeNode node)
 		{
 			if (node instanceof DescriptionTreeNode)

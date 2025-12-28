@@ -4,6 +4,7 @@ import java.awt.Window;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Vector;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -141,20 +142,19 @@ class TreeContextMenu extends ContextMenu
 		JMenuItem miAddNode = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Add , e->{
 			if (clicked.rootTreeNode!=null)
 			{
-				createNewECSNode(null);
+				createNewECSNode(clicked.rootTreeNode);
 			}
 			if (clicked.groupTreeNode!=null)
 			{
 				createNewECSNode(clicked.groupTreeNode);
 			}
-			if (clicked.ecsTreeNode!=null)
+			if (clicked.ecsTreeNode!=null && clicked.ecsTreeNode.ecs.descriptions()!=null)
 			{
-				//createNewDescNode(clicked.ecsTreeNode, clicked.ecsTreeNode.ecs.descriptions());
-				// TODO: add descriptionTreeNode
+				createNewDescNode(clicked.ecsTreeNode);
 			}
-			if (clicked.stationTreeNode!=null)
+			if (clicked.stationTreeNode!=null && clicked.stationTreeNode.stationData.descriptions()!=null)
 			{
-				// TODO: add descriptionTreeNode
+				createNewDescNode(clicked.stationTreeNode);
 			}
 			//if (clicked.descriptionTreeNode!=null)
 			//{
@@ -174,7 +174,7 @@ class TreeContextMenu extends ContextMenu
 			}
 			if (clicked.stationTreeNode!=null)
 			{
-				// TODO: stationTreeNode
+				// TODO: delete stationTreeNode
 			}
 			if (clicked.descriptionTreeNode!=null)
 			{
@@ -323,29 +323,39 @@ class TreeContextMenu extends ContextMenu
 		});
 	}
 
-	private void createNewECSNode(ECSGroupTreeNode groupTreeNode)
+	private <ParentNode extends AbstractTreeNode & EventCriteriaSetTreeNode.HostNode>
+	void createNewECSNode(ParentNode parent)
 	{
+		Objects.requireNonNull(parent);
+		
 		String title = askUserForTitleForNewECSNode();
-		if (title!=null)
-		{
-			getCurrentTreeModel.get().createNewECSNode(title, groupTreeNode);
-			AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
-		}
+		if (title == null)
+			return;
+		
+		getCurrentTreeModel.get().createNewECSNode(parent, title);
+		AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
 	}
 
-	@SuppressWarnings("unused")
-	private void createNewDescNode(AbstractTreeNode parent, DescriptionMaps descriptions)
+	private <ParentNode extends AbstractTreeNode & DescriptionTreeNode.HostNode>
+	void createNewDescNode(ParentNode parent)
 	{
-		Boolean isExtDesc = askUserIfNewDescNodeIsExt();
-		if (isExtDesc!=null)
-		{
-			Map<String, DescriptionData> descriptionsMap = isExtDesc.booleanValue() ? descriptions.extended : descriptions.standard;
-			String title = askUserForTitleForNewDescNode( descriptionsMap );
-			
-		}
-		// TODO: add descriptionTreeNode
-		//parent.insertNode(parent)
+		Objects.requireNonNull(parent);
 		
+		DescriptionMaps descriptions = parent.getDescriptions();
+		if (descriptions==null)
+			return;
+		
+		Boolean isExtDesc = askUserIfNewDescNodeIsExt();
+		if (isExtDesc == null)
+			return;
+		
+		Map<String, DescriptionData> descMap = isExtDesc.booleanValue() ? descriptions.extended : descriptions.standard;
+		String description = askUserForTextForNewDescNode( descMap );
+		if (description == null)
+			return;
+		
+		getCurrentTreeModel.get().createNewDescNode(parent, description, isExtDesc, descMap);
+		AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
 	}
 
 	private Boolean askUserIfNewDescNodeIsExt()
@@ -361,11 +371,11 @@ class TreeContextMenu extends ContextMenu
 		}
 	}
 
-	private String askUserForTitleForNewDescNode(Map<String, DescriptionData> descriptions)
+	private String askUserForTextForNewDescNode(Map<String, DescriptionData> descriptions)
 	{
 		return askUser(
 				"New description",
-				"Pleasae enter a description for new DescriptionNode:",
+				"Please enter a text for new DescriptionNode:",
 				str -> !descriptions.containsKey(str),
 				"Already exists",
 				"Sorry, this description already exists."

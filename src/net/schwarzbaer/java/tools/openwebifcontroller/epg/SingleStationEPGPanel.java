@@ -8,6 +8,7 @@ import java.awt.Point;
 import java.awt.Window;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -509,10 +510,12 @@ public class SingleStationEPGPanel extends JSplitPane
 		private final CustomCellRenderer renderer;
 		private ViewStyle viewStyle;
 		private long dataTimeStamp_ms;
+		private Vector<EPGevent> dataVec;
 		
 		EPGTableModel(TimerDataUpdateNotifier timerNotifier)
 		{
 			super( INITIAL_VIEW_STYLE.columns );
+			dataVec = null;
 			
 			viewStyle = INITIAL_VIEW_STYLE;
 			timersMap = new TimersMap();
@@ -546,18 +549,16 @@ public class SingleStationEPGPanel extends JSplitPane
 			}
 		}
 
-		@Override
 		public void setData(Vector<EPGevent> data)
 		{
 			super.setData(data);
+			this.dataVec = data;
 			dataTimeStamp_ms = System.currentTimeMillis();
 			timersMap.updateData(this.timers, dataVec);
 		}
-		@Override
-		public void setData(EPGevent[] data)
-		{
-			throw new UnsupportedOperationException();
-		}
+		@Override public void setData(EPGevent[] data) { throw new UnsupportedOperationException(); }
+		@Override public void setData(List<EPGevent> data) { throw new UnsupportedOperationException(); }
+		@Override public void setData(Tables.DataSource<EPGevent> data) { throw new UnsupportedOperationException(); }
 
 		public Timer getEventTimer(EPGevent event)
 		{

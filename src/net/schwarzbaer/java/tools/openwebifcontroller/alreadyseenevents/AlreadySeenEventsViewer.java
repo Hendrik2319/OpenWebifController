@@ -23,7 +23,7 @@ import javax.swing.tree.TreeSelectionModel;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.AbstractTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionTreeNode;
@@ -82,7 +82,7 @@ public class AlreadySeenEventsViewer extends StandardDialog
 				//OpenWebifController.createButton("Save Data", true, e->{
 				//	AlreadySeenEvents.getInstance().writeToFile();
 				//}),
-				OpenWebifController.createButton("Close", true, e->{
+				OWCTools.createButton("Close", true, e->{
 					closeDialog();
 				})
 		);

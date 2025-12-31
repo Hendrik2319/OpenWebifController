@@ -147,7 +147,7 @@ public class RemoteControlPanel extends Canvas implements MouseListener, MouseMo
 	}
 
 	public void initialize(String baseURL, ProgressView pd, SystemInfo systemInfo) {
-		Consumer<String> progressTaskFcn = taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Remote Control: "+taskTitle);
+		Consumer<String> progressTaskFcn = taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "Remote Control: "+taskTitle);
 		remoteControl = systemInfo==null ? null : new RemoteControl(systemInfo);
 		if (remoteControl!=null) {
 			remoteControlImage = remoteControl.getRemoteControlImage(baseURL, progressTaskFcn);

@@ -11,10 +11,11 @@ import javax.swing.JSplitPane;
 import javax.swing.tree.TreePath;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ImageView;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
-import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 
@@ -54,11 +55,11 @@ class ValuePanel {
 		JCheckBoxMenuItem miUpdateEPGAlways;
 		
 		updateEPGAlways = OpenWebifController.settings.getBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateEPGAlways, false);
-		textViewContextMenu.add(miUpdateEPGAlways = OpenWebifController.createCheckBoxMenuItem("Update EPG everytime on Select", updateEPGAlways, isChecked->{
+		textViewContextMenu.add(miUpdateEPGAlways = OWCTools.createCheckBoxMenuItem("Update EPG everytime on Select", updateEPGAlways, isChecked->{
 			OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateEPGAlways, updateEPGAlways = isChecked);
 		}) );
 		
-		textViewContextMenu.add(miUpdateEPG = OpenWebifController.createMenuItem("Update EPG Now", GrayCommandIcons.IconGroup.Reload, e->{
+		textViewContextMenu.add(miUpdateEPG = OWCTools.createMenuItem("Update EPG Now", GrayCommandIcons.IconGroup.Reload, e->{
 			if (shownStationNode != null)
 				startEpgUpdate(shownStationNode, this.getBaseURL.get());
 		}) );
@@ -173,7 +174,7 @@ class ValuePanel {
 				for (int i=0; i<stationNode.epgEvents.size(); i++) {
 					EPGevent event = stationNode.epgEvents.get(i);
 					if (level==2) out.add(1, String.format("Event[%d]", i+1));
-					OpenWebifController.generateOutput(out, level, event);
+					OWCTools.generateOutput(out, level, event);
 				}
 			}
 			

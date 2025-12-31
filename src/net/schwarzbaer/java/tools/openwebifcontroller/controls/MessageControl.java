@@ -11,7 +11,7 @@ import javax.swing.JTextField;
 
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageType;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 
 public class MessageControl extends AbstractControlPanel<OpenWebifTools.MessageResponse> {
 	private static final long serialVersionUID = 139846886828802469L;
@@ -30,26 +30,26 @@ public class MessageControl extends AbstractControlPanel<OpenWebifTools.MessageR
 		timeOut = null;
 		messageType = OpenWebifTools.MessageType.INFO;
 		
-		txtfldMessage = OpenWebifController.createTextField("", 10, null);
+		txtfldMessage = OWCTools.createTextField("", 10, null);
 		txtfldMessage.setMinimumSize(new Dimension(85,20));
-		txtfldTimeOut = OpenWebifController.createTextField("", 4, OpenWebifController::parseInt, n->n>0, n->timeOut=n);
+		txtfldTimeOut = OWCTools.createTextField("", 4, OWCTools::parseInt, n->n>0, n->timeOut=n);
 		txtfldTimeOut.setMinimumSize(new Dimension(35,20));
 		
-		chkbxTimeOut = OpenWebifController.createCheckBox("Time Out", false, b->{
+		chkbxTimeOut = OWCTools.createCheckBox("Time Out", false, b->{
 			txtfldTimeOut.setEditable(b);
 			txtfldTimeOut.setEnabled(b);
 		});
 		txtfldTimeOut.setEditable(false);
 		txtfldTimeOut.setEnabled(false);
 		
-		cmbbxMessageType = OpenWebifController.createComboBox(OpenWebifTools.MessageType.values(), messageType, type->messageType = type);
+		cmbbxMessageType = OWCTools.createComboBox(OpenWebifTools.MessageType.values(), messageType, type->messageType = type);
 		
-		btnSend = OpenWebifController.createButton("Send Message", true, e->{
+		btnSend = OWCTools.createButton("Send Message", true, e->{
 			String message = txtfldMessage.getText();
 			Integer timeOut_sec = chkbxTimeOut.isSelected() ? timeOut : null;
 			callCommand(null, "SendMessage", (baseURL, setTaskTitle)->OpenWebifTools.sendMessage(baseURL, message, messageType, timeOut_sec, setTaskTitle));
 		});
-		btnGetAnswer = OpenWebifController.createButton("Get Answer", true, e->{
+		btnGetAnswer = OWCTools.createButton("Get Answer", true, e->{
 			callCommand(null, "GetAnswer", OpenWebifTools::getMessageAnswer);
 		});
 		

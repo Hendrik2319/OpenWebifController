@@ -13,7 +13,7 @@ import javax.swing.JTextField;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.Volume;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 
 public class VolumeControl extends AbstractControlPanel<Volume.Values> {
 	private static final long serialVersionUID = 6164405483744214580L;
@@ -48,9 +48,9 @@ public class VolumeControl extends AbstractControlPanel<Volume.Values> {
 		}
 		
 		if (this.isSmall && isStretchable) c.weightx = 1;
-		add2Panel(btnVolDown = OpenWebifController.createButton("-", true, e->setVolDown(null)), c);
-		add2Panel(btnVolUp   = OpenWebifController.createButton("+", true, e->setVolUp  (null)), c);
-		add2Panel(btnVolMute = OpenWebifController.createButton(isSmall ? null : "Mute", GrayCommandIcons.IconGroup.Muted, true, e->setVolMute(null)), c);
+		add2Panel(btnVolDown = OWCTools.createButton("-", true, e->setVolDown(null)), c);
+		add2Panel(btnVolUp   = OWCTools.createButton("+", true, e->setVolUp  (null)), c);
+		add2Panel(btnVolMute = OWCTools.createButton(isSmall ? null : "Mute", GrayCommandIcons.IconGroup.Muted, true, e->setVolMute(null)), c);
 		if (this.isSmall) add2Panel(txtVolume, c);
 		if (this.isSmall && isStretchable) c.weightx = 0;
 		

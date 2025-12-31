@@ -43,7 +43,7 @@ public class LogWindow extends StandardDialog implements LogWindowInterface
 		contentPane = new JScrollPane(textPane);
 		contentPane.setPreferredSize(new Dimension(600, 600));
 		
-		createGUI(contentPane, OpenWebifController.createButton("Close", true, e->closeDialog()));
+		createGUI(contentPane, OWCTools.createButton("Close", true, e->closeDialog()));
 	}
 	
 	@Override

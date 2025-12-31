@@ -7,10 +7,10 @@ import javax.swing.JButton;
 import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
+import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
-import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 
 abstract class LoadEPGThread {
 	private final String baseURL;
@@ -40,7 +40,7 @@ abstract class LoadEPGThread {
 		isRunning = false;
 		thread = null;
 		taskAtEnd = null;
-		button = OpenWebifController.createButton("Load EPG", true, e->startStopThread());
+		button = OWCTools.createButton("Load EPG", true, e->startStopThread());
 		focusTime_ms = System.currentTimeMillis(); 
 	}
 	
@@ -95,8 +95,8 @@ abstract class LoadEPGThread {
 			System.out.printf("EPG for Bouquet \"%s\" (%5d min - %5d min) [%s - %s] %s%n",
 					bouquet.name,
 					blockStart_mins, blockEnd_mins,
-					OpenWebifController.dateTimeFormatter.getTimeStr(beginTime_UnixTS*1000, true, true, false, true, false),
-					OpenWebifController.dateTimeFormatter.getTimeStr((beginTime_UnixTS+endTime_Minutes*60)*1000, false, false, false, true, false),
+					OWCTools.dateTimeFormatter.getTimeStr(beginTime_UnixTS*1000, true, true, false, true, false),
+					OWCTools.dateTimeFormatter.getTimeStr((beginTime_UnixTS+endTime_Minutes*60)*1000, false, false, false, true, false),
 					isInterrupted ? " -> omitted" : ""
 			);
 			if (isInterrupted) continue;

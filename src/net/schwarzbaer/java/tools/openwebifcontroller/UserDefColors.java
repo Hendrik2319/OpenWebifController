@@ -306,19 +306,19 @@ public enum UserDefColors
 					c.weightx = 1;
 					c.gridx++; contentPane.add(button,c);
 					c.weightx = 0;
-					c.gridx++; contentPane.add(OpenWebifController.createButton("Reset" , GrayCommandIcons.IconGroup.Reload, true, e->resetToDefault(udc)),c);
+					c.gridx++; contentPane.add(OWCTools.createButton("Reset" , GrayCommandIcons.IconGroup.Reload, true, e->resetToDefault(udc)),c);
 					if (udc.isNullable) {
-						c.gridx++; contentPane.add(OpenWebifController.createButton("Remove", GrayCommandIcons.IconGroup.Delete, true, e->removeColor(udc)),c);
+						c.gridx++; contentPane.add(OWCTools.createButton("Remove", GrayCommandIcons.IconGroup.Delete, true, e->removeColor(udc)),c);
 					}
 				}
 			}
 			
 			createGUI(
 					contentPane,
-					OpenWebifController.createButton("Reset all to Defaults", GrayCommandIcons.IconGroup.Reload, true, e -> this.resetAllToDefault()),
-					OpenWebifController.createButton("Read from File", GrayCommandIcons.IconGroup.Folder, true, e -> this.readFromFile()),
-					OpenWebifController.createButton("Write to File" , GrayCommandIcons.IconGroup.Save  , true, e -> this.writeToFile()),
-					OpenWebifController.createButton("Close", true, e -> closeDialog())
+					OWCTools.createButton("Reset all to Defaults", GrayCommandIcons.IconGroup.Reload, true, e -> this.resetAllToDefault()),
+					OWCTools.createButton("Read from File", GrayCommandIcons.IconGroup.Folder, true, e -> this.readFromFile()),
+					OWCTools.createButton("Write to File" , GrayCommandIcons.IconGroup.Save  , true, e -> this.writeToFile()),
+					OWCTools.createButton("Close", true, e -> closeDialog())
 					);
 			pack();
 			setSizeAsMinSize();

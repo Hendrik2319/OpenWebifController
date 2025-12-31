@@ -31,7 +31,7 @@ import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
 
 class EPGView extends Canvas {
@@ -131,7 +131,7 @@ class EPGView extends Canvas {
 	public void showStatus(PrintStream out)
 	{
 		out.printf("EPG View:%n");
-		out.printf("    baseTimeOffset_s      : %12d [%s]%n", baseTimeOffset_s     , OpenWebifController.dateTimeFormatter.getTimeStr(baseTimeOffset_s*1000, true, true, false, true, true));
+		out.printf("    baseTimeOffset_s      : %12d [%s]%n", baseTimeOffset_s     , OWCTools.dateTimeFormatter.getTimeStr(baseTimeOffset_s*1000, true, true, false, true, true));
 		out.printf("    minTime_s_based       : %12d [%s]%n", minTime_s_based      , DateTimeFormatter.getDurationStr(minTime_s_based      ));
 		out.printf("    maxTime_s_based       : %12d [%s]%n", maxTime_s_based      , DateTimeFormatter.getDurationStr(maxTime_s_based      ));
 		out.printf("    rowAnchorTime_s_based : %12d [%s]%n", rowAnchorTime_s_based, DateTimeFormatter.getDurationStr(rowAnchorTime_s_based));
@@ -188,7 +188,7 @@ class EPGView extends Canvas {
 		Font font = g2.getFont();
 		FontRenderContext frc = g2.getFontRenderContext();
 		for (String formatStr:formatStrs) {
-			String str = OpenWebifController.dateTimeFormatter.getTimeStr(time_ms, Locale.GERMANY, formatStr);
+			String str = OWCTools.dateTimeFormatter.getTimeStr(time_ms, Locale.GERMANY, formatStr);
 			Rectangle2D bounds2 = font.getStringBounds(str, frc);
 			if (bounds2.getWidth()+10 < maxWidth)
 				return str;

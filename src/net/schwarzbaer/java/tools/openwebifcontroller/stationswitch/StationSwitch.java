@@ -42,6 +42,7 @@ import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer.Type;
 import net.schwarzbaer.java.tools.openwebifcontroller.LogWindow;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
@@ -101,7 +102,7 @@ public class StationSwitch {
 		
 		EPG epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
-				return OpenWebifController.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+				return OWCTools.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
 			}
 		});
 		
@@ -130,9 +131,9 @@ public class StationSwitch {
 		volumeControl = new VolumeControl(controlPanelCommands,false,true,true);
 		powerControl.addUpdateTask(baseURL -> volumeControl.initialize(baseURL,null));
 		
-		JButton btnShowMainController = asSubWindow ? null : OpenWebifController.createButton("MainCtrl", true, e->OpenWebifController.start(true));
-		JButton btnShowLogWindow = OpenWebifController.createButton("Log", true, e->logWindow.showDialog(LogWindow.Position.RIGHT_OF_PARENT));
-		JButton btnShowEPG = OpenWebifController.createButton("EPG", true, e->{
+		JButton btnShowMainController = asSubWindow ? null : OWCTools.createButton("MainCtrl", true, e->OpenWebifController.start(true));
+		JButton btnShowLogWindow = OWCTools.createButton("Log", true, e->logWindow.showDialog(LogWindow.Position.RIGHT_OF_PARENT));
+		JButton btnShowEPG = OWCTools.createButton("EPG", true, e->{
 			String baseURL = OpenWebifController.getBaseURL(true, mainWindow);
 			if (baseURL==null) return;
 			
@@ -162,14 +163,14 @@ public class StationSwitch {
 					mainWindow, baseURL, epg, bouquet,
 					timerDataUpdateNotifier, bouquetsNStationsUpdateNotifier,
 					epgDialogCommands,
-					OpenWebifController.createButton("Update Timer Data", GrayCommandIcons.IconGroup.Reload, true, e1->{
+					OWCTools.createButton("Update Timer Data", GrayCommandIcons.IconGroup.Reload, true, e1->{
 						reloadTimerData();
 					}));
 		});
 		
 		
 		
-		btnReLoadTimerData = OpenWebifController.createButton(GrayCommandIcons.IconGroup.Download, true, e -> reloadTimerData());
+		btnReLoadTimerData = OWCTools.createButton(GrayCommandIcons.IconGroup.Download, true, e -> reloadTimerData());
 		btnReLoadTimerData.setToolTipText("Load Timer Data");
 		
 		txtActiveTimers = new JTextArea();
@@ -179,7 +180,7 @@ public class StationSwitch {
 		txtActiveTimers  .setToolTipText("Active Timers");
 		scrollPaneActiveTimers.setToolTipText("Active Timers");
 		scrollPaneActiveTimers.setPreferredSize(new Dimension(300,70));
-		btnShowTimers = OpenWebifController.createButton("Timer", false, e-> {
+		btnShowTimers = OWCTools.createButton("Timer", false, e-> {
 			if (timerData==null) {
 				//System.err.printf("timerData == null%n");
 				return;
@@ -204,13 +205,13 @@ public class StationSwitch {
 		
 		stationsPanel = new JPanel(new GridBagLayout());
 		
-		btnReLoadBouquetData = OpenWebifController.createButton(GrayCommandIcons.IconGroup.Download, true, e->{
+		btnReLoadBouquetData = OWCTools.createButton(GrayCommandIcons.IconGroup.Download, true, e->{
 			reloadBouquetData();
 			mainWindow.pack();
 		});
 		btnReLoadBouquetData.setToolTipText("Load Bouquet Data");
 		
-		btnAddStation = OpenWebifController.createButton("Add", false, e->{
+		btnAddStation = OWCTools.createButton("Add", false, e->{
 			Bouquet.SubService station = selectedStation;
 			if (station==null) return;
 			
@@ -220,7 +221,7 @@ public class StationSwitch {
 		});
 		
 		JLabel labStation = new JLabel("Station: ");
-		cmbbxStation = OpenWebifController.createComboBox((Bouquet.SubService subService)->{
+		cmbbxStation = OWCTools.createComboBox((Bouquet.SubService subService)->{
 			selectedStation = subService;
 			updateBtnAddStation();
 		});
@@ -229,7 +230,7 @@ public class StationSwitch {
 		cmbbxStation.setEnabled(false);
 		
 		labBouquet = new JLabel("Bouquet: ");
-		cmbbxBouquet = OpenWebifController.createComboBox((Bouquet bouquet)->{
+		cmbbxBouquet = OWCTools.createComboBox((Bouquet bouquet)->{
 			cmbbxStation.setModel  (bouquet==null ? new DefaultComboBoxModel<>() : new DefaultComboBoxModel<>(bouquet.subservices));
 			labStation  .setEnabled(bouquet!=null && !bouquet.subservices.isEmpty());
 			cmbbxStation.setEnabled(bouquet!=null && !bouquet.subservices.isEmpty());
@@ -254,9 +255,9 @@ public class StationSwitch {
 
 		private void updateCurrentStation(String baseURL)
 		{
-			OpenWebifController.runWithProgressDialog(mainWindow, "title", pd->{
+			OWCTools.runWithProgressDialog(mainWindow, "title", pd->{
 				OpenWebifTools.CurrentStation currentStationData = OpenWebifTools.getCurrentStation(
-					baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "CurrentStation: "+taskTitle)
+					baseURL, taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "CurrentStation: "+taskTitle)
 				);
 				
 				currentStation = currentStationData==null || currentStationData.stationInfo==null
@@ -279,20 +280,20 @@ public class StationSwitch {
 		JLabel label = new JLabel(station.name);
 		comps.add(label);
 		
-		JButton btnZap = OpenWebifController.createButton("Switch", baseURL!=null, e1->{
+		JButton btnZap = OWCTools.createButton("Switch", baseURL!=null, e1->{
 			if (baseURL==null) return;
 			OpenWebifController.zapToStation(station.service.stationID, baseURL, logWindow);
 		});
 		comps.add(btnZap);
 		
-		JButton btnStream = OpenWebifController.createButton("Stream", baseURL!=null, e1->{
+		JButton btnStream = OWCTools.createButton("Stream", baseURL!=null, e1->{
 			if (baseURL==null) return;
 			OpenWebifController.streamStation(station.service.stationID, baseURL);
 		});
 		btnStream.setEnabled(OpenWebifController.canStreamStation());
 		comps.add(btnStream);
 		
-		JButton btnDelete = OpenWebifController.createButton(GrayCommandIcons.IconGroup.Delete , true, e1->{
+		JButton btnDelete = OWCTools.createButton(GrayCommandIcons.IconGroup.Delete , true, e1->{
 			SwingUtilities.invokeLater(()->{
 				for (Component comp : comps)
 					stationsPanel.remove(comp);
@@ -410,20 +411,20 @@ public class StationSwitch {
 	private void reloadBouquetData()
 	{
 		String title = (bouquetData == null ? "Load" : "Reload") +" Bouquet Data";
-		OpenWebifController.runWithProgressDialog(mainWindow, title, this::initializeBouquetData);
+		OWCTools.runWithProgressDialog(mainWindow, title, this::initializeBouquetData);
 	}
 
 	private void reloadTimerData()
 	{
 		String title = (timerData == null ? "Load" : "Reload") +" Timer Data";
-		OpenWebifController.runWithProgressDialog(mainWindow, title, pd -> initializeTimerData(baseURL, pd));
+		OWCTools.runWithProgressDialog(mainWindow, title, pd -> initializeTimerData(baseURL, pd));
 	}
 	
 	private void initialize(String baseURL) {
 		if (baseURL==null) baseURL = OpenWebifController.getBaseURL(true, mainWindow);
 		this.baseURL = baseURL;
 		
-		OpenWebifController.runWithProgressDialog(mainWindow, "Initialize", pd->{
+		OWCTools.runWithProgressDialog(mainWindow, "Initialize", pd->{
 			if (this.baseURL!=null) {
 				powerControl .initialize(this.baseURL,pd);
 				volumeControl.initialize(this.baseURL,pd);
@@ -440,11 +441,11 @@ public class StationSwitch {
 		timerData = null;
 		
 		if (baseURL!=null)
-			timerData = Timers.read(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timer Data: "+taskTitle));
+			timerData = Timers.read(baseURL, taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "Timer Data: "+taskTitle));
 		
 		SwingUtilities.invokeLater(()->{
 			btnReLoadTimerData.setToolTipText("Reload Timer Data");
-			OpenWebifController.setIcon(btnReLoadTimerData, GrayCommandIcons.IconGroup.Reload);
+			OWCTools.setIcon(btnReLoadTimerData, GrayCommandIcons.IconGroup.Reload);
 			txtActiveTimers.setEnabled(timerData != null);
 			btnShowTimers.setEnabled(timerData != null);
 			updateActiveTimersText();
@@ -456,11 +457,11 @@ public class StationSwitch {
 		bouquetData = null;
 		
 		if (baseURL!=null)
-			bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquet Data: "+taskTitle));
+			bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "Bouquet Data: "+taskTitle));
 		
 		SwingUtilities.invokeLater(()->{
 			btnReLoadBouquetData.setToolTipText("Reload Bouquet Data");
-			OpenWebifController.setIcon(btnReLoadBouquetData, GrayCommandIcons.IconGroup.Reload);
+			OWCTools.setIcon(btnReLoadBouquetData, GrayCommandIcons.IconGroup.Reload);
 			cmbbxBouquet.setModel  (bouquetData==null ? new DefaultComboBoxModel<Bouquet>() : new DefaultComboBoxModel<Bouquet>(bouquetData.bouquets));
 			cmbbxBouquet.setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());
 			labBouquet  .setEnabled(bouquetData!=null && !bouquetData.bouquets.isEmpty());

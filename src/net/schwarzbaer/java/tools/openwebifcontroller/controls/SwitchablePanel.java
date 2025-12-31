@@ -9,7 +9,7 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 
 public class SwitchablePanel extends JPanel
 {
@@ -27,7 +27,7 @@ public class SwitchablePanel extends JPanel
 			setBorder(BorderFactory.createTitledBorder(borderTitle));
 		
 		isOpen = true;
-		viewButton = OpenWebifController.createButton("<", true, e->changePanel(!isOpen));
+		viewButton = OWCTools.createButton("<", true, e->changePanel(!isOpen));
 		viewButton.setMargin(new Insets(0,0,0,0));
 		super.add(viewButton, BorderLayout.WEST);
 		super.add(contentPanel, BorderLayout.CENTER);

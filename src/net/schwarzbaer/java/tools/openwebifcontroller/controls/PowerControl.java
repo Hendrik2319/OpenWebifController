@@ -11,7 +11,7 @@ import javax.swing.JComboBox;
 
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.openwebif.Power;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 
 public class PowerControl extends AbstractControlPanel<Power.Values> {
 	private static final long serialVersionUID = 3842993673551313089L;
@@ -33,7 +33,7 @@ public class PowerControl extends AbstractControlPanel<Power.Values> {
 		c.fill = GridBagConstraints.BOTH;
 		
 		if (this.isSmall && isStretchable) c.weightx = 1;
-		add2Panel(btnPower = OpenWebifController.createButton(isSmall ? null : "Toggle StandBy", GrayCommandIcons.IconGroup.Power_IsOn, true, e->{
+		add2Panel(btnPower = OWCTools.createButton(isSmall ? null : "Toggle StandBy", GrayCommandIcons.IconGroup.Power_IsOn, true, e->{
 			callCommand(null, "ToggleStandBy", true, (baseURL, setTaskTitle)->{
 				Power.Values state = Power.setState(baseURL, Power.Commands.ToggleStandBy, setTaskTitle);
 				for (UpdateTask ut : updateTasks) ut.update(baseURL);
@@ -46,7 +46,7 @@ public class PowerControl extends AbstractControlPanel<Power.Values> {
 			if (isStretchable) c.weightx = 1;
 			Vector<Power.Commands> items = new Vector<>(Arrays.asList(Power.Commands.values()));
 			items.remove(Power.Commands.ToggleStandBy);
-			add2Panel(cmbbxSetOtherState = OpenWebifController.createComboBox(items, Power.Commands.Wakeup, cmd->{
+			add2Panel(cmbbxSetOtherState = OWCTools.createComboBox(items, Power.Commands.Wakeup, cmd->{
 				callCommand(null, cmd.name(), true, (baseURL, setTaskTitle)->{
 					Power.Values state = Power.setState(baseURL, cmd, setTaskTitle);
 					for (UpdateTask ut : updateTasks) ut.update(baseURL);
@@ -83,9 +83,9 @@ public class PowerControl extends AbstractControlPanel<Power.Values> {
 			else btnPower.setText("Switch to Standby");
 		}
 		if (values.instandby)
-			OpenWebifController.setIcon(btnPower, GrayCommandIcons.Power_IsOff.getIcon(), GrayCommandIcons.Power_IsOff_Dis.getIcon());
+			OWCTools.setIcon(btnPower, GrayCommandIcons.Power_IsOff.getIcon(), GrayCommandIcons.Power_IsOff_Dis.getIcon());
 		else
-			OpenWebifController.setIcon(btnPower, GrayCommandIcons.Power_IsOn.getIcon(), GrayCommandIcons.Power_IsOn_Dis.getIcon());
+			OWCTools.setIcon(btnPower, GrayCommandIcons.Power_IsOn.getIcon(), GrayCommandIcons.Power_IsOn_Dis.getIcon());
 	}
 
 	@Override protected void setPanelEnable(boolean enabled) {

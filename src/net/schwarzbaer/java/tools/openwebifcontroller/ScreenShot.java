@@ -62,7 +62,7 @@ class ScreenShot extends JPanel {
 		c.weightx = 1;
 		
 		c.gridwidth = GridBagConstraints.REMAINDER;
-		updatePanel.add(OpenWebifController.createCheckBox("Automatic Update", false, b->{
+		updatePanel.add(OWCTools.createCheckBox("Automatic Update", false, b->{
 			if (b) screenShotUpdater.start();
 			else   screenShotUpdater.stop();
 		}),c);
@@ -72,9 +72,9 @@ class ScreenShot extends JPanel {
 		updatePanel.add(new JLabel("Interval (s): "),c);
 		c.weightx = 1;
 		c.gridwidth = GridBagConstraints.REMAINDER;
-		updatePanel.add(OpenWebifController.createTextField(Integer.toString(updateInterval_s), 6, OpenWebifController::parseInt, n->n>0, screenShotUpdater::changeInterval),c);
+		updatePanel.add(OWCTools.createTextField(Integer.toString(updateInterval_s), 6, OWCTools::parseInt, n->n>0, screenShotUpdater::changeInterval),c);
 		
-		updatePanel.add(updateButton = OpenWebifController.createButton("Update", true, e->screenShotUpdater.runOnce()),c);
+		updatePanel.add(updateButton = OWCTools.createButton("Update", true, e->screenShotUpdater.runOnce()),c);
 		
 		JPanel configPanel = new JPanel(new GridBagLayout());
 		c = new GridBagConstraints();
@@ -84,15 +84,15 @@ class ScreenShot extends JPanel {
 		
 		ButtonGroup bgContent = new ButtonGroup();
 		configPanel.add(createGridPanel("Content",
-				OpenWebifController.createRadioButton("TV & OSD", bgContent, content == OpenWebifTools.ScreenShotType.TVnOSD , b->{ content = OpenWebifTools.ScreenShotType.TVnOSD;  updateScreenShot(); }),
-				OpenWebifController.createRadioButton("TV only" , bgContent, content == OpenWebifTools.ScreenShotType.TVonly , b->{ content = OpenWebifTools.ScreenShotType.TVonly;  updateScreenShot(); }),
-				OpenWebifController.createRadioButton("OSD only", bgContent, content == OpenWebifTools.ScreenShotType.OSDonly, b->{ content = OpenWebifTools.ScreenShotType.OSDonly; updateScreenShot(); })
+				OWCTools.createRadioButton("TV & OSD", bgContent, content == OpenWebifTools.ScreenShotType.TVnOSD , b->{ content = OpenWebifTools.ScreenShotType.TVnOSD;  updateScreenShot(); }),
+				OWCTools.createRadioButton("TV only" , bgContent, content == OpenWebifTools.ScreenShotType.TVonly , b->{ content = OpenWebifTools.ScreenShotType.TVonly;  updateScreenShot(); }),
+				OWCTools.createRadioButton("OSD only", bgContent, content == OpenWebifTools.ScreenShotType.OSDonly, b->{ content = OpenWebifTools.ScreenShotType.OSDonly; updateScreenShot(); })
 		),c);
 		
 		ButtonGroup bgResolution = new ButtonGroup();
 		configPanel.add(createGridPanel("Resolution",
-				OpenWebifController.createRadioButton("720 Rows" , bgResolution, resolution == OpenWebifTools.ScreenShotResolution.R720   , b->{ resolution = OpenWebifTools.ScreenShotResolution.R720   ;  updateScreenShot(); }),
-				OpenWebifController.createRadioButton("High-Res" , bgResolution, resolution == OpenWebifTools.ScreenShotResolution.HighRes, b->{ resolution = OpenWebifTools.ScreenShotResolution.HighRes;  updateScreenShot(); })
+				OWCTools.createRadioButton("720 Rows" , bgResolution, resolution == OpenWebifTools.ScreenShotResolution.R720   , b->{ resolution = OpenWebifTools.ScreenShotResolution.R720   ;  updateScreenShot(); }),
+				OWCTools.createRadioButton("High-Res" , bgResolution, resolution == OpenWebifTools.ScreenShotResolution.HighRes, b->{ resolution = OpenWebifTools.ScreenShotResolution.HighRes;  updateScreenShot(); })
 		),c);
 		
 		configPanel.add(updatePanel,c);
@@ -117,7 +117,7 @@ class ScreenShot extends JPanel {
 	}
 
 	public void initialize(String baseURL, ProgressView pd) {
-		OpenWebifController.setIndeterminateProgressTask(pd, "ScreenShot: Read Image");
+		OWCTools.setIndeterminateProgressTask(pd, "ScreenShot: Read Image");
 		updateScreenShot(baseURL);
 		SwingUtilities.invokeLater(this::revalidate);
 	}

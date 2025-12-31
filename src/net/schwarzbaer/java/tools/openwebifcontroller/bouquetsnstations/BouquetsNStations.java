@@ -49,6 +49,7 @@ import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.CurrentStation;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
@@ -210,20 +211,20 @@ public class BouquetsNStations extends JPanel {
 			clickedStationNode     = null;
 			parentBouquetNode      = null;
 			
-			add(OpenWebifController.createMenuItem("Reload Bouquets", GrayCommandIcons.IconGroup.Reload, e->{
+			add(OWCTools.createMenuItem("Reload Bouquets", GrayCommandIcons.IconGroup.Reload, e->{
 				main.getBaseURLAndRunWithProgressDialog("Reload Bouquets", BouquetsNStations.this::readData);
 			}));
 			
-			add(OpenWebifController.createMenuItem("Save All Stations to TabSeparated-File", GrayCommandIcons.IconGroup.Save, e->{
+			add(OWCTools.createMenuItem("Save All Stations to TabSeparated-File", GrayCommandIcons.IconGroup.Save, e->{
 				if (bsTreeRoot==null) return;
 				
 				main.runWithProgressDialog("Save Stations to TabSeparated-File", pd -> {
-					OpenWebifController.setIndeterminateProgressTask(pd, "Choose Output File");
+					OWCTools.setIndeterminateProgressTask(pd, "Choose Output File");
 					
 					if (txtFileChooser.showSaveDialog(main.mainWindow)!=FileChooser.APPROVE_OPTION) return;
 					File outFile = txtFileChooser.getSelectedFile();
 					
-					OpenWebifController.setIndeterminateProgressTask(pd, "Write to Output File");
+					OWCTools.setIndeterminateProgressTask(pd, "Write to Output File");
 					try (PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outFile), StandardCharsets.UTF_8))) {
 						
 						for (Bouquet bouquet:bsTreeRoot.bouquetData.bouquets)
@@ -237,28 +238,28 @@ public class BouquetsNStations extends JPanel {
 			}));
 			
 			
-			add(OpenWebifController.createCheckBoxMenuItem("Update 'Is Playable' States Periodically", updatePlayableStatesPeriodically, isChecked->{
+			add(OWCTools.createCheckBoxMenuItem("Update 'Is Playable' States Periodically", updatePlayableStatesPeriodically, isChecked->{
 				startStopPeriodicUpdater10s( ()->updatePlayableStatesPeriodically=isChecked );
 				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdatePlayableStates, isChecked);
 			}));
-			JMenuItem miUpdatePlayableStatesNow = add(OpenWebifController.createMenuItem("Update 'Is Playable' States Now", GrayCommandIcons.IconGroup.Reload, e->{
+			JMenuItem miUpdatePlayableStatesNow = add(OWCTools.createMenuItem("Update 'Is Playable' States Now", GrayCommandIcons.IconGroup.Reload, e->{
 				periodicUpdater10s.runOnce( () -> updatePlayableStates() );
 			}));
 			
-			add(OpenWebifController.createCheckBoxMenuItem("Update 'Current Station' Periodically", updateCurrentStationPeriodically, isChecked->{
+			add(OWCTools.createCheckBoxMenuItem("Update 'Current Station' Periodically", updateCurrentStationPeriodically, isChecked->{
 				startStopPeriodicUpdater10s( ()->updateCurrentStationPeriodically=isChecked );
 				OpenWebifController.settings.putBool(OpenWebifController.AppSettings.ValueKey.BouquetsNStations_UpdateCurrentStation, isChecked);
 			}));
-			JMenuItem miUpdateCurrentStationNow = add(OpenWebifController.createMenuItem("Update 'Current Station' Now", GrayCommandIcons.IconGroup.Reload, e->{
+			JMenuItem miUpdateCurrentStationNow = add(OWCTools.createMenuItem("Update 'Current Station' Now", GrayCommandIcons.IconGroup.Reload, e->{
 				periodicUpdater10s.runOnce( () -> updateCurrentStation() );
 			}));
-			add(OpenWebifController.createMenuItem("Show 'Current Station' Data", e->{
+			add(OWCTools.createMenuItem("Show 'Current Station' Data", e->{
 				String msg = BouquetsNStations.toString( currentStationData );
 				TextAreaDialog.showText(main.mainWindow, "Current Station", 800, 500, true, msg);
 				//JOptionPane.showMessageDialog(mainWindow, msg, "Current Station", JOptionPane.INFORMATION_MESSAGE);
 			}));
 			
-			JMenuItem miWriteSelectedStreamsToM3U = add(OpenWebifController.createMenuItem("Write Streams of Selected Stations to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
+			JMenuItem miWriteSelectedStreamsToM3U = add(OWCTools.createMenuItem("Write Streams of Selected Stations to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
 				if (selectedStationNodes.isEmpty()) return;
 				
 				String baseURL = main.getBaseURL();
@@ -273,13 +274,13 @@ public class BouquetsNStations extends JPanel {
 			
 			addSeparator();
 			
-			JMenuItem miUpdatePlayableStatesBouquet = add(OpenWebifController.createMenuItem("Update 'Is Playable' States of Bouquet", GrayCommandIcons.IconGroup.Reload, e->{
+			JMenuItem miUpdatePlayableStatesBouquet = add(OWCTools.createMenuItem("Update 'Is Playable' States of Bouquet", GrayCommandIcons.IconGroup.Reload, e->{
 				String baseURL = main.getBaseURL();
 				if (baseURL==null) return;
 				periodicUpdater10s.runOnce( () -> updatePlayableStates(baseURL, clickedBouquetNode) );
 			}));
 			
-			JMenuItem miWriteBouquetStreamsToM3U = add(OpenWebifController.createMenuItem("Write Streams of Bouquet to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
+			JMenuItem miWriteBouquetStreamsToM3U = add(OWCTools.createMenuItem("Write Streams of Bouquet to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
 				if (clickedBouquetNode==null) return;
 				
 				String baseURL = main.getBaseURL();
@@ -292,12 +293,12 @@ public class BouquetsNStations extends JPanel {
 				main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Bouquet: %s", clickedBouquetNode.bouquet.name));
 			}));
 			
-			JMenuItem miShowEPGforBouquet = add(OpenWebifController.createMenuItem("Show EPG for Bouquet", e->{
+			JMenuItem miShowEPGforBouquet = add(OWCTools.createMenuItem("Show EPG for Bouquet", e->{
 				if (clickedBouquetNode==null) return;
 				main.openEPGDialog(clickedBouquetNode.bouquet);
 			}));
 			
-			JCheckBoxMenuItem chkbxMiGroupStations = OpenWebifController.createCheckBoxMenuItem("Group stations of bouquet by transponder", false, checked -> {
+			JCheckBoxMenuItem chkbxMiGroupStations = OWCTools.createCheckBoxMenuItem("Group stations of bouquet by transponder", false, checked -> {
 				BSTreeNode.BouquetNode bouquetNode = clickedBouquetNode!=null ? clickedBouquetNode : parentBouquetNode;
 				if (bouquetNode==null) return;
 				bouquetNode.changeSubNodeStructure(
@@ -313,7 +314,7 @@ public class BouquetsNStations extends JPanel {
 			
 			addSeparator();
 			
-			JMenuItem miLoadPicons = add(OpenWebifController.createMenuItem("Load Picons", GrayCommandIcons.IconGroup.Image, e->{
+			JMenuItem miLoadPicons = add(OWCTools.createMenuItem("Load Picons", GrayCommandIcons.IconGroup.Image, e->{
 				if (clickedBouquetNode!=null) {
 					String baseURL = main.getBaseURL();
 					if (baseURL==null) return;
@@ -326,10 +327,10 @@ public class BouquetsNStations extends JPanel {
 					PICON_LOADER.addTask(clickedStationNode.getStationID());
 				}
 			}));
-			JMenuItem miSwitchToStation = add(OpenWebifController.createMenuItem("Switch To Station",                                   e->main. zapToStation(clickedStationNode.getStationID())));
-			JMenuItem miStreamStation   = add(OpenWebifController.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->main.streamStation(clickedStationNode.getStationID())));
+			JMenuItem miSwitchToStation = add(OWCTools.createMenuItem("Switch To Station",                                   e->main. zapToStation(clickedStationNode.getStationID())));
+			JMenuItem miStreamStation   = add(OWCTools.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->main.streamStation(clickedStationNode.getStationID())));
 			
-			JMenuItem miShowSameTransponder = add(OpenWebifController.createMenuItem("Show Same Transponder", e->{
+			JMenuItem miShowSameTransponder = add(OWCTools.createMenuItem("Show Same Transponder", e->{
 				if (isSameTransponder(clickedStationNode.getStationID()))
 					transponderListBaseStation = null;
 				else
@@ -465,7 +466,7 @@ public class BouquetsNStations extends JPanel {
 	}
 
 	private void updateCurrentStation(String baseURL, ProgressDialog pd) {
-		Consumer<String> setIndeterminateProgressTask = pd==null ? null : taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "CurrentStation: "+taskTitle);
+		Consumer<String> setIndeterminateProgressTask = pd==null ? null : taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "CurrentStation: "+taskTitle);
 		
 		updateCurrentlyPlayedStationNodes(false);
 		currentStationData = OpenWebifTools.getCurrentStation(baseURL, setIndeterminateProgressTask);
@@ -544,10 +545,10 @@ public class BouquetsNStations extends JPanel {
 	public void readData(String baseURL, ProgressView pd) {
 		if (baseURL==null) return;
 		
-		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: "+taskTitle));
+		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: "+taskTitle));
 		
 		if (bouquetData!=null) {
-			OpenWebifController.callInGUIThread(() -> {
+			OWCTools.callInGUIThread(() -> {
 				PICON_LOADER.clear();
 				PICON_LOADER.setBaseURL(baseURL);
 				bsTreeRoot = new BSTreeNode.RootNode(bouquetData);
@@ -594,7 +595,7 @@ public class BouquetsNStations extends JPanel {
 		if (currentStationData==null)
 			out.add(0, "No Current Station Data");
 		else
-			OpenWebifController.generateOutput(out, 0, currentStationData);
+			OWCTools.generateOutput(out, 0, currentStationData);
 		return out.generateOutput();
 	}
 	

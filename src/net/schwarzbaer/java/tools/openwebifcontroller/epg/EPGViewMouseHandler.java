@@ -13,7 +13,7 @@ import javax.swing.JScrollBar;
 
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.EventContextMenu;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGDialog.StationContextMenu;
 
@@ -164,7 +164,7 @@ class EPGViewMouseHandler implements MouseListener, MouseMotionListener, MouseWh
 		case MouseEvent.BUTTON1:
 			if (hoveredEvent!=null) {
 				EPGView.Timer timer = epgView.getTimer(hoveredEvent.event.sref, hoveredEvent.event.id);
-				String text = OpenWebifController.generateOutput(hoveredEvent.event, timer==null ? null : timer.timer);
+				String text = OWCTools.generateOutput(hoveredEvent.event, timer==null ? null : timer.timer);
 				TextAreaDialog.showText(parent, hoveredEvent.title, 700, 500, true, text);
 			}
 			break;

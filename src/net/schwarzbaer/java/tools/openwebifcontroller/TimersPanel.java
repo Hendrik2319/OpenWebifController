@@ -8,7 +8,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Vector;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -40,10 +39,6 @@ import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadyS
 
 public class TimersPanel extends JSplitPane {
 	private static final long serialVersionUID = -2563250955373710618L;
-	
-	private static String formatDate(long millis, boolean withTextDay, boolean withDate, boolean dateIsLong, boolean withTime, boolean withTimeZone) {
-		return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
-	}
 	
 	private final OpenWebifController main;
 	private final JTable table;
@@ -106,7 +101,7 @@ public class TimersPanel extends JSplitPane {
 		if (table.getSelectedRowCount() == 1) {
 			int rowV = table.getSelectedRow();
 			int rowM = table.convertRowIndexToModel(rowV);
-			text = TimerTools.generateShortInfo(tableModel.getRow(rowM), true);
+			text = OWCTools.generateShortInfo(tableModel.getRow(rowM), true);
 		} else {
 			int[] rowsV = table.getSelectedRows();
 			int[] rowsM = Tables.convertRowIndexesToModel(table,rowsV);
@@ -120,7 +115,7 @@ public class TimersPanel extends JSplitPane {
 						text += "\r\n    \"%s\" (%s) at %s".formatted(
 							row.name,
 							row.servicename,
-							formatDate(row.begin*1000,  true,  true, false,  true, false)
+							OWCTools.formatDate(row.begin*1000,  true,  true, false,  true, false)
 						);
 				}
 			}
@@ -143,11 +138,11 @@ public class TimersPanel extends JSplitPane {
 			addTo(table, () -> ContextMenu.computeSurrogateMousePos(table, tableScrollPane, tableModel.getColumn(TimersTableModel.ColumnID.name)));
 			addTo(tableScrollPane);
 			
-			add(OpenWebifController.createMenuItem("Reload Timers", GrayCommandIcons.IconGroup.Reload, e->{
+			add(OWCTools.createMenuItem("Reload Timers", GrayCommandIcons.IconGroup.Reload, e->{
 				main.getBaseURLAndRunWithProgressDialog("Reload Timers", TimersPanel.this::readData);
 			}));
 			
-			add(OpenWebifController.createMenuItem("CleanUp Timers", GrayCommandIcons.IconGroup.Delete, e->{
+			add(OWCTools.createMenuItem("CleanUp Timers", GrayCommandIcons.IconGroup.Delete, e->{
 				main.cleanUpTimers(TimersPanel.this::readData);
 			}));
 			
@@ -156,28 +151,28 @@ public class TimersPanel extends JSplitPane {
 			JMenu menuClickedTimer;
 			add(menuClickedTimer = new JMenu("Clicked Timer"));
 			
-			menuClickedTimer.add(OpenWebifController.createMenuItem("Toggle", e->{
+			menuClickedTimer.add(OWCTools.createMenuItem("Toggle", e->{
 				if (clickedTimer==null) return;
 				main.toggleTimer(null, clickedTimer, this::handleToggleResponse, this::updateGUI);
 			}));
 			
-			menuClickedTimer.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
+			menuClickedTimer.add(OWCTools.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
 				main.deleteTimer(null, clickedTimer, this::handleDeleteResponse, this::updateGUI);
 			}));
 			
-			menuClickedTimer.add(OpenWebifController.createMenuItem("Show Details", e->{
+			menuClickedTimer.add(OWCTools.createMenuItem("Show Details", e->{
 				if (clickedTimer==null) return;
-				String text = TimerTools.generateDetailsOutput(clickedTimer);
+				String text = OWCTools.generateDetailsOutput(clickedTimer);
 				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
 			}));
 			
-			menuClickedTimer.add(OpenWebifController.createMenuItem("Show Collisions", e->{
+			menuClickedTimer.add(OWCTools.createMenuItem("Show Collisions", e->{
 				if (clickedTimer==null) return;
-				TimerTools.showCollisions(
+				OWCTools.showCollisions(
 						main.mainWindow,
 						clickedTimer,
-						action -> tableModel.forEachRow((i,timer) -> action.accept(timer)),
+						tableModel::forEachRow,
 						timerStateGuesser::getState
 				);
 			}));
@@ -191,24 +186,24 @@ public class TimersPanel extends JSplitPane {
 			JMenu menuSelectedTimers;
 			add(menuSelectedTimers = new JMenu("Selected Timers"));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Activate", GrayCommandIcons.IconGroup.Play, e->{
+			menuSelectedTimers.add(OWCTools.createMenuItem("Activate", GrayCommandIcons.IconGroup.Play, e->{
 				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Deactivated);
 				if (filteredTimers.length<1) return;
 				main.toggleTimer(null, filteredTimers, this::handleToggleResponse, this::updateGUI);
 			}));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Deactivate", GrayCommandIcons.IconGroup.Stop, e->{
+			menuSelectedTimers.add(OWCTools.createMenuItem("Deactivate", GrayCommandIcons.IconGroup.Stop, e->{
 				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Waiting);
 				if (filteredTimers.length<1) return;
 				main.toggleTimer(null, filteredTimers, this::handleToggleResponse, this::updateGUI);
 			}));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Toggle", e->{
+			menuSelectedTimers.add(OWCTools.createMenuItem("Toggle", e->{
 				if (selectedTimers.length<1) return;
 				main.toggleTimer(null, selectedTimers, this::handleToggleResponse, this::updateGUI);
 			}));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
+			menuSelectedTimers.add(OWCTools.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (selectedTimers.length<1) return;
 				main.deleteTimer(null, selectedTimers, this::handleDeleteResponse, this::updateGUI);
 			}));
@@ -221,11 +216,11 @@ public class TimersPanel extends JSplitPane {
 			
 			addSeparator();
 			
-			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
+			add(OWCTools.createMenuItem("Show Column Widths", e->{
 				System.out.printf("Column Widths: %s%n", TimersTableModel.getColumnWidthsAsString(table));
 			}));
 			
-			add(OpenWebifController.createMenuItem("Reset Row Order", e->{
+			add(OWCTools.createMenuItem("Reset Row Order", e->{
 				tableRowSorter.resetSortOrder();
 				table.repaint();
 			}));
@@ -308,8 +303,8 @@ public class TimersPanel extends JSplitPane {
 
 	public void readData(String baseURL, ProgressView pd) {
 		if (baseURL==null) return;
-		timers = Timers.read(baseURL, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));
-		OpenWebifController.callInGUIThread(() -> {
+		timers = Timers.read(baseURL, taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "Timers: "+taskTitle));
+		OWCTools.callInGUIThread(() -> {
 			timerStateGuesser.clearGuessedStates();
 			tableModel = timers==null ? new TimersTableModel(timerStateGuesser) : new TimersTableModel(timers.timers, timerStateGuesser);
 			table.setModel(tableModel);
@@ -431,9 +426,9 @@ public class TimersPanel extends JSplitPane {
 		private String toString(Timer timer)
 		{
 			return String.format("%s, %s - %s, %s - %s",
-					formatDate(timer.begin*1000,  true,  true, false, false, false),
-					formatDate(timer.begin*1000, false, false, false,  true, false),
-					formatDate(timer.end  *1000, false, false, false,  true, false),
+					OWCTools.formatDate(timer.begin*1000,  true,  true, false, false, false),
+					OWCTools.formatDate(timer.begin*1000, false, false, false,  true, false),
+					OWCTools.formatDate(timer.end  *1000, false, false, false,  true, false),
 					timer.servicename,
 					timer.name
 			);
@@ -491,7 +486,7 @@ public class TimersPanel extends JSplitPane {
 			if (columnID!=null) {
 				boolean markedAsAlreadySeen = AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(timer);
 				
-				Supplier<Color> bgCol = ()->timer==null ? null : TimerTools.getBgColor(
+				Supplier<Color> bgCol = ()->timer==null ? null : OWCTools.getBgColor(
 						tableModel.timerStateGuesser.getState(timer),
 						markedAsAlreadySeen
 				);
@@ -513,7 +508,7 @@ public class TimersPanel extends JSplitPane {
 					
 				} else {
 					if (columnID.cfg.columnClass==Timer.Type.class && value instanceof Timer.Type timerType)
-						bgCol = ()->TimerTools.getBgColor(timerType);
+						bgCol = ()->OWCTools.getBgColor(timerType);
 					
 					String valueStr = columnID.cfg.toString!=null ? columnID.cfg.toString.apply(value) : value!=null ? value.toString() : null;
 					labRenderer.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
@@ -533,8 +528,8 @@ public class TimersPanel extends JSplitPane {
 			type               (config("Type"                 , Timer.Type .class,  90, CENTER).setValFunc(t->t.type               )),
 			state_             (config("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((m,t)->m.timerStateGuesser.getState(t))),
 			seen               (config("Seen"                 , String     .class,  75, CENTER).setValFunc(t->toString(AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(t)))),
-			begin_date         (config("Begin"                , Long       .class, 170, null  ).setValFunc(t->t.begin              ).setToString(t->formatDate(t*1000,  true,  true, false,  true, false))),
-			end                (config("End"                  , Long       .class,  60, null  ).setValFunc(t->t.end                ).setToString(t->formatDate(t*1000, false, false, false,  true, false))),
+			begin_date         (config("Begin"                , Long       .class, 170, null  ).setValFunc(t->t.begin              ).setToString(t->OWCTools.formatDate(t*1000,  true,  true, false,  true, false))),
+			end                (config("End"                  , Long       .class,  60, null  ).setValFunc(t->t.end                ).setToString(t->OWCTools.formatDate(t*1000, false, false, false,  true, false))),
 			duration           (config("Duration"             , Double     .class,  60, null  ).setValFunc(t->t.duration           ).setToString(DateTimeFormatter::getDurationStr)),
 			name               (config("Name"                 , String     .class, 220, null  ).setValFunc(t->t.name               )),
 			servicename        (config("Station"              , String     .class, 110, null  ).setValFunc(t->t.servicename        )),
@@ -546,8 +541,8 @@ public class TimersPanel extends JSplitPane {
 			
 			realbegin          (config("<realbegin>"          , String     .class, 100, null  ).setValFunc(t->t.realbegin          )),
 			realend            (config("<realend>"            , String     .class, 100, null  ).setValFunc(t->t.realend            )),
-			startprepare       (config("<startprepare>"       , Double     .class, 170, null  ).setValFunc(t->t.startprepare       ).setToString(d->formatDate(Math.round(d*1000), true, true, false, true, false))),
-			nextactivation     (config("<nextactivation>"     , Long       .class, 170, null  ).setValFunc(t->t.nextactivation     ).setToString(t->formatDate(           t*1000 , true, true, false, true, false))),
+			startprepare       (config("<startprepare>"       , Double     .class, 170, null  ).setValFunc(t->t.startprepare       ).setToString(d->OWCTools.formatDate(Math.round(d*1000), true, true, false, true, false))),
+			nextactivation     (config("<nextactivation>"     , Long       .class, 170, null  ).setValFunc(t->t.nextactivation     ).setToString(t->OWCTools.formatDate(           t*1000 , true, true, false, true, false))),
 			eit                (config("<eit>"                , Long       .class,  60, null  ).setValFunc(t->t.eit                )),
 			state              (config("<state>"              , Long       .class,  55, CENTER).setValFunc(t->t.state              )),
 			justplay           (config("<justplay>"           , Long       .class,  65, CENTER).setValFunc(t->t.justplay           )),

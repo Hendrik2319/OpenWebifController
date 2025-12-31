@@ -17,7 +17,7 @@ import javax.swing.table.TableCellRenderer;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.SimplifiedColumnConfig;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.EPGEventGenres.EPGEventGenre;
 
 class EPGEventGenresView extends StandardDialog
@@ -43,7 +43,7 @@ class EPGEventGenresView extends StandardDialog
 		JScrollPane contentPane = new JScrollPane(table);
 		Dimension preferredTableSize = table.getPreferredSize();
 		contentPane.setPreferredSize(new Dimension( preferredTableSize.width + 30, 500 ));
-		createGUI(contentPane, OpenWebifController.createButton("Close", true, e -> closeDialog()));
+		createGUI(contentPane, OWCTools.createButton("Close", true, e -> closeDialog()));
 	}
 
 	@Override

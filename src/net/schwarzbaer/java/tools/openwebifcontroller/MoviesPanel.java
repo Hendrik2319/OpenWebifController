@@ -192,8 +192,8 @@ class MoviesPanel extends JSplitPane {
 			clickedTreePath = null;
 			clickedTreeNode = null;
 			
-			add(OpenWebifController.createMenuItem("Reload Movies", GrayCommandIcons.IconGroup.Reload, e->main.getBaseURLAndRunWithProgressDialog("Reload Movies", MoviesPanel.this::readInitialMovieList)));
-			JMenuItem miReloadTreeNode = add(OpenWebifController.createMenuItem("Reload Folder", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(clickedTreeNode)));
+			add(OWCTools.createMenuItem("Reload Movies", GrayCommandIcons.IconGroup.Reload, e->main.getBaseURLAndRunWithProgressDialog("Reload Movies", MoviesPanel.this::readInitialMovieList)));
+			JMenuItem miReloadTreeNode = add(OWCTools.createMenuItem("Reload Folder", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(clickedTreeNode)));
 			
 			addContextMenuInvokeListener((comp, x, y) -> {
 				clickedTreePath = locationsTree.getPathForLocation(x,y);
@@ -226,10 +226,10 @@ class MoviesPanel extends JSplitPane {
 			selectedMovies = null;
 			selectedMovieRowsM = null;
 			
-			JMenuItem miOpenVideoPlayer = add(OpenWebifController.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image , e->showMovie(clickedMovie)));
-			JMenuItem miOpenBrowser     = add(OpenWebifController.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image , e->showMovieInBrowser(clickedMovie)));
-			JMenuItem miZapToMovie      = add(OpenWebifController.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play  , e->zapToMovie(clickedMovie)));
-			JMenuItem miDeleteMovie     = add(OpenWebifController.createMenuItem("Delete"              , GrayCommandIcons.IconGroup.Delete, e->{
+			JMenuItem miOpenVideoPlayer = add(OWCTools.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image , e->showMovie(clickedMovie)));
+			JMenuItem miOpenBrowser     = add(OWCTools.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image , e->showMovieInBrowser(clickedMovie)));
+			JMenuItem miZapToMovie      = add(OWCTools.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play  , e->zapToMovie(clickedMovie)));
+			JMenuItem miDeleteMovie     = add(OWCTools.createMenuItem("Delete"              , GrayCommandIcons.IconGroup.Delete, e->{
 				deleteMovie(clickedMovie, ()->{
 					movieTableModel.deletedMovies.add(clickedMovie);
 					movieTableModel.fireTableRowUpdate(clickedMovieRowM);
@@ -253,18 +253,18 @@ class MoviesPanel extends JSplitPane {
 			addSeparator();
 			
 			boolean showDescriptionInNameColumn = MovieTableModel.getShowDescriptionInNameColumn();
-			add(OpenWebifController.createCheckBoxMenuItem("Show description in name column", showDescriptionInNameColumn, b->{
+			add(OWCTools.createCheckBoxMenuItem("Show description in name column", showDescriptionInNameColumn, b->{
 				if (movieTableModel!=null)
 					movieTableModel.setShowDescriptionInNameColumn(b);
 			}));
 			
-			JMenuItem miReloadTable = add(OpenWebifController.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
+			JMenuItem miReloadTable = add(OWCTools.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
 			
-			add( OpenWebifController.createMenuItem("Copy table content to clipboard (tab separated)", GrayCommandIcons.IconGroup.Copy, e->{
+			add( OWCTools.createMenuItem("Copy table content to clipboard (tab separated)", GrayCommandIcons.IconGroup.Copy, e->{
 				ClipboardTools.copyToClipBoard(movieTableModel.getTableContentAsString(OutputType.TabSeparated, true, true));
 			}) );
 			
-			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
+			add(OWCTools.createMenuItem("Show Column Widths", e->{
 				TableColumnModel columnModel = movieTable.getColumnModel();
 				if (columnModel==null) return;
 				int[] widths = new int[columnModel.getColumnCount()];
@@ -343,7 +343,7 @@ class MoviesPanel extends JSplitPane {
 		
 		main.runWithProgressDialog("Zap to Movie", pd->{
 			OpenWebifTools.MessageResponse response = OpenWebifTools.zapToMovie(baseURL, movie, taskTitle->{
-				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
+				OWCTools.setIndeterminateProgressTask(pd, taskTitle);
 			});
 			main.showMessageResponse(response, "Zap to Movie");
 		});
@@ -357,7 +357,7 @@ class MoviesPanel extends JSplitPane {
 		
 		main.runWithProgressDialog("Delete Movie", pd->{
 			OpenWebifTools.MessageResponse response = OpenWebifTools.deleteMovie(baseURL, movie, taskTitle->{
-				OpenWebifController.setIndeterminateProgressTask(pd, taskTitle);
+				OWCTools.setIndeterminateProgressTask(pd, taskTitle);
 			});
 			main.showMessageResponse(response, "Delete Movie");
 			if (response.result && wasDeleted!=null)
@@ -412,7 +412,7 @@ class MoviesPanel extends JSplitPane {
 		
 		try {
 			Process process = Runtime.getRuntime().exec(new String[] { browser.getAbsolutePath(), url });
-			System.out.println(OpenWebifController.toString(process));
+			System.out.println(OWCTools.toString(process));
 		}
 		catch (IOException e) { System.err.printf("IOException while starting movie player: %s%n", e.getMessage()); }
 	}
@@ -465,7 +465,7 @@ class MoviesPanel extends JSplitPane {
 	private MovieList getMovieList(String baseURL, String dir, ProgressView pd) {
 		if (baseURL==null) return null;
 		
-		MovieList movieList = OpenWebifTools.readMovieList(baseURL, dir, taskTitle -> OpenWebifController.setIndeterminateProgressTask(pd, "Movies: "+taskTitle));
+		MovieList movieList = OpenWebifTools.readMovieList(baseURL, dir, taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "Movies: "+taskTitle));
 		//movieList.printTo(System.out);
 		return movieList;
 	}
@@ -474,7 +474,7 @@ class MoviesPanel extends JSplitPane {
 		MovieList movieList = getMovieList(baseURL, null, pd);
 		
 		if (movieList!=null)
-			OpenWebifController.callInGUIThread(() -> {
+			OWCTools.callInGUIThread(() -> {
 				locationsRoot = LocationTreeNode.create(movieList);
 				locationsTreeModel = new DefaultTreeModel(locationsRoot, true);
 				locationsTree.setModel(locationsTreeModel);

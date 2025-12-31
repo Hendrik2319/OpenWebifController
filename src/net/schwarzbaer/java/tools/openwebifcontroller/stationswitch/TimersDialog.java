@@ -31,7 +31,7 @@ import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.LogWindow;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
-import net.schwarzbaer.java.tools.openwebifcontroller.TimerTools;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerStateGuesser;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimersTableRowSorter;
@@ -132,17 +132,17 @@ class TimersDialog extends JDialog {
 		TimersTableContextMenu() {
 			clickedTimer = null;
 			
-			JMenuItem miReloadTimers = add(OpenWebifController.createMenuItem("Reload Timers", GrayCommandIcons.IconGroup.Reload, e->{
+			JMenuItem miReloadTimers = add(OWCTools.createMenuItem("Reload Timers", GrayCommandIcons.IconGroup.Reload, e->{
 				if (updateData==null) return;
 				setData(updateData.get());
 			}));
 			
-			add(OpenWebifController.createMenuItem("CleanUp Timers", GrayCommandIcons.IconGroup.Delete, e->{
+			add(OWCTools.createMenuItem("CleanUp Timers", GrayCommandIcons.IconGroup.Delete, e->{
 				OpenWebifController.cleanUpTimers(null, TimersDialog.this, logWindow, (baseURL, pd) -> {
 					if (updateData!=null)
 					{
 						Vector<Timer> data = updateData.get(baseURL, pd);
-						OpenWebifController.callInGUIThread(() -> setData(data));
+						OWCTools.callInGUIThread(() -> setData(data));
 					}
 				});
 			}));
@@ -152,12 +152,12 @@ class TimersDialog extends JDialog {
 			JMenu menuClickedTimer;
 			add(menuClickedTimer = new JMenu("Clicked Timer"));
 			
-			menuClickedTimer.add(OpenWebifController.createMenuItem("Toggle", e->{
+			menuClickedTimer.add(OWCTools.createMenuItem("Toggle", e->{
 				if (clickedTimer==null) return;
 				OpenWebifController.toggleTimer(null, clickedTimer, TimersDialog.this, logWindow, this::handleToggleResponse);
 			}));
 			
-			menuClickedTimer.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
+			menuClickedTimer.add(OWCTools.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (clickedTimer==null) return;
 				OpenWebifController.deleteTimer(null, clickedTimer, TimersDialog.this, logWindow, this::handleDeleteResponse);
 			}));
@@ -165,31 +165,31 @@ class TimersDialog extends JDialog {
 			JMenu menuSelectedTimers;
 			add(menuSelectedTimers = new JMenu("Selected Timers"));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Activate", GrayCommandIcons.IconGroup.Play, e->{
+			menuSelectedTimers.add(OWCTools.createMenuItem("Activate", GrayCommandIcons.IconGroup.Play, e->{
 				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Deactivated);
 				if (filteredTimers.length<1) return;
 				OpenWebifController.toggleTimer(null, filteredTimers, TimersDialog.this, logWindow, this::handleToggleResponse);
 			}));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Deactivate", GrayCommandIcons.IconGroup.Stop, e->{
+			menuSelectedTimers.add(OWCTools.createMenuItem("Deactivate", GrayCommandIcons.IconGroup.Stop, e->{
 				Timer[] filteredTimers = filterSelectedTimers(TimerStateGuesser.ExtTimerState.Waiting);
 				if (filteredTimers.length<1) return;
 				OpenWebifController.toggleTimer(null, filteredTimers, TimersDialog.this, logWindow, this::handleToggleResponse);
 			}));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Toggle", e->{
+			menuSelectedTimers.add(OWCTools.createMenuItem("Toggle", e->{
 				if (selectedTimers.length<1) return;
 				OpenWebifController.toggleTimer(null, selectedTimers, TimersDialog.this, logWindow, this::handleToggleResponse);
 			}));
 			
-			menuSelectedTimers.add(OpenWebifController.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
+			menuSelectedTimers.add(OWCTools.createMenuItem("Delete", GrayCommandIcons.IconGroup.Delete, e->{
 				if (selectedTimers.length<1) return;
 				OpenWebifController.deleteTimer(null, selectedTimers, TimersDialog.this, logWindow, this::handleDeleteResponse);
 			}));
 			
 			addSeparator();
 			
-			add(OpenWebifController.createMenuItem("Reset Row Order", e->{
+			add(OWCTools.createMenuItem("Reset Row Order", e->{
 				tableRowSorter.resetSortOrder();
 				table.repaint();
 			}));
@@ -259,10 +259,10 @@ class TimersDialog extends JDialog {
 				valueStr = value==null ? null : value.toString();
 			
 			if (value instanceof Timer.Type type)
-				bgCol = ()->TimerTools.getBgColor(type);
+				bgCol = ()->OWCTools.getBgColor(type);
 				
 			if (value instanceof TimerStateGuesser.ExtTimerState state)
-				bgCol = ()->TimerTools.getBgColor(state);
+				bgCol = ()->OWCTools.getBgColor(state);
 			
 			
 			rendererComp.configureAsTableCellRendererComponent(table, null, valueStr, isSelected, hasFocus, bgCol, fgCol);
@@ -281,8 +281,8 @@ class TimersDialog extends JDialog {
 			state      (config("State"       , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((model, timer) -> model.timerStateGuesser.getState(timer))),
 			servicename(config("Station"     , String     .class, 110, null  ).setValFunc(timer -> timer.servicename)),
 			name       (config("Name"        , String     .class, 220, null  ).setValFunc(timer -> timer.name       )),
-			begin_date (config("Begin"       , Long       .class, 170, RIGHT ).setValFunc(timer -> timer.begin      ).setToString(val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false,  true, false))),
-			end        (config("End"         , Long       .class,  55, RIGHT ).setValFunc(timer -> timer.end        ).setToString(val -> OpenWebifController.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false))),
+			begin_date (config("Begin"       , Long       .class, 170, RIGHT ).setValFunc(timer -> timer.begin      ).setToString(val -> OWCTools.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false,  true, false))),
+			end        (config("End"         , Long       .class,  55, RIGHT ).setValFunc(timer -> timer.end        ).setToString(val -> OWCTools.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false))),
 			duration   (config("Duration"    , Double     .class,  60, RIGHT ).setValFunc(timer -> timer.duration   ).setToString(val -> DateTimeFormatter.getDurationStr(val))),
 			;
 			

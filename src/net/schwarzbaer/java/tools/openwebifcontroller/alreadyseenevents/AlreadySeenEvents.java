@@ -33,6 +33,7 @@ import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.MovieList;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 
 public class AlreadySeenEvents
@@ -545,14 +546,14 @@ public class AlreadySeenEvents
 			this.getData = Objects.requireNonNull( getData );
 			
 			parent.add(menuAdd = new JMenu("Mark as Already Seen"));
-			menuAdd.add(OpenWebifController.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, false, false)));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, true , false)));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, false, true )));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , false, false)));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , true , false)));
-			menuAdd.add(OpenWebifController.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , false, true )));
+			menuAdd.add(OWCTools.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, false, false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, true , false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, false, true )));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , false, false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , true , false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , false, true )));
 			
-			miShowRule = parent.add(OpenWebifController.createMenuItem("##", e->{
+			miShowRule = parent.add(OWCTools.createMenuItem("##", e->{
 				if (singleSourceAlreadySeenRule != null)
 					TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule.toString());
 			}));

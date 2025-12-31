@@ -1,15 +1,11 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Window;
-import java.awt.event.ActionListener;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,59 +18,42 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
-import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
-import javax.swing.ButtonGroup;
 import javax.swing.Icon;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JCheckBoxMenuItem;
-import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
-import net.schwarzbaer.java.lib.gui.GeneralIcons;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.LookAndFeelSwitch;
 import net.schwarzbaer.java.lib.gui.MultiStepProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
-import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.StandardMainWindow;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.BoxSettings;
 import net.schwarzbaer.java.lib.openwebif.BoxSettings.BoxSettingsValue;
 import net.schwarzbaer.java.lib.openwebif.EPG;
-import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.OptionalValue;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers;
-import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.lib.system.Settings;
 import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
-import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
@@ -151,7 +130,6 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	}
 	
 	public static AppSettings settings = new AppSettings();
-	public static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();
 
 	public static void main(String[] args) {
 		System.out.println("OpenWebifController");
@@ -290,9 +268,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		public Updater(long interval_sec, Runnable task) {
 			this.interval_sec = interval_sec;
 			this.task = !SHOW_PROGRESS ? task : ()->{
-				System.out.printf("[0x%08X|%s] Updater.task.run()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
+				System.out.printf("[0x%08X|%s] Updater.task.run()%n"         , Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 				task.run();
-				System.out.printf("[0x%08X|%s] Updater.task.run() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+				System.out.printf("[0x%08X|%s] Updater.task.run() finished%n", Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 			};
 			scheduler = Executors.newSingleThreadScheduledExecutor();
 			
@@ -313,26 +291,26 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		}
 	
 		public void runOnce(Runnable task) {
-			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.runOnce()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.runOnce()%n"         , Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 			scheduler.execute(!SHOW_PROGRESS ? task : ()->{
-				System.out.printf("[0x%08X|%s] Updater.runOnce() -> start task%n"   , Thread.currentThread().hashCode(), getCurrentTimeStr());
+				System.out.printf("[0x%08X|%s] Updater.runOnce() -> start task%n"   , Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 				task.run();
-				System.out.printf("[0x%08X|%s] Updater.runOnce() -> task finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+				System.out.printf("[0x%08X|%s] Updater.runOnce() -> task finished%n", Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 			});
-			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.runOnce() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.runOnce() finished%n", Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 		}
 	
 		public void start() {
-			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.start()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.start()%n"         , Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 			taskHandle = scheduler.scheduleWithFixedDelay(task, 0, interval_sec, TimeUnit.SECONDS);
-			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.start() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.start() finished%n", Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 		}
 	
 		public void stop() {
-			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.stop()%n"         , Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.stop()%n"         , Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 			taskHandle.cancel(false);
 			taskHandle = null;
-			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.stop() finished%n", Thread.currentThread().hashCode(), getCurrentTimeStr());
+			if (SHOW_PROGRESS) System.out.printf("[0x%08X|%s] Updater.stop() finished%n", Thread.currentThread().hashCode(), OWCTools.getCurrentTimeStr());
 		}
 		
 	}
@@ -368,7 +346,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		
 		epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
-				return dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+				return OWCTools.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
 			}
 		});
 		
@@ -387,52 +365,52 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		tabPanel.setSelectedIndex(2);
 		
 		JMenuBar menuBar = new JMenuBar();
-		JMenu settingsMenu = menuBar.add(createMenu("Settings"));
+		JMenu settingsMenu = menuBar.add(OWCTools.createMenu("Settings"));
 		
-		settingsMenu.add(createMenuItem("Set Base URL", e->{
+		settingsMenu.add(OWCTools.createMenuItem("Set Base URL", e->{
 			String baseURL = askUserForBaseURL();
 			if (baseURL!=null)
 				System.out.printf("Set Base URL to \"%s\"%n", baseURL);
 		}));
 		settingsMenu.addSeparator();
-		settingsMenu.add(createMenuItem("Set Path to VideoPlayer", e->{
+		settingsMenu.add(OWCTools.createMenuItem("Set Path to VideoPlayer", e->{
 			File file = askUserForVideoPlayer();
 			if (file!=null) System.out.printf("Set VideoPlayer to \"%s\"%n", file.getAbsolutePath());
 		}));
-		settingsMenu.add(createMenuItem("Set Path to Java VM", e->{
+		settingsMenu.add(OWCTools.createMenuItem("Set Path to Java VM", e->{
 			File file = askUserForJavaVM();
 			if (file!=null) System.out.printf("Set Java VM to \"%s\"%n", file.getAbsolutePath());
 		}));
-		settingsMenu.add(createMenuItem("Set Path to Browser", e->{
+		settingsMenu.add(OWCTools.createMenuItem("Set Path to Browser", e->{
 			File file = askUserForBrowser();
 			if (file!=null) System.out.printf("Set Browser to \"%s\"%n", file.getAbsolutePath());
 		}));
 		settingsMenu.addSeparator();
-		settingsMenu.add(createMenuItem("Configure User Defined Colors", e->UserDefColors.EditDialog.showDialog(mainWindow)));
+		settingsMenu.add(OWCTools.createMenuItem("Configure User Defined Colors", e->UserDefColors.EditDialog.showDialog(mainWindow)));
 		
-		JMenu updatesMenu = menuBar.add(createMenu("Init / Updates"));
+		JMenu updatesMenu = menuBar.add(OWCTools.createMenu("Init / Updates"));
 		fillUpdatesMenu(updatesMenu);
 		
-		JMenu extrasMenu = menuBar.add(createMenu("Tools"));
+		JMenu extrasMenu = menuBar.add(OWCTools.createMenu("Tools"));
 		if (!asSubWindow)
-			extrasMenu.add(createMenuItem("Station Switch", e->{
+			extrasMenu.add(OWCTools.createMenuItem("Station Switch", e->{
 				String baseURL = getBaseURL();
 				if (baseURL==null) return;
 				StationSwitch.start(baseURL,true);
 			}));
-		extrasMenu.add(createMenuItem("Remote Control Tool", e->{
+		extrasMenu.add(OWCTools.createMenuItem("Remote Control Tool", e->{
 			new RemoteControlTool(true);
 		}));
 		
 		lookAndFeelSwitch.setUITreeRoot(mainWindow);
 		extrasMenu.add(lookAndFeelSwitch.createMenu("Look & Feel"));
 		
-		extrasMenu.add(createMenuItem("Show Definitions of Already Seen Events", e->{
+		extrasMenu.add(OWCTools.createMenuItem("Show Definitions of Already Seen Events", e->{
 			AlreadySeenEventsViewer.showViewer(mainWindow, "Already Seen Events");
 		}));
 		
-		JMenu logsMenu = menuBar.add(createMenu("Logs"));
-		logsMenu.add(createMenuItem("Show Response Log", e->{
+		JMenu logsMenu = menuBar.add(OWCTools.createMenu("Logs"));
+		logsMenu.add(OWCTools.createMenuItem("Show Response Log", e->{
 			logWindow.showDialog();
 		}));
 		
@@ -445,7 +423,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		//}));
 		
 		SwitchablePanel epgControlPanel = new SwitchablePanel(new BorderLayout(), "EPG");
-		epgControlPanel.add2Panel(createButton("Show EPG", true, e->openEPGDialog()), BorderLayout.CENTER);
+		epgControlPanel.add2Panel(OWCTools.createButton("Show EPG", true, e->openEPGDialog()), BorderLayout.CENTER);
 		
 		JPanel toolBar = new JPanel(new GridBagLayout());
 		GridBagConstraints c = new GridBagConstraints();
@@ -522,18 +500,18 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			
 			baseURL = null;
 			addTask("BaseURL", pd->{
-				setIndeterminateProgressTask(pd, "Get BaseURL");
+				OWCTools.setIndeterminateProgressTask(pd, "Get BaseURL");
 				baseURL = getBaseURL();
 				return baseURL!=null;
 			});
 			addTask("Box Settings", pd->{
 				if (baseURL==null) return false;
-				boxSettings = BoxSettings.getSettings (baseURL, createProgressTaskFcn(pd, "BoxSettings"));
+				boxSettings = BoxSettings.getSettings (baseURL, OWCTools.createProgressTaskFcn(pd, "BoxSettings"));
 				return true;
 			});
 			addTask("System Info", pd->{
 				if (baseURL==null) return false;
-				systemInfo  = SystemInfo.getSystemInfo(baseURL, createProgressTaskFcn(pd, "SystemInfo"));
+				systemInfo  = SystemInfo.getSystemInfo(baseURL, OWCTools.createProgressTaskFcn(pd, "SystemInfo"));
 				SwingUtilities.invokeLater(systemInfoPanel::update);
 				return true;
 			});
@@ -552,21 +530,21 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	}
 	
 	private void fillUpdatesMenu(JMenu updatesMenu) {
-		updatesMenu.add(createMenuItem("BoxSettings", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update BoxSettings", (baseURL, pd)->{
-			boxSettings = BoxSettings.getSettings (baseURL, createProgressTaskFcn(pd, "BoxSettings"));
+		updatesMenu.add(OWCTools.createMenuItem("BoxSettings", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update BoxSettings", (baseURL, pd)->{
+			boxSettings = BoxSettings.getSettings (baseURL, OWCTools.createProgressTaskFcn(pd, "BoxSettings"));
 		})));
-		updatesMenu.add(createMenuItem("SystemInfo", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update SystemInfo", (baseURL, pd)->{
-			systemInfo  = SystemInfo.getSystemInfo(baseURL, createProgressTaskFcn(pd, "SystemInfo"));
+		updatesMenu.add(OWCTools.createMenuItem("SystemInfo", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update SystemInfo", (baseURL, pd)->{
+			systemInfo  = SystemInfo.getSystemInfo(baseURL, OWCTools.createProgressTaskFcn(pd, "SystemInfo"));
 			SwingUtilities.invokeLater(systemInfoPanel::update);
 		})));
-		updatesMenu.add(createMenuItem("Movies"               , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Movies"               , movies::readInitialMovieList)));
-		updatesMenu.add(createMenuItem("Bouquets 'n' Stations", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Bouquets 'n' Stations", bouquetsNStations ::readData)));
-		updatesMenu.add(createMenuItem("Timers"               , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Timers"               , timers            ::readData)));
-		updatesMenu.add(createMenuItem("Remote Control"       , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Remote Control"       , (baseURL, pd)->{ remoteControl.initialize(baseURL,pd,systemInfo); })));
-		updatesMenu.add(createMenuItem("ScreenShot"           , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update ScreenShot"           , screenShot      ::initialize)));
-	//	updatesMenu.add(createMenuItem("Power Control"        , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Power Control"        , powerControl    ::initialize)));
-	//	updatesMenu.add(createMenuItem("Volume Control"       , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Volume Control"       , volumeControl   ::initialize)));
-	//	updatesMenu.add(createMenuItem("Message Control"      , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Message Control"      , messageControl  ::initialize)));
+		updatesMenu.add(OWCTools.createMenuItem("Movies"               , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Movies"               , movies::readInitialMovieList)));
+		updatesMenu.add(OWCTools.createMenuItem("Bouquets 'n' Stations", GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Bouquets 'n' Stations", bouquetsNStations ::readData)));
+		updatesMenu.add(OWCTools.createMenuItem("Timers"               , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Timers"               , timers            ::readData)));
+		updatesMenu.add(OWCTools.createMenuItem("Remote Control"       , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Remote Control"       , (baseURL, pd)->{ remoteControl.initialize(baseURL,pd,systemInfo); })));
+		updatesMenu.add(OWCTools.createMenuItem("ScreenShot"           , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update ScreenShot"           , screenShot      ::initialize)));
+	//	updatesMenu.add(OWCTools.createMenuItem("Power Control"        , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Power Control"        , powerControl    ::initialize)));
+	//	updatesMenu.add(OWCTools.createMenuItem("Volume Control"       , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Volume Control"       , volumeControl   ::initialize)));
+	//	updatesMenu.add(OWCTools.createMenuItem("Message Control"      , GrayCommandIcons.IconGroup.Reload, e->getBaseURLAndRunWithProgressDialog("Init/Update Message Control"      , messageControl  ::initialize)));
 	}
 	
 	public void getBaseURLAndRunWithProgressDialog(String dlgTitle, BiConsumer<String,ProgressDialog> action) {
@@ -576,290 +554,12 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	}
 	
 	public void runWithProgressDialog(String title, Consumer<ProgressDialog> action) {
-		runWithProgressDialog(mainWindow, title, action);
-	}
-	public static void runWithProgressDialog(Window parent, String title, Consumer<ProgressDialog> action) {
-		ProgressDialog.runWithProgressDialog(parent, title, 400, action);
-	}
-	
-	public static Consumer<String> createProgressTaskFcn(ProgressView pd, String moduleTitle) {
-		return taskTitle -> setIndeterminateProgressTask(pd, moduleTitle+": "+taskTitle);
-	}
-	public static void setIndeterminateProgressTask(ProgressView pd, String taskTitle) {
-		SwingUtilities.invokeLater(()->{
-			pd.setTaskTitle(taskTitle);
-			pd.setIndeterminate(true);
-		});
-	}
-	
-	public static void callInGUIThread(Runnable task)
-	{
-		if (SwingUtilities.isEventDispatchThread())
-			task.run();
-		else
-			SwingUtilities.invokeLater(task);
+		OWCTools.runWithProgressDialog(mainWindow, title, action);
 	}
 
 	@Override
 	public void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight) {
 		logWindow.showMessageResponse(response, title, stringsToHighlight);
-	}
-
-	static String getCurrentTimeStr() {
-		return dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
-	}
-	
-	public static JRadioButton createRadioButton(String text, ButtonGroup bg, boolean selected, Consumer<Boolean> setValue) {
-		JRadioButton comp = new JRadioButton(text,selected);
-		if (bg!=null) bg.add(comp);
-		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
-		return comp;
-	}
-	
-	public static JCheckBox createCheckBox(String text, boolean selected, Consumer<Boolean> setValue) {
-		JCheckBox comp = new JCheckBox(text, selected);
-		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
-		return comp;
-	}
-
-	public static JTextField createTextField(String text, int columns, Consumer<String> setValue) {
-		JTextField comp = new JTextField(text, columns);
-		if (setValue!=null) {
-			comp.addActionListener(e->setValue.accept(comp.getText()));
-			comp.addFocusListener(new FocusListener() {
-				@Override public void focusLost  (FocusEvent e) { setValue.accept(comp.getText()); }
-				@Override public void focusGained(FocusEvent e) {}
-			});
-		}
-		return comp;
-	}
-
-	public static Integer parseInt(String str) {
-		try { return Integer.parseInt(str); }
-		catch (NumberFormatException e1) { return null; }
-	}
-
-	public static <ValueType> JTextField createTextField(String initialValue, int columns, Function<String,ValueType> convert, Predicate<ValueType> isOk, Consumer<ValueType> setValue) {
-		JTextField comp = new JTextField(initialValue, columns);
-		Color defaultBackground = comp.getBackground();
-		ASSERT(setValue!=null);
-		ASSERT(convert !=null);
-		@SuppressWarnings("null")
-		Runnable setValueTask = ()->{
-			String str = comp.getText();
-			ValueType value = convert.apply(str);
-			if (value==null) { comp.setBackground(Color.RED); return; }
-			if (isOk ==null) { setValue.accept(value); return; }
-			if (!isOk.test(value)) { comp.setBackground(Color.RED); return; }
-			comp.setBackground(defaultBackground);
-			setValue.accept(value);
-		};
-		comp.addActionListener(e->setValueTask.run());
-		comp.addFocusListener(new FocusListener() {
-			@Override public void focusLost  (FocusEvent e) { setValueTask.run(); }
-			@Override public void focusGained(FocusEvent e) {}
-		});
-		return comp;
-	}
-
-	public static <E> JComboBox<E> createComboBox(Consumer<E> setValue) {
-		return confirureComboBox(new JComboBox<E>(), null, setValue);
-	}
-
-	public static <E> JComboBox<E> createComboBox(E[] items, E initialValue, Consumer<E> setValue) {
-		return confirureComboBox(new JComboBox<>(items), initialValue, setValue);
-	}
-
-	public static <E> JComboBox<E> createComboBox(Vector<E> items, E initialValue, Consumer<E> setValue) {
-		return confirureComboBox(new JComboBox<>(items), initialValue, setValue);
-	}
-	
-	public static <E> JComboBox<E> confirureComboBox(JComboBox<E> comp, E initialValue, Consumer<E> setValue) {
-		comp.setSelectedItem(initialValue);
-		if (setValue!=null)
-			comp.addActionListener(e->{
-				int i = comp.getSelectedIndex();
-				if (i<0) setValue.accept(null);
-				else setValue.accept(comp.getItemAt(i));
-			});
-		return comp;
-	}
-	
-	public static JButton createButton(String text, boolean enabled, ActionListener al) {
-		return createButton(text, null, null, enabled, al);
-	}
-	public static JButton createButton(String text, Icon icon, boolean enabled, ActionListener al) {
-		return createButton(text, icon, null, enabled, al);
-	}
-	public static JButton createButton(GeneralIcons.IconGroup icons, boolean enabled, ActionListener al) {
-		return createButton(icons.getEnabledIcon(), icons.getDisabledIcon(), enabled, al);
-	}
-	public static JButton createButton(Icon icon, Icon disabledIcon, boolean enabled, ActionListener al) {
-		return createButton(null, icon, disabledIcon, enabled, al);
-	}
-	public static JButton createButton(String text, GeneralIcons.IconGroup icons, boolean enabled, ActionListener al) {
-		return createButton(text, icons.getEnabledIcon(), icons.getDisabledIcon(), enabled, al);
-	}
-	public static JButton createButton(String text, Icon icon, Icon disabledIcon, boolean enabled, ActionListener al) {
-		JButton comp = new JButton(text);
-		setIcon(comp, icon, disabledIcon);
-		comp.setEnabled(enabled);
-		if (al!=null) comp.addActionListener(al);
-		return comp;
-	}
-	public static void setIcon(AbstractButton btn, GeneralIcons.IconGroup icons) {
-		setIcon(btn, icons.getEnabledIcon(), icons.getDisabledIcon());
-	}
-	public static void setIcon(AbstractButton btn, Icon icon, Icon disabledIcon) {
-		if (icon        !=null) btn.setIcon        (icon        );
-		if (disabledIcon!=null) btn.setDisabledIcon(disabledIcon);
-	}
-
-	public static JCheckBoxMenuItem createCheckBoxMenuItem(String title, boolean isChecked, Consumer<Boolean> setValue) {
-		JCheckBoxMenuItem comp = new JCheckBoxMenuItem(title,isChecked);
-		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
-		return comp;
-	}
-
-	public static JMenuItem createMenuItem(String title, ActionListener al) {
-		return createMenuItem(title, null, null, al);
-	}
-	public static JMenuItem createMenuItem(String title, Icon icon, ActionListener al) {
-		return createMenuItem(title, icon, null, al);
-	}
-	public static JMenuItem createMenuItem(String title, GeneralIcons.IconGroup iconGroup, ActionListener al) {
-		return createMenuItem(title, iconGroup.getEnabledIcon(), iconGroup.getDisabledIcon(), al);
-	}
-	public static JMenuItem createMenuItem(String title, Icon icon, Icon disabledIcon, ActionListener al) {
-		JMenuItem comp = new JMenuItem(title,icon);
-		if (disabledIcon!=null) comp.setDisabledIcon(disabledIcon);
-		if (al!=null) comp.addActionListener(al);
-		return comp;
-	}
-
-	public static JMenu createMenu(String title) {
-		return new JMenu(title);
-	}
-
-	public static String toString(Process process) {
-		ValueListOutput out = new ValueListOutput();
-		out.add(0, "Process", process.toString());
-		try { out.add(0, "Exit Value", process.exitValue()); }
-		catch (Exception e) { out.add(0, "Exit Value", "%s", e.getMessage()); }
-		out.add(0, "HashCode"  , "0x%08X", process.hashCode());
-		out.add(0, "Is Alive"  , process.isAlive());
-		out.add(0, "Class"     , "%s", process.getClass());
-		return out.generateOutput();
-	}
-
-	public static void generateOutput(ValueListOutput out, int level, OpenWebifTools.CurrentStation currentStation) {
-		out.add(level, "Station"          ); generateOutput(out, level+1, currentStation.stationInfo    );
-		out.add(level, "Current EPG Event"); generateOutput(out, level+1, currentStation.currentEPGevent);
-		out.add(level, "Next EPG Event"   ); generateOutput(out, level+1, currentStation.nextEPGevent   );
-	}
-
-	public static void generateOutput(ValueListOutput out, int level, OpenWebifTools.StationInfo stationInfo) {
-		out.add(level, "Bouquet Name"      , stationInfo.bouquetName ); // String    bouquetName ;
-		out.add(level, "Bouquet Reference" , stationInfo.bouquetRef  ); // String    bouquetRef  ;
-		out.add(level, "Service Name"      , stationInfo.serviceName ); // String    serviceName ;
-		out.add(level, "service Reference" , stationInfo.serviceRef  ); // String    serviceRef  ;
-		if (stationInfo.stationID!=null)
-			out.add(level, "StationID", " %s", stationInfo.stationID.toIDStr()); // StationID stationID   ;
-		out.add(     level, "Provider"     ,                 stationInfo.provider); // String    provider    ;
-		addLine(out, level, "Width"        ,                 stationInfo.width);
-		addLine(out, level, "Height"       ,                 stationInfo.height);
-		addLine(out, level, "\"Aspect\""   ,                 stationInfo.aspect);
-		out.add(     level, "Is WideScreen",                 stationInfo.isWideScreen); // boolean   isWideScreen;
-		addLine(out, level, "[onid]"       , "0x%1$X, %1$d", stationInfo.onid  );
-		addLine(out, level, "[txtpid]"     , "0x%1$X, %1$d", stationInfo.txtpid);
-		addLine(out, level, "[pmtpid]"     , "0x%1$X, %1$d", stationInfo.pmtpid);
-		addLine(out, level, "[tsid]"       , "0x%1$X, %1$d", stationInfo.tsid  );
-		addLine(out, level, "[pcrpid]"     , "0x%1$X, %1$d", stationInfo.pcrpid);
-		out.add(     level, "[sid]"        , "0x%X, %d"    , stationInfo.sid   , stationInfo.sid   ); // long      sid         ;
-		addLine(out, level, "[namespace]"  , "0x%1$X, %1$d", stationInfo.namespace);
-		addLine(out, level, "[apid]"       , "0x%1$X, %1$d", stationInfo.apid);
-		addLine(out, level, "[vpid]"       , "0x%1$X, %1$d", stationInfo.vpid);
-		out.add(     level, "result"       ,                 stationInfo.result); // boolean   result      ;
-	}
-
-	private static void addLine(ValueListOutput out, int level, String field, OptionalValue optVal) {
-		addLine(out, level, field, null, optVal);
-	}
-	private static void addLine(ValueListOutput out, int level, String field, String format, OptionalValue optVal)
-	{
-		if (optVal.value() == null) out.add(level, field,         optVal.str());
-		else if (format    != null) out.add(level, field, format, optVal.value());
-		else                        out.add(level, field,         optVal.value());
-	}
-	
-	public static void generateOutput(ValueListOutput out, int level, EPGevent event) {
-		out.add(level, "Station"   , event.station_name);
-		out.add(level, "SRef"      , event.sref);
-		if (event.picon   !=null) out.add(level, "Picon"   , event.picon);
-		if (event.provider!=null) out.add(level, "Provider", event.provider);
-		out.add(level, "Title"     , event.title);
-		out.add(level, "Genre"     , "[%d] \"%s\"", event.genreid, event.genre);
-		out.add(level, "ID"        , event.id);
-		if (event.date!=null && event.begin!=null && event.end  !=null)
-			out.add(level, "Time", "\"%s\", \"%s\" - \"%s\"", event.date, event.begin, event.end  );
-		else {
-			if (event.date !=null) out.add(level, "Date" , event.date );
-			if (event.begin!=null) out.add(level, "Begin", event.begin);
-			if (event.end  !=null) out.add(level, "End"  , event.end  );
-		}
-		out.add(level, "Begin"     , "%s", event.begin_timestamp==null ? "<null>" : dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
-		if (event.isUpToDate)
-		{
-			if (event.now_timestamp==0)
-				out.add(level, "Now", "%s", event.now_timestamp);
-			else
-				out.add(level, "Now", "%s", dateTimeFormatter.getTimeStr(event.now_timestamp*1000, true, true, false, true, false) );
-		}
-		if (event.duration_sec==null)
-			out.add(level, "Duration"  , "%s", "<null>");
-		else
-			out.add(level, "Duration"  , "%s (%d s)", DateTimeFormatter.getDurationStr(event.duration_sec), event.duration_sec);
-		if (event.duration_min!=null                    ) out.add(level, "Duration" , "%s (%d min)", DateTimeFormatter.getDurationStr(event.duration_min*60), event.duration_min);
-		if (event.remaining   !=null && event.isUpToDate) out.add(level, "Remaining", "%s", DateTimeFormatter.getDurationStr(event.remaining));
-		if (event.tleft       !=null && event.isUpToDate) {
-			if (event.tleft<0) out.add(level, "Time Left", "ended %s ago", DateTimeFormatter.getDurationStr(-event.tleft*60));
-			else               out.add(level, "Time Left", "%s"          , DateTimeFormatter.getDurationStr( event.tleft*60));
-		}
-		if (event.progress    !=null && event.isUpToDate) out.add(level, "Progress" , event.progress);
-		out.add(level, "Is Up-To-Date" , event.isUpToDate);
-		out.add(level, "Description");
-		out.add(level+1, "", event.shortdesc);
-		out.add(level+1, "", event.longdesc );
-		
-		AlreadySeenEvents.RuleOutput rule = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(event);
-		if (rule!=null)
-		{
-			out.addEmptyLine();
-			out.add(level, "Is Already Seen");
-			rule.writeIntoOutput(out, level+1);
-		}
-	}
-
-	public static String generateOutput(EPGevent event, Timers.Timer timer)
-	{
-		ValueListOutput out = new ValueListOutput();
-		String output;
-		if (timer == null)
-		{
-			generateOutput(out, 0, event);
-			output = out.generateOutput();
-		}
-		else
-		{
-			out.add(0, "EPG Event");
-			generateOutput(out, 1, event);
-			out.addEmptyLine();
-			out.add(0, "Timer");
-			TimerTools.generateDetailsOutput(out, 1, timer);
-			output = out.generateOutput();
-			output += "\r\n"+TimerTools.generateShortInfo(ValueListOutput.DEFAULT_INDENT, timer, false);
-		}
-		return output;
 	}
 
 	public interface LogWindowInterface {
@@ -877,17 +577,17 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	}
 	public static void addTimer(String baseURL, String sRef, int eventID, Timers.Timer.Type type, Window window, LogWindowInterface lwi, UpdateTimersTask updateTimersTask)
 	{
-		runWithProgressDialog(window, "Add Timer", pd->{
+		OWCTools.runWithProgressDialog(window, "Add Timer", pd->{
 			String baseURL_ = baseURL;
 			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
 			if (baseURL_==null) return;
 			MessageResponse response = Timers.addTimer(baseURL, sRef, eventID, type, taskTitle->{
-				setIndeterminateProgressTask(pd, taskTitle);
+				OWCTools.setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "Add Timer");
 			if (updateTimersTask!=null)
 			{
-				setIndeterminateProgressTask(pd, "Update Data");
+				OWCTools.setIndeterminateProgressTask(pd, "Update Data");
 				updateTimersTask.updateTimers(baseURL_,pd);
 			}
 		});
@@ -929,14 +629,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			UpdateTimersTask updateTimersTask,
 			Runnable updateGUITask
 	) {
-		runWithProgressDialog(window, "Delete Timer", pd->{
+		OWCTools.runWithProgressDialog(window, "Delete Timer", pd->{
 			String baseURL_ = baseURL;
 			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
 			if (baseURL_==null) return;
 			
 			for (Timers.Timer timer : timers) {
 				MessageResponse response = Timers.deleteTimer(baseURL_, timer.serviceref, timer.begin, timer.end, taskTitle->{
-					setIndeterminateProgressTask(pd, taskTitle);
+					OWCTools.setIndeterminateProgressTask(pd, taskTitle);
 				});
 				lwi.showMessageResponse(response, "Delete Timer");
 				if (handleResponse!=null) handleResponse.accept(timer,response);
@@ -944,7 +644,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			
 			if (updateTimersTask!=null)
 			{
-				setIndeterminateProgressTask(pd, "Update Data");
+				OWCTools.setIndeterminateProgressTask(pd, "Update Data");
 				updateTimersTask.updateTimers(baseURL_,pd);
 			}
 			
@@ -988,14 +688,14 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			UpdateTimersTask updateTimersTask,
 			Runnable updateGUITask
 	) {
-		runWithProgressDialog(window, "Toggle Timer", pd->{
+		OWCTools.runWithProgressDialog(window, "Toggle Timer", pd->{
 			String baseURL_ = baseURL;
 			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
 			if (baseURL_==null) return;
 			
 			for (Timers.Timer timer : timers) {
 				MessageResponse response = Timers.toggleTimer(baseURL_, timer.serviceref, timer.begin, timer.end, taskTitle->{
-					setIndeterminateProgressTask(pd, taskTitle);
+					OWCTools.setIndeterminateProgressTask(pd, taskTitle);
 				});
 				lwi.showMessageResponse(response, "Toggle Timer", "disabled", "enabled", "nicht aktiviert");
 				if (handleResponse!=null) handleResponse.accept(timer,response);
@@ -1003,7 +703,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			
 			if (updateTimersTask!=null)
 			{
-				setIndeterminateProgressTask(pd, "Update Data");
+				OWCTools.setIndeterminateProgressTask(pd, "Update Data");
 				updateTimersTask.updateTimers(baseURL_,pd);
 			}
 			
@@ -1026,17 +726,17 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	}
 	public static void cleanUpTimers(String baseURL, Window window, LogWindowInterface lwi, UpdateTimersTask updateTimersTask)
 	{
-		runWithProgressDialog(window, "CleanUp Timers", pd->{
+		OWCTools.runWithProgressDialog(window, "CleanUp Timers", pd->{
 			String baseURL_ = baseURL;
 			if (baseURL_==null) baseURL_ = getBaseURL(true, window);
 			if (baseURL_==null) return;
 			MessageResponse response = Timers.cleanup(baseURL_, taskTitle->{
-				setIndeterminateProgressTask(pd, taskTitle);
+				OWCTools.setIndeterminateProgressTask(pd, taskTitle);
 			});
 			lwi.showMessageResponse(response, "CleanUp Timer"/* , "disabled", "enabled", "nicht aktiviert" */);
 			if (updateTimersTask!=null)
 			{
-				setIndeterminateProgressTask(pd, "Update Data");
+				OWCTools.setIndeterminateProgressTask(pd, "Update Data");
 				updateTimersTask.updateTimers(baseURL_,pd);
 			}
 		});
@@ -1411,7 +1111,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			
 			setLineWrap(activateLineWrap);
 			setWrapStyleWord(activateLineWrap);
-			contextMenu.add(createCheckBoxMenuItem("Line Wrap", activateLineWrap, isChecked->{
+			contextMenu.add(OWCTools.createCheckBoxMenuItem("Line Wrap", activateLineWrap, isChecked->{
 				setLineWrap(isChecked);
 				setWrapStyleWord(isChecked);
 				if (setLineWrap!=null) setLineWrap.accept(isChecked);

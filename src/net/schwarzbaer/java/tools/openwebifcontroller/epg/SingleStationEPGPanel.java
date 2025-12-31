@@ -41,8 +41,7 @@ import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
-import net.schwarzbaer.java.tools.openwebifcontroller.TimerTools;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
 
@@ -106,7 +105,7 @@ public class SingleStationEPGPanel extends JSplitPane
 
 	private void showEPGOutput()
 	{
-		showEPGOutput(selectedEvent==null ? null : OpenWebifController.generateOutput(selectedEvent, selectedTimer));
+		showEPGOutput(selectedEvent==null ? null : OWCTools.generateOutput(selectedEvent, selectedTimer));
 	}
 
 	private void showEPGOutput(String str)
@@ -337,11 +336,11 @@ public class SingleStationEPGPanel extends JSplitPane
 			clickedEvent = null;
 		//	selectedEvent = null;
 			
-			add(miAddRecordTimer        = OpenWebifController.createMenuItem("Add Record Timer"         , GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Record       )));
-			add(miAddSwitchTimer        = OpenWebifController.createMenuItem("Add Switch Timer"         , GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Switch       )));
-			add(miAddRecordNSwitchTimer = OpenWebifController.createMenuItem("Add Record'N'Switch Timer", GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.RecordNSwitch)));
-			add(miToggleTimer           = OpenWebifController.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
-			add(miDeleteTimer           = OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			add(miAddRecordTimer        = OWCTools.createMenuItem("Add Record Timer"         , GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Record       )));
+			add(miAddSwitchTimer        = OWCTools.createMenuItem("Add Switch Timer"         , GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Switch       )));
+			add(miAddRecordNSwitchTimer = OWCTools.createMenuItem("Add Record'N'Switch Timer", GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.RecordNSwitch)));
+			add(miToggleTimer           = OWCTools.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
+			add(miDeleteTimer           = OWCTools.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
 			
 			addSeparator();
 			
@@ -355,11 +354,11 @@ public class SingleStationEPGPanel extends JSplitPane
 			
 			addSeparator();
 			
-			add(OpenWebifController.createMenuItem("Show Column Widths", e->{
+			add(OWCTools.createMenuItem("Show Column Widths", e->{
 				System.out.printf("Column Widths: %s%n", EPGTableModel.getColumnWidthsAsString(epgTable));
 			}));
 			
-			add(OpenWebifController.createMenuItem("Reset Row Order", e->{
+			add(OWCTools.createMenuItem("Reset Row Order", e->{
 				epgTableRowSorter.resetSortOrder();
 				epgTable.repaint();
 			}));
@@ -404,7 +403,7 @@ public class SingleStationEPGPanel extends JSplitPane
 	static class EPGTableModel extends Tables.SimpleGetValueTableModel<EPGevent, EPGTableModel.ColumnID> {
 		
 		private static String formatDate(long millis, boolean withTextDay, boolean withDate, boolean dateIsLong, boolean withTime, boolean withTimeZone) {
-			return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
+			return OWCTools.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
 		}
 		
 		private static boolean areEqual(ColumnID[] array1, ColumnID[] array2)
@@ -625,8 +624,8 @@ public class SingleStationEPGPanel extends JSplitPane
 				if (timer!=null)
 				{
 					Color bgColor;
-					if (columnID==ColumnID.Timer) bgColor = TimerTools.getBgColor(timer.type);
-					else                          bgColor = TimerTools.getBgColor(timer.state2);
+					if (columnID==ColumnID.Timer) bgColor = OWCTools.getBgColor(timer.type);
+					else                          bgColor = OWCTools.getBgColor(timer.state2);
 					getCustomBackground = ()->bgColor;
 				}
 				

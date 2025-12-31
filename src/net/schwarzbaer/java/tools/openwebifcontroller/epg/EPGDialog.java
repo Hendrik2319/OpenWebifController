@@ -39,9 +39,9 @@ import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
-import net.schwarzbaer.java.tools.openwebifcontroller.TimerTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BouquetsNStationsUpdateNotifier;
@@ -191,7 +191,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		if (rowHeight<0) rowHeight = epgView.getRowHeight();
 		else epgView.setRowHeight(rowHeight);
 		
-		JComboBox<RowHeight> cmbbxRowHeight = OpenWebifController.createComboBox(RowHeight.values(), RowHeight.get(rowHeight), val->{
+		JComboBox<RowHeight> cmbbxRowHeight = OWCTools.createComboBox(RowHeight.values(), RowHeight.get(rowHeight), val->{
 			epgView.setRowHeight(val.value);
 			epgView.repaint();
 			reconfigureEPGViewVertScrollBar();
@@ -203,7 +203,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		loadEPGThread.setLeadTime (leadTime_s);
 		loadEPGThread.setRangeTime(rangeTime_s<0 ? RangeTime.getMax().time_s : rangeTime_s);
 		
-		JComboBox<LeadTime > cmbbxLeadTime = OpenWebifController.createComboBox(LeadTime.values(), LeadTime.get(leadTime_s), e->{
+		JComboBox<LeadTime > cmbbxLeadTime = OWCTools.createComboBox(LeadTime.values(), LeadTime.get(leadTime_s), e->{
 			int oldLeadTime_s = leadTime_s;
 			OpenWebifController.settings.putInt(ValueKey.EPGDialog_LeadTime, leadTime_s = e.time_s);
 			loadEPGThread.setLeadTime(oldLeadTime_s);
@@ -226,7 +226,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 				}
 			}
 		});
-		JComboBox<RangeTime> cmbbxRangeTime = OpenWebifController.createComboBox(RangeTime.values(), RangeTime.get(rangeTime_s), e->{
+		JComboBox<RangeTime> cmbbxRangeTime = OWCTools.createComboBox(RangeTime.values(), RangeTime.get(rangeTime_s), e->{
 			OpenWebifController.settings.putInt(ValueKey.EPGDialog_RangeTime, rangeTime_s = e.time_s);
 			loadEPGThread.setRangeTime(rangeTime_s<0 ? RangeTime.getMax().time_s : rangeTime_s);
 			if (!loadEPGThread.isRunning()) {
@@ -273,7 +273,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		EventContextMenu     eventContextMenu = externCommands==null ? null : new   EventContextMenu(externCommands, baseURL, epgView, parent, ()->timers);
 		new EPGViewMouseHandler(this, epgView, epgViewHorizScrollBar, epgViewVertScrollBar, eventContextMenu, stationContextMenu, this.stations);
 		
-		JButton closeButton = OpenWebifController.createButton("Close", true, e->closeDialog());
+		JButton closeButton = OWCTools.createButton("Close", true, e->closeDialog());
 		
 		GridBagConstraints c = new GridBagConstraints();
 		c.fill = GridBagConstraints.BOTH;
@@ -303,10 +303,10 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			epgView.showStatus(System.out);
 		}),c);
 		*/
-		set(c,x++,0,0,0); southPanel.add(OpenWebifController.createButton("Show EPG Event Genres", true, e->{
+		set(c,x++,0,0,0); southPanel.add(OWCTools.createButton("Show EPG Event Genres", true, e->{
 			new EPGEventGenresView(this, "EPG Event Genres").showDialog();
 		}),c);
-		set(c,x++,0,0,0); southPanel.add(OpenWebifController.createButton("Jump to time", true, e->{
+		set(c,x++,0,0,0); southPanel.add(OWCTools.createButton("Jump to time", true, e->{
 			ZonedDateTime newValue = epgTimeDialog.showDialog(epgFocusTime);
 			if (newValue!=null)
 			{
@@ -505,16 +505,16 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			this.epgView = epgView;
 			event = null;
 			timer = null;
-			add(miAddRecordTimer        = OpenWebifController.createMenuItem("Add Record Timer"         , e->addTimer(Timers.Timer.Type.Record)));
-			add(miAddSwitchTimer        = OpenWebifController.createMenuItem("Add Switch Timer"         , e->addTimer(Timers.Timer.Type.Switch)));
-			add(miAddRecordNSwitchTimer = OpenWebifController.createMenuItem("Add Record'N'Switch Timer", e->addTimer(Timers.Timer.Type.RecordNSwitch)));
-			add(miToggleTimer           = OpenWebifController.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
-			add(miDeleteTimer           = OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
-			add(miShowCollisions        = OpenWebifController.createMenuItem("Show Collisions", e->{
-				TimerTools.showCollisions(
+			add(miAddRecordTimer        = OWCTools.createMenuItem("Add Record Timer"         , e->addTimer(Timers.Timer.Type.Record)));
+			add(miAddSwitchTimer        = OWCTools.createMenuItem("Add Switch Timer"         , e->addTimer(Timers.Timer.Type.Switch)));
+			add(miAddRecordNSwitchTimer = OWCTools.createMenuItem("Add Record'N'Switch Timer", e->addTimer(Timers.Timer.Type.RecordNSwitch)));
+			add(miToggleTimer           = OWCTools.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
+			add(miDeleteTimer           = OWCTools.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			add(miShowCollisions        = OWCTools.createMenuItem("Show Collisions", e->{
+				OWCTools.showCollisions(
 						window,
 						"EPG Event", event.event,
-						TimerTools.ValueAccess.EPGeventAccess,
+						OWCTools.ValueAccess.EPGeventAccess,
 						action -> {
 							Timers timers = getTimers.get();
 							if (timers!=null) timers.timers.forEach(action);
@@ -534,8 +534,8 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 								else
 									end = begin;
 								
-								out.add(indentLevel+1, "Begin", "%s", OpenWebifController.dateTimeFormatter.getTimeStr(begin*1000, Locale.GERMANY, true, true, false, true, false));
-								out.add(indentLevel+1, "End"  , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(end  *1000, Locale.GERMANY, true, true, false, true, false));
+								out.add(indentLevel+1, "Begin", "%s", OWCTools.dateTimeFormatter.getTimeStr(begin*1000, Locale.GERMANY, true, true, false, true, false));
+								out.add(indentLevel+1, "End"  , "%s", OWCTools.dateTimeFormatter.getTimeStr(end  *1000, Locale.GERMANY, true, true, false, true, false));
 							}
 							else
 							{
@@ -598,8 +598,8 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		private final JMenuItem miStreamStation;
 		
 		StationContextMenu(StationCommands externCommands, String baseURL) {
-			add(miSwitchToStation = OpenWebifController.createMenuItem("Switch to Station",                                   e->externCommands. zapToStation(baseURL,stationID)));
-			add(miStreamStation   = OpenWebifController.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->externCommands.streamStation(baseURL,stationID)));
+			add(miSwitchToStation = OWCTools.createMenuItem("Switch to Station",                                   e->externCommands. zapToStation(baseURL,stationID)));
+			add(miStreamStation   = OWCTools.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->externCommands.streamStation(baseURL,stationID)));
 		}
 
 		void setStationID(String stationName, StationID stationID) {
@@ -633,11 +633,11 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			contentPane.setBorder(BorderFactory.createEmptyBorder(5,10,5,10));
 			
 			createGUI(contentPane,
-					OpenWebifController.createButton("Reset"     , true, e->timeInput.setValue(initValue)),
-					OpenWebifController.createButton("Set to Now", true, e->timeInput.setValue(getNow())),
+					OWCTools.createButton("Reset"     , true, e->timeInput.setValue(initValue)),
+					OWCTools.createButton("Set to Now", true, e->timeInput.setValue(getNow())),
 					new JLabel("   "),
-					OpenWebifController.createButton("Ok"    , true, e->{ ignoreValue = false; closeDialog(); }),
-					OpenWebifController.createButton("Cancel", true, e->{ closeDialog(); })
+					OWCTools.createButton("Ok"    , true, e->{ ignoreValue = false; closeDialog(); }),
+					OWCTools.createButton("Cancel", true, e->{ closeDialog(); })
 			);
 		}
 

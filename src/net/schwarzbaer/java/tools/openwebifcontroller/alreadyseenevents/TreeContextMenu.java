@@ -18,7 +18,7 @@ import javax.swing.JTree;
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionMaps;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.TextOperator;
@@ -53,22 +53,22 @@ class TreeContextMenu extends ContextMenu
 		this.getCurrentTreeModel = getCurrentTreeModel;
 		clicked = new SelectionInfo(null);
 		
-		JMenuItem miCopyStr = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Copy, e->{
+		JMenuItem miCopyStr = add( OWCTools.createMenuItem( "##", GrayCommandIcons.IconGroup.Copy, e->{
 			this.viewer.copyNodeTitle(clicked);
 		} ) );
 		
-		JMenuItem miEditEpisodeStr = add( OpenWebifController.createMenuItem( "##", e->{
+		JMenuItem miEditEpisodeStr = add( OWCTools.createMenuItem( "##", e->{
 			this.viewer.editEpisodeStr(window, clicked);
 		} ) );
 		
-		add(OpenWebifController.createCheckBoxMenuItem("Show Episode Text before Title", this.factory.isEpisodeStringFirst(), val -> {
+		add(OWCTools.createCheckBoxMenuItem("Show Episode Text before Title", this.factory.isEpisodeStringFirst(), val -> {
 			this.factory.setEpisodeStringFirst(val);
 			this.viewer.rebuildTree();
 		} ));
 		
 		addSeparator();
 		
-		JMenuItem miEditDesc = add(OpenWebifController.createMenuItem("Edit Description Text", e -> {
+		JMenuItem miEditDesc = add(OWCTools.createMenuItem("Edit Description Text", e -> {
 			if (clicked.descriptionTreeNode==null) return;
 			String newDesc = TextAreaDialog.editText(window, "Edit Description Text", 400, 200, true, clicked.descriptionTreeNode.description.getText());
 			if (newDesc!=null)
@@ -90,12 +90,12 @@ class TreeContextMenu extends ContextMenu
 			}
 		}));
 		
-		JMenu menuDescOperator = OpenWebifController.createMenu("##");
+		JMenu menuDescOperator = OWCTools.createMenu("##");
 		add(menuDescOperator);
 		EnumMap<TextOperator, JCheckBoxMenuItem> menuDescOperatorItems = new EnumMap<>(TextOperator.class);
 		for (TextOperator op : TextOperator.values())
 		{
-			JCheckBoxMenuItem cmi = OpenWebifController.createCheckBoxMenuItem(op.title, false, b -> {
+			JCheckBoxMenuItem cmi = OWCTools.createCheckBoxMenuItem(op.title, false, b -> {
 				if (clicked.descriptionTreeNode!=null)
 				{
 					clicked.descriptionTreeNode.description.getData().operator = op;
@@ -111,15 +111,15 @@ class TreeContextMenu extends ContextMenu
 		
 		addSeparator();
 		
-		add(menuMoveToGroup = OpenWebifController.createMenu("Move to group"));
+		add(menuMoveToGroup = OWCTools.createMenu("Move to group"));
 		updateMenuMoveToGroup();
 		
-		JMenuItem miRemoveFromGroup = add( OpenWebifController.createMenuItem( "##", e->{
+		JMenuItem miRemoveFromGroup = add( OWCTools.createMenuItem( "##", e->{
 			this.getCurrentTreeModel.get().removeEcsTreeNodeFromGroup( clicked.ecsTreeNode );
 			AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.Grouping);
 		} ) );
 		
-		JMenuItem miRenameGroup = add( OpenWebifController.createMenuItem( "##", e->{
+		JMenuItem miRenameGroup = add( OWCTools.createMenuItem( "##", e->{
 			String result = JOptionPane.showInputDialog(window, "New group name", clicked.groupTreeNode.groupName);
 			if (result==null || result.isBlank() || result.equals(clicked.groupTreeNode.groupName)) return;
 			if (this.getCurrentTreeModel.get().isExistingGroupName( result ))
@@ -139,7 +139,7 @@ class TreeContextMenu extends ContextMenu
 		
 		addSeparator();
 		
-		JMenuItem miAddNode = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Add , e->{
+		JMenuItem miAddNode = add( OWCTools.createMenuItem( "##", GrayCommandIcons.IconGroup.Add , e->{
 			if (clicked.rootTreeNode!=null)
 			{
 				createNewECSNode(clicked.rootTreeNode);
@@ -161,7 +161,7 @@ class TreeContextMenu extends ContextMenu
 			//}
 		} ) ); 
 		
-		JMenuItem miDeleteNode = add( OpenWebifController.createMenuItem( "##", GrayCommandIcons.IconGroup.Delete, e->{
+		JMenuItem miDeleteNode = add( OWCTools.createMenuItem( "##", GrayCommandIcons.IconGroup.Delete, e->{
 			if (clicked.groupTreeNode!=null)
 			{
 				this.getCurrentTreeModel.get().deleteGroup( clicked.groupTreeNode );
@@ -186,21 +186,21 @@ class TreeContextMenu extends ContextMenu
 		
 		addSeparator();
 		
-		JMenuItem miReorderSiblings = add( OpenWebifController.createMenuItem( "##", e->{
+		JMenuItem miReorderSiblings = add( OWCTools.createMenuItem( "##", e->{
 			this.viewer.reorderSiblings(clicked);
 		} ) );
 		
-		JMenu menuRootOrder = OpenWebifController.createMenu("Order of subnodes of root");
+		JMenu menuRootOrder = OWCTools.createMenu("Order of subnodes of root");
 		add(menuRootOrder);
 		EnumMap<RootTreeNode.NodeOrder, JCheckBoxMenuItem> mapMiRootOrder = new EnumMap<>(RootTreeNode.NodeOrder.class);
 		for (RootTreeNode.NodeOrder order : RootTreeNode.NodeOrder.values())
 		{
-			JCheckBoxMenuItem checkBoxMenuItem = OpenWebifController.createCheckBoxMenuItem(order.title, false, b -> this.getCurrentTreeModel.get().setRootSubnodeOrder(order));
+			JCheckBoxMenuItem checkBoxMenuItem = OWCTools.createCheckBoxMenuItem(order.title, false, b -> this.getCurrentTreeModel.get().setRootSubnodeOrder(order));
 			menuRootOrder.add(checkBoxMenuItem);
 			mapMiRootOrder.put(order, checkBoxMenuItem);
 		}
 		
-		add(OpenWebifController.createMenuItem("Rebuild Tree", GrayCommandIcons.IconGroup.Reload, e -> {
+		add(OWCTools.createMenuItem("Rebuild Tree", GrayCommandIcons.IconGroup.Reload, e -> {
 			this.viewer.rebuildTree();
 		}));
 		
@@ -425,7 +425,7 @@ class TreeContextMenu extends ContextMenu
 		
 		for (String groupName : groupNamesVec)
 		{
-			menuMoveToGroup.add( OpenWebifController.createMenuItem( groupName, e->{
+			menuMoveToGroup.add( OWCTools.createMenuItem( groupName, e->{
 				getCurrentTreeModel.get().moveEcsTreeNodeToGroup( groupName, clicked.ecsTreeNode );
 				AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.Grouping);
 			} ) );
@@ -434,7 +434,7 @@ class TreeContextMenu extends ContextMenu
 		if (!groupNamesVec.isEmpty())
 			menuMoveToGroup.addSeparator();
 		
-		menuMoveToGroup.add( OpenWebifController.createMenuItem( "New group ...", e->{
+		menuMoveToGroup.add( OWCTools.createMenuItem( "New group ...", e->{
 			String suggestedName = clicked.ecsTreeNode==null || clicked.ecsTreeNode.ecs==null ? "" : clicked.ecsTreeNode.ecs.title();
 			String groupName = JOptionPane.showInputDialog(window, "Group name", suggestedName);
 			if (groupName==null) return;

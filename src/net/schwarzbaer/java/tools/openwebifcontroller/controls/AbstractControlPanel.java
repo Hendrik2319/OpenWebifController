@@ -11,7 +11,7 @@ import javax.swing.SwingUtilities;
 import net.schwarzbaer.java.lib.gui.GeneralIcons;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 
 public abstract class AbstractControlPanel<ValueStructType> extends SwitchablePanel {
 	private static final long serialVersionUID = 1376060978837360833L;
@@ -49,7 +49,7 @@ public abstract class AbstractControlPanel<ValueStructType> extends SwitchablePa
 	private JButton createUpdateButton(String title, Icon icon, Icon disIcon, boolean withDelayedUpdate) {
 		if (updateCommand==null)
 			throw new UnsupportedOperationException("Can't create an UpdateButton for a ContolPanel without an UpdateCommand");
-		return OpenWebifController.createButton(title, icon, disIcon, true, e->{
+		return OWCTools.createButton(title, icon, disIcon, true, e->{
 			callCommand(null, "Update"+controlLabel, withDelayedUpdate, updateCommand);
 		});
 	}
@@ -68,7 +68,7 @@ public abstract class AbstractControlPanel<ValueStructType> extends SwitchablePa
 	}
 	protected void callCommand(String baseURL, ProgressView pd, String commandLabel, boolean withDelayedUpdate, BiFunction<String, Consumer<String>, ValueStructType> commandFcn) {
 		if (pd != null)
-			callCommand(baseURL, withDelayedUpdate, commandFcn, taskTitle->OpenWebifController.setIndeterminateProgressTask(pd, String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle)));
+			callCommand(baseURL, withDelayedUpdate, commandFcn, taskTitle->OWCTools.setIndeterminateProgressTask(pd, String.format("%s.%s: %s", controlLabel, commandLabel, taskTitle)));
 		else
 			new Thread(()->callCommand(baseURL, withDelayedUpdate, commandFcn, null)).start();
 	}

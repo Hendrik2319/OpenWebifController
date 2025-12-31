@@ -1,9 +1,21 @@
 package net.schwarzbaer.java.tools.openwebifcontroller;
 
 import java.awt.Color;
+import java.awt.Window;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
+import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
+import net.schwarzbaer.java.lib.openwebif.EPGevent;
+import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
@@ -145,5 +157,183 @@ public class TimerTools
 				sb.append(String.format("%sIs Already Seen:%n%s%n", indent, rule.toString(indent+"    ")));
 		}
 		return sb.toString();
+	}
+	
+	public interface ValueAccess<SourceType>
+	{
+		long getBegin(SourceType sourceItem);
+		long getEnd(SourceType sourceItem);
+		String getServiceRef(SourceType sourceItem);
+		
+		public static ValueAccess<Timer> TimerAccess = new ValueAccess<>()
+		{
+			@Override public long   getBegin     (Timer timer) { return timer.begin; }
+			@Override public long   getEnd       (Timer timer) { return timer.end; }
+			@Override public String getServiceRef(Timer timer) { return timer.serviceref; }
+		};
+		
+		public static ValueAccess<EPGevent> EPGeventAccess = new ValueAccess<>() {
+			@Override public String getServiceRef(EPGevent ev) { return ev.sref; }
+			@Override public long getBegin(EPGevent ev)
+			{
+				if (ev.begin_timestamp==null)
+					return 0;
+				
+				return ev.begin_timestamp;
+			}
+			@Override public long getEnd(EPGevent ev)
+			{
+				if (ev.begin_timestamp==null)
+					return 0;
+				
+				if (ev.duration_sec!=null)
+					return ev.begin_timestamp + ev.duration_sec;
+				
+				if (ev.duration_min!=null)
+					return ev.begin_timestamp + ev.duration_min*60;
+				
+				return ev.begin_timestamp;
+			}
+		};
+	}
+	
+	public static <GroupType> void showCollisions(Window window, Timer timer, Consumer<Consumer<Timer>> loopOverAllTimers, Function<Timer,GroupType> getGroupValue)
+	{
+		showCollisions(
+				window,
+				"Timer", timer, ValueAccess.TimerAccess,
+				loopOverAllTimers,
+				getGroupValue,
+				(out, indentLevel, t) -> showTimer(out, indentLevel, t, null, null)
+		);
+	}
+	public static <GroupType, SourceType> void showCollisions(
+			Window window,
+			String sourceTypeLabel, SourceType sourceItem, ValueAccess<SourceType> valueAccess,
+			Consumer<Consumer<Timer>> loopOverAllTimers,
+			Function<Timer,GroupType> getGroupValue,
+			ShowSourceItem<SourceType> showSourceItem
+	) {
+		List<Timer> collidingTimers = new ArrayList<>();
+		loopOverAllTimers.accept(t -> {
+			if (sourceItem!=t && collidesWith( sourceItem, t, valueAccess ))
+				collidingTimers.add(t);
+		});
+		
+		String collidingInfo = generateCollidingInfo(
+				sourceTypeLabel,
+				sourceItem,
+				valueAccess,
+				collidingTimers,
+				getGroupValue,
+				showSourceItem
+		);
+		TextAreaDialog.showText(window, "Collisions with "+sourceTypeLabel, 800, 800, true, collidingInfo);
+	}
+
+	private static <SourceType> boolean collidesWith(SourceType v1, Timer v2, ValueAccess<SourceType> valueAccess)
+	{
+		long v1_begin = valueAccess.getBegin(v1);
+		long v1_end   = valueAccess.getEnd(v1);
+		if (v1_begin > v1_end) return false;
+		if (v2.begin > v2.end) return false;
+		if (isIn(v1_begin, v2.begin, v2.end)) return true;
+		if (isIn(v1_end  , v2.begin, v2.end)) return true;
+		if (isIn(v2.begin, v1_begin, v1_end)) return true;
+		if (isIn(v2.end  , v1_begin, v1_end)) return true;
+		return false;
+	}
+
+	private static boolean isIn(long n1, long n2a, long n2b)
+	{
+		return (n2a <= n1 && n1 <= n2b);
+	}
+	
+	public interface ShowSourceItem<SourceType>
+	{
+		void showDetails(ValueListOutput out, int indentLevel, SourceType sourceItem);
+	}
+	
+	private static <GroupType,SourceType> String generateCollidingInfo(
+			String sourceTypeLabel,
+			SourceType sourceItem,
+			ValueAccess<SourceType> valueAccess,
+			List<Timer> collidingTimers,
+			Function<Timer,GroupType> getGroupValue,
+			ShowSourceItem<SourceType> showSourceItem
+	) {
+		Map<GroupType,List<Timer>> collidingTimersMap = new HashMap<>();
+		collidingTimers.forEach(t -> {
+			collidingTimersMap
+				.computeIfAbsent( getGroupValue.apply(t), st -> new ArrayList<>() )
+				.add(t);
+		});
+		
+		ValueListOutput out = new ValueListOutput();
+		
+		out.add(0, sourceTypeLabel);
+		showSourceItem.showDetails(out, 1, sourceItem);
+		
+		out.addEmptyLine();
+		
+		out.add(0, "Colliding Timers", collidingTimers.size());
+		out.addEmptyLine();
+		collidingTimersMap.keySet().stream().sorted().forEachOrdered(group -> {
+			out.add(1, group.toString());
+			List<Timer> list = collidingTimersMap.get(group);
+			list.sort( Comparator.<Timer,Long>comparing(t -> t.begin).thenComparing(t -> t.name) );
+			list.forEach(t -> {
+				showTimer(out, 2, t, sourceItem, valueAccess);
+			});
+		});
+		
+		return out.generateOutput();
+	}
+
+	private static <SourceType> void showTimer(ValueListOutput out, int indentLevel, Timer timer, SourceType sourceItem, ValueAccess<SourceType> valueAccess)
+	{
+		out.add(indentLevel, "\"%s\"".formatted( timer.name ));
+		out.add(indentLevel+1, "Type"   , "%s", timer.type);
+		out.add(indentLevel+1, "Station", timer.servicename);
+		
+		if (sourceItem!=null && Objects.equals(timer.serviceref, valueAccess.getServiceRef(sourceItem)))
+			out.add(indentLevel+2, "[ SAME STATION ]");
+		
+		else if (isSameTransponder(timer, sourceItem, valueAccess))
+			out.add(indentLevel+2, "[ SAME TRANSPONDER ]");
+		
+		out.add(indentLevel+1, "Begin", "%s", formatDate(timer.begin*1000, true, true, false, true, false));
+		out.add(indentLevel+1, "End"  , "%s", formatDate(timer.end  *1000, true, true, false, true, false));
+		out.addEmptyLine();
+	}
+	
+	private static String formatDate(long millis, boolean withTextDay, boolean withDate, boolean dateIsLong, boolean withTime, boolean withTimeZone) {
+		return OpenWebifController.dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
+	}
+
+	private static <SourceType> boolean isSameTransponder(Timer timer, SourceType sourceItem, ValueAccess<SourceType> valueAccess)
+	{
+		if (timer==null || sourceItem==null)
+			return false;
+		
+		return isSameTransponder(timer.serviceref, valueAccess.getServiceRef(sourceItem));
+	}
+
+	public static boolean isSameTransponder(Timer t1, Timer t2)
+	{
+		if (t1==null || t2==null)
+			return false;
+		
+		return isSameTransponder(t1.serviceref, t2.serviceref);
+	}
+
+	public static boolean isSameTransponder(String serviceRef1, String serviceRef2)
+	{
+		if (serviceRef1==null || serviceRef2==null)
+			return false;
+		
+		StationID stationID1 = StationID.parseIDStr(serviceRef1);
+		StationID stationID2 = StationID.parseIDStr(serviceRef2);
+		return StationID.isSameTransponder(stationID1, stationID2);
 	}
 }

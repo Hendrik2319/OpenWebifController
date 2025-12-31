@@ -7,6 +7,7 @@ import java.awt.Point;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Vector;
 import java.util.function.Function;
@@ -171,6 +172,16 @@ public class TimersPanel extends JSplitPane {
 				TextAreaDialog.showText(main.mainWindow, "Details of Timer", 800, 800, true, text);
 			}));
 			
+			menuClickedTimer.add(OpenWebifController.createMenuItem("Show Collisions", e->{
+				if (clickedTimer==null) return;
+				TimerTools.showCollisions(
+						main.mainWindow,
+						clickedTimer,
+						action -> tableModel.forEachRow((i,timer) -> action.accept(timer)),
+						timerStateGuesser::getState
+				);
+			}));
+			
 			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents
 					.getInstance()
 					.createMenuForTimer(menuClickedTimer, main.mainWindow, ()->clickedTimer, () -> {
@@ -318,7 +329,7 @@ public class TimersPanel extends JSplitPane {
 		
 		public enum ExtTimerState
 		{
-			Deleted, Finished, Running, Deactivated, Waiting, Unknown ;
+			Running, Waiting, Deactivated, Finished, Deleted, Unknown ;
 			
 			public static ExtTimerState convert(Timer.State state)
 			{
@@ -583,9 +594,9 @@ public class TimersPanel extends JSplitPane {
 		private final TimerStateGuesser timerStateGuesser;
 
 		public TimersTableModel(TimerStateGuesser timerStateGuesser) {
-			this(new Vector<>(), timerStateGuesser);
+			this(List.of(), timerStateGuesser);
 		}
-		public TimersTableModel(Vector<Timer> timers, TimerStateGuesser timerStateGuesser) {
+		public TimersTableModel(List<Timer> timers, TimerStateGuesser timerStateGuesser) {
 			super(ColumnID.values(), timers);
 			this.timerStateGuesser = timerStateGuesser;
 		}

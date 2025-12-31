@@ -13,8 +13,10 @@ import java.awt.event.WindowListener;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
+import java.util.Locale;
 import java.util.Vector;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -39,6 +41,7 @@ import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSettings.ValueKey;
+import net.schwarzbaer.java.tools.openwebifcontroller.TimerTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations.BouquetsNStationsUpdateNotifier;
@@ -121,6 +124,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 	private final TimeInputDialog epgTimeDialog;
 	private ZonedDateTime epgFocusTime;
 	private boolean saveSuggestedEPGViewFocus;
+	private Timers timers;
 
 	public static void showDialog(
 			Window parent, String baseURL, EPG epg, Bouquet bouquet,
@@ -266,7 +270,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		//epgViewHorizScrollBar.setValues(epgView.getRowOffsetY(), epgView.getRowViewHeight(), 0, epgView.getContentHeight());
 		
 		StationContextMenu stationContextMenu = externCommands==null ? null : new StationContextMenu(externCommands, baseURL);
-		EventContextMenu     eventContextMenu = externCommands==null ? null : new   EventContextMenu(externCommands, baseURL, epgView, parent);
+		EventContextMenu     eventContextMenu = externCommands==null ? null : new   EventContextMenu(externCommands, baseURL, epgView, parent, ()->timers);
 		new EPGViewMouseHandler(this, epgView, epgViewHorizScrollBar, epgViewVertScrollBar, eventContextMenu, stationContextMenu, this.stations);
 		
 		JButton closeButton = OpenWebifController.createButton("Close", true, e->closeDialog());
@@ -470,6 +474,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 	}
 	
 	private void timersWereUpdated(Timers timers, boolean repaintEPGView) {
+		this.timers = timers;
 		Vector<EPGView.Timer> convertedTimers = epgView.convertTimers(timers.timers);
 		epgView.setTimers(convertedTimers);
 		if (repaintEPGView) epgView.repaint();
@@ -487,13 +492,14 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		private final JMenuItem miAddRecordNSwitchTimer;
 		private final JMenuItem miToggleTimer;
 		private final JMenuItem miDeleteTimer;
+		private final JMenuItem miShowCollisions;
 		
 		private EPGViewEvent event;
 		private EPGView.Timer timer;
 
 		private final AlreadySeenEvents.MenuControl aseMenuControlClicked;
 
-		EventContextMenu(TimerCommands externCommands, String baseURL, EPGView epgView, Window window) {
+		EventContextMenu(TimerCommands externCommands, String baseURL, EPGView epgView, Window window, Supplier<Timers> getTimers) {
 			this.externCommands = externCommands;
 			this.baseURL = baseURL;
 			this.epgView = epgView;
@@ -502,8 +508,44 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			add(miAddRecordTimer        = OpenWebifController.createMenuItem("Add Record Timer"         , e->addTimer(Timers.Timer.Type.Record)));
 			add(miAddSwitchTimer        = OpenWebifController.createMenuItem("Add Switch Timer"         , e->addTimer(Timers.Timer.Type.Switch)));
 			add(miAddRecordNSwitchTimer = OpenWebifController.createMenuItem("Add Record'N'Switch Timer", e->addTimer(Timers.Timer.Type.RecordNSwitch)));
-			add(miToggleTimer        = OpenWebifController.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
-			add(miDeleteTimer        = OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			add(miToggleTimer           = OpenWebifController.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
+			add(miDeleteTimer           = OpenWebifController.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			add(miShowCollisions        = OpenWebifController.createMenuItem("Show Collisions", e->{
+				TimerTools.showCollisions(
+						window,
+						"EPG Event", event.event,
+						TimerTools.ValueAccess.EPGeventAccess,
+						action -> {
+							Timers timers = getTimers.get();
+							if (timers!=null) timers.timers.forEach(action);
+						},
+						t -> t.state2,
+						(out, indentLevel, ev) -> {
+							out.add(indentLevel, "\"%s\" [%d]".formatted( ev.title, ev.id ));
+							out.add(indentLevel+1, "Station", ev.station_name);
+							if (ev.begin_timestamp!=null)
+							{
+								long begin = ev.begin_timestamp;
+								long end;
+								if (ev.duration_sec!=null)
+									end = begin + ev.duration_sec;
+								else if (ev.duration_min!=null)
+									end = begin + ev.duration_min*60;
+								else
+									end = begin;
+								
+								out.add(indentLevel+1, "Begin", "%s", OpenWebifController.dateTimeFormatter.getTimeStr(begin*1000, Locale.GERMANY, true, true, false, true, false));
+								out.add(indentLevel+1, "End"  , "%s", OpenWebifController.dateTimeFormatter.getTimeStr(end  *1000, Locale.GERMANY, true, true, false, true, false));
+							}
+							else
+							{
+								if (ev.begin!=null) out.add(indentLevel+1, "Begin", ev.begin);
+								if (ev.end  !=null) out.add(indentLevel+1, "End"  , ev.end  );
+							}
+							out.addEmptyLine();
+						}
+				);
+			}));
 			
 			addSeparator();
 			
@@ -536,11 +578,13 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			miAddRecordNSwitchTimer.setEnabled(isEventOK && timer==null);
 			miToggleTimer          .setEnabled(isEventOK && timer!=null);
 			miDeleteTimer          .setEnabled(isEventOK && timer!=null);
+			miShowCollisions       .setEnabled(isEventOK);
 			miAddRecordTimer       .setText(!isEventOK || this.event.title==null ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", this.event.title));
 			miAddSwitchTimer       .setText(!isEventOK || this.event.title==null ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", this.event.title));
 			miAddRecordNSwitchTimer.setText(!isEventOK || this.event.title==null ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", this.event.title));
 			miToggleTimer          .setText(timer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", timer.name));
 			miDeleteTimer          .setText(timer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", timer.name));
+			miShowCollisions       .setText(!isEventOK || this.event.title==null ? "Show Collisions" : String.format("Show Collisions for Event \"%s\"", this.event.title));
 			
 			aseMenuControlClicked.updateBeforeShowingMenu();
 		}

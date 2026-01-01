@@ -550,7 +550,7 @@ public class SingleStationEPGPanel extends JSplitPane
 
 		public void setData(Vector<EPGevent> data)
 		{
-			super.setData(data);
+			super.setData(Tables.DataSource.createFrom(data));
 			this.dataVec = data;
 			dataTimeStamp_ms = System.currentTimeMillis();
 			timersMap.updateData(this.timers, dataVec);

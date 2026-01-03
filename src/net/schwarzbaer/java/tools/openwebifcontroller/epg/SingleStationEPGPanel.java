@@ -74,7 +74,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		epgTableModel.setColumnWidths(epgTable);
 		epgTableModel.setCellRenderers();
 		
-		new EPGTableContextMenu(window, getBaseURL, timerCommands);
+		new EPGTableContextMenu(window, getBaseURL, timerCommands, timerNotifier::getTimers);
 		
 		JScrollPane tableScrollPane = new JScrollPane(epgTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
@@ -323,24 +323,25 @@ public class SingleStationEPGPanel extends JSplitPane
 		private final JMenuItem miAddRecordNSwitchTimer;
 		private final JMenuItem miToggleTimer;
 		private final JMenuItem miDeleteTimer;
+		private final JMenuItem miShowCollisions;
 		
 		private EPGevent clickedEvent;
-		private Timer clickedEventTimer;
-		
 	//	private EPGevent selectedEvent;
+		private Timer clickedEventTimer;
 
-		EPGTableContextMenu(Window window, Supplier<String> getBaseURL, EPGDialog.TimerCommands timerCommands)
+		EPGTableContextMenu(Window window, Supplier<String> getBaseURL, EPGDialog.TimerCommands timerCommands, Supplier<Timers> getTimers)
 		{
 			this.getBaseURL = Objects.requireNonNull(getBaseURL);
 			this.timerCommands = Objects.requireNonNull(timerCommands);
 			clickedEvent = null;
 		//	selectedEvent = null;
 			
-			add(miAddRecordTimer        = OWCTools.createMenuItem("Add Record Timer"         , GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Record       )));
-			add(miAddSwitchTimer        = OWCTools.createMenuItem("Add Switch Timer"         , GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Switch       )));
-			add(miAddRecordNSwitchTimer = OWCTools.createMenuItem("Add Record'N'Switch Timer", GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.RecordNSwitch)));
-			add(miToggleTimer           = OWCTools.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
-			add(miDeleteTimer           = OWCTools.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			add(miAddRecordTimer        = OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Record       )));
+			add(miAddSwitchTimer        = OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.Switch       )));
+			add(miAddRecordNSwitchTimer = OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Add, e->addTimer(Timers.Timer.Type.RecordNSwitch)));
+			add(miToggleTimer           = OWCTools.createMenuItem("###"                                   , e->toggleTimer()));
+			add(miDeleteTimer           = OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			add(miShowCollisions        = OWCTools.createMenuItem("###", e->OWCTools.showCollisions(window, clickedEvent, getTimers)));
 			
 			addSeparator();
 			
@@ -383,11 +384,13 @@ public class SingleStationEPGPanel extends JSplitPane
 				miAddRecordNSwitchTimer.setEnabled(isEventOK && clickedEventTimer==null);
 				miToggleTimer          .setEnabled(isEventOK && clickedEventTimer!=null);
 				miDeleteTimer          .setEnabled(isEventOK && clickedEventTimer!=null);
+				miShowCollisions       .setEnabled(isEventOK);
 				miAddRecordTimer       .setText(!isEventOK || clickedEvent.title==null ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", clickedEvent.title));
 				miAddSwitchTimer       .setText(!isEventOK || clickedEvent.title==null ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", clickedEvent.title));
 				miAddRecordNSwitchTimer.setText(!isEventOK || clickedEvent.title==null ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", clickedEvent.title));
-				miToggleTimer          .setText(clickedEventTimer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", clickedEventTimer.name));
-				miDeleteTimer          .setText(clickedEventTimer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", clickedEventTimer.name));
+				miToggleTimer          .setText(clickedEventTimer==null                ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", clickedEventTimer.name));
+				miDeleteTimer          .setText(clickedEventTimer==null                ? "Delete Timer"              : String.format("Delete Timer \"%s\"", clickedEventTimer.name));
+				miShowCollisions       .setText(!isEventOK || clickedEvent.title==null ? "Show Collisions"           : String.format("Show Collisions for Event \"%s\"", clickedEvent.title));
 				
 				aseMenuControlClicked.updateBeforeShowingMenu();
 			});

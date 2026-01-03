@@ -13,7 +13,6 @@ import java.awt.event.WindowListener;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
-import java.util.Locale;
 import java.util.Vector;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -170,6 +169,7 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 		this.epg = epg;
 		this.bouquet = bouquet;
 		this.stations = this.bouquet.subservices;
+		timers = null;
 		
 		epgTimeDialog = new TimeInputDialog(this,ModalityType.APPLICATION_MODAL,true,"EPG Focus", "Please enter date and time where EPG should focus on. ");
 		epgFocusTime = epgTimeDialog.getNow();
@@ -505,47 +505,12 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			this.epgView = epgView;
 			event = null;
 			timer = null;
-			add(miAddRecordTimer        = OWCTools.createMenuItem("Add Record Timer"         , e->addTimer(Timers.Timer.Type.Record)));
-			add(miAddSwitchTimer        = OWCTools.createMenuItem("Add Switch Timer"         , e->addTimer(Timers.Timer.Type.Switch)));
-			add(miAddRecordNSwitchTimer = OWCTools.createMenuItem("Add Record'N'Switch Timer", e->addTimer(Timers.Timer.Type.RecordNSwitch)));
-			add(miToggleTimer           = OWCTools.createMenuItem("Toggle Timer"                                   , e->toggleTimer()));
-			add(miDeleteTimer           = OWCTools.createMenuItem("Delete Timer", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
-			add(miShowCollisions        = OWCTools.createMenuItem("Show Collisions", e->{
-				OWCTools.showCollisions(
-						window,
-						"EPG Event", event.event,
-						OWCTools.ValueAccess.EPGeventAccess,
-						action -> {
-							Timers timers = getTimers.get();
-							if (timers!=null) timers.timers.forEach(action);
-						},
-						t -> t.state2,
-						(out, indentLevel, ev) -> {
-							out.add(indentLevel, "\"%s\" [%d]".formatted( ev.title, ev.id ));
-							out.add(indentLevel+1, "Station", ev.station_name);
-							if (ev.begin_timestamp!=null)
-							{
-								long begin = ev.begin_timestamp;
-								long end;
-								if (ev.duration_sec!=null)
-									end = begin + ev.duration_sec;
-								else if (ev.duration_min!=null)
-									end = begin + ev.duration_min*60;
-								else
-									end = begin;
-								
-								out.add(indentLevel+1, "Begin", "%s", OWCTools.dateTimeFormatter.getTimeStr(begin*1000, Locale.GERMANY, true, true, false, true, false));
-								out.add(indentLevel+1, "End"  , "%s", OWCTools.dateTimeFormatter.getTimeStr(end  *1000, Locale.GERMANY, true, true, false, true, false));
-							}
-							else
-							{
-								if (ev.begin!=null) out.add(indentLevel+1, "Begin", ev.begin);
-								if (ev.end  !=null) out.add(indentLevel+1, "End"  , ev.end  );
-							}
-							out.addEmptyLine();
-						}
-				);
-			}));
+			add(miAddRecordTimer        = OWCTools.createMenuItem("###", e->addTimer(Timers.Timer.Type.Record)));
+			add(miAddSwitchTimer        = OWCTools.createMenuItem("###", e->addTimer(Timers.Timer.Type.Switch)));
+			add(miAddRecordNSwitchTimer = OWCTools.createMenuItem("###", e->addTimer(Timers.Timer.Type.RecordNSwitch)));
+			add(miToggleTimer           = OWCTools.createMenuItem("###"                                   , e->toggleTimer()));
+			add(miDeleteTimer           = OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Delete, e->deleteTimer()));
+			add(miShowCollisions        = OWCTools.createMenuItem("###", e->OWCTools.showCollisions(window, event.event, getTimers)));
 			
 			addSeparator();
 			
@@ -582,9 +547,9 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			miAddRecordTimer       .setText(!isEventOK || this.event.title==null ? "Add Record Timer"          : String.format("Add "+"Record"         +" Timer for Event \"%s\"", this.event.title));
 			miAddSwitchTimer       .setText(!isEventOK || this.event.title==null ? "Add Switch Timer"          : String.format("Add "+"Switch"         +" Timer for Event \"%s\"", this.event.title));
 			miAddRecordNSwitchTimer.setText(!isEventOK || this.event.title==null ? "Add Record'N'Switch Timer" : String.format("Add "+"Record'N'Switch"+" Timer for Event \"%s\"", this.event.title));
-			miToggleTimer          .setText(timer==null ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", timer.name));
-			miDeleteTimer          .setText(timer==null ? "Delete Timer"              : String.format("Delete Timer \"%s\"", timer.name));
-			miShowCollisions       .setText(!isEventOK || this.event.title==null ? "Show Collisions" : String.format("Show Collisions for Event \"%s\"", this.event.title));
+			miToggleTimer          .setText(timer==null                          ? "Toggle Timer"              : String.format("Toggle Timer \"%s\"", timer.name));
+			miDeleteTimer          .setText(timer==null                          ? "Delete Timer"              : String.format("Delete Timer \"%s\"", timer.name));
+			miShowCollisions       .setText(!isEventOK || this.event.title==null ? "Show Collisions"           : String.format("Show Collisions for Event \"%s\"", this.event.title));
 			
 			aseMenuControlClicked.updateBeforeShowingMenu();
 		}

@@ -16,6 +16,7 @@ import java.util.Vector;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import javax.swing.AbstractButton;
 import javax.swing.ButtonGroup;
@@ -37,9 +38,9 @@ import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.OptionalValue;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.OptionalValue;
 import net.schwarzbaer.java.lib.openwebif.Timers.LogEntry;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
@@ -158,9 +159,28 @@ public class OWCTools
 				"Timer", timer, ValueAccess.TimerAccess,
 				loopOverAllTimers,
 				getGroupValue,
-				(out, indentLevel, t) -> showTimer(out, indentLevel, t, null, null)
+				(out, indentLevel, t) -> showTimerInCollisionResult(out, indentLevel, t, null, null)
 		);
 	}
+	
+	public static void showCollisions(Window window, EPGevent epgEvent, Supplier<Timers> getTimers)
+	{
+		showCollisions(window, epgEvent, getTimers, t -> t.state2);
+	}
+	public static <GroupType> void showCollisions(Window window, EPGevent epgEvent, Supplier<Timers> getTimers, Function<Timer,GroupType> getGroupValue)
+	{
+		showCollisions(
+				window,
+				"EPG Event", epgEvent, ValueAccess.EPGeventAccess,
+				action -> {
+					Timers timers = getTimers.get();
+					if (timers!=null) timers.timers.forEach(action);
+				},
+				getGroupValue,
+				OWCTools::showEPGEventInCollisionResult
+		);
+	}
+	
 	public static <GroupType, SourceType> void showCollisions(
 			Window window,
 			String sourceTypeLabel, SourceType sourceItem, ValueAccess<SourceType> valueAccess,
@@ -237,14 +257,14 @@ public class OWCTools
 			List<Timer> list = collidingTimersMap.get(group);
 			list.sort( Comparator.<Timer,Long>comparing(t -> t.begin).thenComparing(t -> t.name) );
 			list.forEach(t -> {
-				showTimer(out, 2, t, sourceItem, valueAccess);
+				showTimerInCollisionResult(out, 2, t, sourceItem, valueAccess);
 			});
 		});
 		
 		return out.generateOutput();
 	}
 
-	private static <SourceType> void showTimer(ValueListOutput out, int indentLevel, Timer timer, SourceType sourceItem, ValueAccess<SourceType> valueAccess)
+	private static <SourceType> void showTimerInCollisionResult(ValueListOutput out, int indentLevel, Timer timer, SourceType sourceItem, ValueAccess<SourceType> valueAccess)
 	{
 		out.add(indentLevel, "\"%s\"".formatted( timer.name ));
 		out.add(indentLevel+1, "Type"   , "%s", timer.type);
@@ -258,6 +278,32 @@ public class OWCTools
 		
 		out.add(indentLevel+1, "Begin", "%s", formatDate(timer.begin*1000, true, true, false, true, false));
 		out.add(indentLevel+1, "End"  , "%s", formatDate(timer.end  *1000, true, true, false, true, false));
+		out.addEmptyLine();
+	}
+	
+	private static void showEPGEventInCollisionResult(ValueListOutput out, int indentLevel, EPGevent ev)
+	{
+		out.add(indentLevel, "\"%s\" [%d]".formatted( ev.title, ev.id ));
+		out.add(indentLevel+1, "Station", ev.station_name);
+		if (ev.begin_timestamp!=null)
+		{
+			long begin = ev.begin_timestamp;
+			long end;
+			if (ev.duration_sec!=null)
+				end = begin + ev.duration_sec;
+			else if (ev.duration_min!=null)
+				end = begin + ev.duration_min*60;
+			else
+				end = begin;
+			
+			out.add(indentLevel+1, "Begin", "%s", OWCTools.dateTimeFormatter.getTimeStr(begin*1000, Locale.GERMANY, true, true, false, true, false));
+			out.add(indentLevel+1, "End"  , "%s", OWCTools.dateTimeFormatter.getTimeStr(end  *1000, Locale.GERMANY, true, true, false, true, false));
+		}
+		else
+		{
+			if (ev.begin!=null) out.add(indentLevel+1, "Begin", ev.begin);
+			if (ev.end  !=null) out.add(indentLevel+1, "End"  , ev.end  );
+		}
 		out.addEmptyLine();
 	}
 	

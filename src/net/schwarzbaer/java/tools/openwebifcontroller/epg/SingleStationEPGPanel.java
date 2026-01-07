@@ -604,6 +604,7 @@ public class SingleStationEPGPanel extends JSplitPane
 		{
 			private static final Color COLOR_FG_INACTIVE_EVENT = new Color(0x92B4C9);
 			private static final Color COLOR_FG_MARKER         = new Color(0xFF8700);
+			private static final Color COLOR_FG_SEEN_EVENT     = new Color(0x00619B);
 			private final Tables.LabelRendererComponent label;
 			private final ProgressScaleRC progressScale;
 			
@@ -632,17 +633,22 @@ public class SingleStationEPGPanel extends JSplitPane
 					getCustomBackground = ()->bgColor;
 				}
 				
-				if (viewStyle==ViewStyle.Bouquet)
-				{
-					if (event!=null)
+				if (event!=null)
+					switch (viewStyle)
 					{
+					case Bouquet:
 						if (StationID.isMarker(event.sref))
 							getCustomForeground = ()->COLOR_FG_MARKER;
 							
 						else if (!EPGTableModel.isInTimeSpan( event, dataTimeStamp_ms ))
 							getCustomForeground = ()->COLOR_FG_INACTIVE_EVENT;
+						break;
+						
+					case Station:
+						if (AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(event))
+							getCustomForeground = ()->COLOR_FG_SEEN_EVENT;
+						break;
 					}
-				}
 				
 				if (columnID==ColumnID.CompProgress)
 				{

@@ -24,6 +24,7 @@ import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNode
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.EventCriteriaSetTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.NewNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.RootTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.StationTreeNode;
 
 class ViewerTreeModel implements TreeModel
 {
@@ -207,19 +208,61 @@ class ViewerTreeModel implements TreeModel
 			fireTreeNodeRemoved( treeRoot, groupNode, index );
 	}
 
-	boolean deleteDescNode(DescriptionTreeNode descNode)
+	boolean deleteECSNode(EventCriteriaSetTreeNode treeNode)
 	{
-		if (descNode==null) return false;
+		if (treeNode==null) return false;
 		
-		AbstractTreeNode parent = descNode.parent;
+		AbstractTreeNode parent = treeNode.parent;
 		if (parent!=null)
 		{
-			int index = parent.removeNode(descNode);
+			AlreadySeenEvents.getInstance().deleteECS(treeNode.ecs.title());
+			
+			int index = parent.removeNode(treeNode);
 			if (index >= 0)
-				fireTreeNodeRemoved( parent, descNode, index );
+				fireTreeNodeRemoved( parent, treeNode, index );
+			
+			return true;
 		}
 		
-		return descNode.description.removeFromMap();
+		return false;
+	}
+
+	boolean deleteStationNode(StationTreeNode treeNode)
+	{
+		if (treeNode==null) return false;
+		
+		if (treeNode.parent instanceof EventCriteriaSetTreeNode parent)
+		{
+			if (parent.ecs.stations()!=null)
+				parent.ecs.stations().remove( treeNode.station );
+			
+			int index = parent.removeNode(treeNode);
+			if (index >= 0)
+				fireTreeNodeRemoved( parent, treeNode, index );
+			
+			return true;
+		}
+		
+		return false;
+	}
+
+	boolean deleteDescNode(DescriptionTreeNode treeNode)
+	{
+		if (treeNode==null) return false;
+		
+		AbstractTreeNode parent = treeNode.parent;
+		if (parent!=null)
+		{
+			treeNode.description.removeFromMap();
+			
+			int index = parent.removeNode(treeNode);
+			if (index >= 0)
+				fireTreeNodeRemoved( parent, treeNode, index );
+			
+			return true;
+		}
+		
+		return false;
 	}
 
 	@Override public void addTreeModelListener   (TreeModelListener l) { listeners.add   (l); }

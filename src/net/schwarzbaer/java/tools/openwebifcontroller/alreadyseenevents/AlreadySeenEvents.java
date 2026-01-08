@@ -96,6 +96,11 @@ public class AlreadySeenEvents
 			standard.putAll(descriptions.standard);
 			extended.putAll(descriptions.extended);
 		}
+
+		int size()
+		{
+			return standard.size() + extended.size();
+		}
 	}
 	
 	record StationData (
@@ -220,6 +225,11 @@ public class AlreadySeenEvents
 	boolean containsECS(String title)
 	{
 		return alreadySeenEvents.containsKey(title);
+	}
+
+	void deleteECS(String title)
+	{
+		alreadySeenEvents.remove(title);
 	}
 
 	EventCriteriaSet createECS(String title)

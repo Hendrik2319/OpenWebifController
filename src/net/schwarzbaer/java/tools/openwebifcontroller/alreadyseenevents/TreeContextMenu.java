@@ -21,6 +21,7 @@ import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionMaps;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.StationData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.TextOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.KeyFunction;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.SelectionInfo;
@@ -170,11 +171,51 @@ class TreeContextMenu extends ContextMenu
 			}
 			if (clicked.ecsTreeNode!=null)
 			{
-				// TODO: delete ecsTreeNode
+				boolean allowed = true;
+				DescriptionMaps descriptions = clicked.ecsTreeNode.ecs.descriptions();
+				Map<String, StationData> stations = clicked.ecsTreeNode.ecs.stations();
+				if ((descriptions!=null && !descriptions.isEmpty()) || (stations!=null && !stations.isEmpty()))
+				{
+					String descStr     = descriptions!=null && !descriptions.isEmpty() ? "descriptions (%d)".formatted(descriptions.size()) : null;
+					String stationsStr = stations    !=null && !stations    .isEmpty() ?     "stations (%d)".formatted(stations    .size()) : null;
+					String title = "Are you sure?";
+					String[] msg = {
+							"There are some %s defined in this title (\"%s\").".formatted(
+									descStr!=null && stationsStr!=null
+										? "%s and %s".formatted(descStr, stationsStr)
+										: descStr!=null ? descStr : stationsStr!=null ? stationsStr : "??????",
+									clicked.ecsTreeNode.title
+							),
+							"Do you really want to delete this title?",
+					};
+					allowed = JOptionPane.YES_OPTION == JOptionPane.showConfirmDialog(window, msg, title, JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+				}
+				if (allowed)
+				{
+					boolean success = this.getCurrentTreeModel.get().deleteECSNode(clicked.ecsTreeNode);
+					if (success)
+						AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
+				}
 			}
 			if (clicked.stationTreeNode!=null)
 			{
-				// TODO: delete stationTreeNode
+				boolean allowed = true;
+				DescriptionMaps descriptions = clicked.stationTreeNode.stationData.descriptions();
+				if (descriptions!=null && !descriptions.isEmpty())
+				{
+					String title = "Are you sure?";
+					String[] msg = {
+							"There are some descriptions (%d) defined in this station (\"%s\").".formatted(descriptions.size(), clicked.stationTreeNode.station),
+							"Do you really want to delete this station?",
+					};
+					allowed = JOptionPane.YES_OPTION == JOptionPane.showConfirmDialog(window, msg, title, JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+				}
+				if (allowed)
+				{
+					boolean success = this.getCurrentTreeModel.get().deleteStationNode(clicked.stationTreeNode);
+					if (success)
+						AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
+				}
 			}
 			if (clicked.descriptionTreeNode!=null)
 			{
@@ -286,8 +327,8 @@ class TreeContextMenu extends ContextMenu
 			
 			miDeleteNode.setEnabled(
 					clicked.groupTreeNode!=null ||
-					//clicked.ecsTreeNode!=null ||
-					//clicked.stationTreeNode!=null ||
+					clicked.ecsTreeNode!=null ||
+					clicked.stationTreeNode!=null ||
 					clicked.descriptionTreeNode!=null
 			);
 			miDeleteNode.setText(

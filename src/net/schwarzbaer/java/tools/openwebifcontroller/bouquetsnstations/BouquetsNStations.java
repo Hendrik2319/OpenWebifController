@@ -120,6 +120,7 @@ public class BouquetsNStations extends JPanel {
 		JTabbedPane rightPanel = new JTabbedPane();
 		rightPanel.addTab("Station", valuePanel.panel);
 		rightPanel.addTab("EPG", singleStationEPGPanel);
+		rightPanel.setSelectedIndex(1);
 		
 		JSplitPane centerPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true, treeScrollPane, rightPanel);
 		add(centerPanel,BorderLayout.CENTER);

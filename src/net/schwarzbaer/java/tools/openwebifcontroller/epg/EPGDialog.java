@@ -420,8 +420,8 @@ public class EPGDialog extends StandardDialog implements TimerDataUpdateNotifier
 			setValue.accept(value);
 		
 		scrollBar.setValues(value, visible, minimum, maximum);
-		scrollBar.setUnitIncrement (visible/4);
-		scrollBar.setBlockIncrement(visible*9/10);
+		scrollBar.setUnitIncrement (visible/7);
+		scrollBar.setBlockIncrement(visible/2);
 	}
 
 	private void set(GridBagConstraints c, int gridx, int gridy, double weightx, double weighty) {

@@ -35,8 +35,8 @@ import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.AbstractMessageResponse;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.BouquetData;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
@@ -119,7 +119,7 @@ public class StationSwitch {
 		};
 		
 		AbstractControlPanel.ExternCommands controlPanelCommands = new AbstractControlPanel.ExternCommands() {
-			@Override public void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight) {
+			@Override public void showMessageResponse(AbstractMessageResponse response, String title, String... stringsToHighlight) {
 				logWindow.showMessageResponse(response, title, stringsToHighlight);
 			}
 			@Override public String getBaseURL() {

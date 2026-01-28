@@ -14,10 +14,10 @@ import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.gui.StyledDocumentInterface;
 import net.schwarzbaer.java.lib.gui.StyledDocumentInterface.Style;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.AbstractMessageResponse;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
-import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.LogWindowInterface;
 
-public class LogWindow extends StandardDialog implements LogWindowInterface
+public class LogWindow extends StandardDialog implements OWCTools.LogWindowInterface
 {
 	private static final long serialVersionUID = -9060941148738931230L;
 	
@@ -47,16 +47,13 @@ public class LogWindow extends StandardDialog implements LogWindowInterface
 	}
 	
 	@Override
-	public void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight)
+	public void showMessageResponse(AbstractMessageResponse response, String title, String... stringsToHighlight)
 	{
 		printToDoc(response, title, stringsToHighlight);
 		printToSystemOut(response, title);
 		
-		if (response!=null && !response.result)
-		{
-			String message = response==null ? STR_NO_RESPONSE : toString(response);
-			JOptionPane.showMessageDialog(getParent(), message, title, JOptionPane.WARNING_MESSAGE);
-		}
+		if (response!=null && (!response.getResult() || !(response instanceof MessageResponse) ) )
+			JOptionPane.showMessageDialog(getParent(), response.getDialogMessage(), title, JOptionPane.WARNING_MESSAGE);
 	}
 	
 	private record FoundStr(int pos, String str)
@@ -80,20 +77,20 @@ public class LogWindow extends StandardDialog implements LogWindowInterface
 		}
 	}
 
-	private void printToDoc(MessageResponse response, String title, String[] stringsToHighlight)
+	private void printToDoc(AbstractMessageResponse response, String title, String[] stringsToHighlight)
 	{
 		ScrollPosition scrollPos = ScrollPosition.getVertical(contentPane);
 		
 		if (response==null)
 			sdi.append(STYLE_NORESPONSE, "[-------] ");
-		else if (response.result)
+		else if (response.getResult())
 			sdi.append(STYLE_SUCCESS, "[SUCCESS] ");
 		else
 			sdi.append(STYLE_FAILURE, "[FAILURE] ");
 		
 		sdi.append(STYLE_TITLE, "%s: ", title);
 		
-		String message = response==null ? STR_NO_RESPONSE : response.message;
+		String message = response==null ? STR_NO_RESPONSE : response.getLogWindowMessage();
 		
 		FoundStr str;
 		while ( (str = FoundStr.getFindFirst(message, stringsToHighlight))!=null )
@@ -113,19 +110,12 @@ public class LogWindow extends StandardDialog implements LogWindowInterface
 			});
 	}
 
-	private static void printToSystemOut(MessageResponse response, String title)
+	private static void printToSystemOut(AbstractMessageResponse response, String title)
 	{
 		System.out.println(title+":");
 		if (response!=null)
 			response.printTo(System.out, "   ");
 		else
 			System.out.println(STR_NO_RESPONSE);
-	}
-
-	private static String toString(MessageResponse values) {
-		StringBuilder sb = new StringBuilder();
-		sb.append(String.format("Message: \"%s\"%n", values.message));
-		sb.append(String.format("Result: %s%n", values.result));
-		return sb.toString();
 	}
 }

@@ -452,8 +452,7 @@ class MoviesPanel extends JSplitPane {
 			OpenWebifTools.MovieInfoResponse response = OpenWebifTools.setMovieTitleDesc(baseURL, movie, result.title(), result.desc(), taskTitle->{
 				OWCTools.setIndeterminateProgressTask(pd, taskTitle);
 			});
-			//main.showMessageResponse(response, "Change Movie Title & Description");
-			// TODO: main.showMessageResponse with OpenWebifTools.MovieInfoResponse
+			main.showMessageResponse(response, "Change Movie Title & Description");
 			if (response.result && movieTableModel!=null)
 			{
 				NewTitleDesc changed = new NewTitleDesc(response.title, response.description);
@@ -569,13 +568,19 @@ class MoviesPanel extends JSplitPane {
 		);
 		
 		StringBuilder sb = new StringBuilder();
+		String description = movie.description==null ? "" : movie.description.replace(""+((char)0x8a), "\r\n");
 		if (changedTitleDesc!=null && changedTitleDesc.desc()!=null)
 		{
-			sb.append("new description:\r\n").append(changedTitleDesc.desc()).append("\r\n");
-			sb.append("old description:\r\n").append(movie.description.replace(""+((char)0x8a), "\r\n")).append("\r\n");
+			if (changedTitleDesc.desc().equals(description))
+				sb.append("old&new description:\r\n").append(description).append("\r\n");
+			else
+			{
+				sb.append("new description:\r\n").append(changedTitleDesc.desc()).append("\r\n");
+				sb.append("old description:\r\n").append(description).append("\r\n");
+			}
 		}
 		else
-			sb.append("description:\r\n").append(movie.description.replace(""+((char)0x8a), "\r\n")).append("\r\n");
+			sb.append("description:\r\n").append(description).append("\r\n");
 		sb.append("\r\nextended description:\r\n").append(movie.descriptionExtended.replace(""+((char)0x8a), "\r\n")).append("\r\n");
 		ScrollPosition.keepScrollPos(
 				movieInfo2ScrollPane,

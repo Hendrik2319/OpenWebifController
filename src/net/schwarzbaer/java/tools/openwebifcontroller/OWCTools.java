@@ -38,6 +38,7 @@ import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.AbstractMessageResponse;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.OptionalValue;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
@@ -693,5 +694,9 @@ public class OWCTools
 				sb.append(String.format("%sIs Already Seen:%n%s%n", indent, rule.toString(indent+"    ")));
 		}
 		return sb.toString();
+	}
+
+	public interface LogWindowInterface {
+		void showMessageResponse(AbstractMessageResponse response, String title, String... stringsToHighlight);
 	}
 }

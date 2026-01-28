@@ -47,6 +47,7 @@ import net.schwarzbaer.java.lib.openwebif.BoxSettings;
 import net.schwarzbaer.java.lib.openwebif.BoxSettings.BoxSettingsValue;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools;
+import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.AbstractMessageResponse;
 import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
@@ -54,6 +55,7 @@ import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.system.Settings;
 import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
+import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools.LogWindowInterface;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
@@ -558,12 +560,8 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	}
 
 	@Override
-	public void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight) {
+	public void showMessageResponse(AbstractMessageResponse response, String title, String... stringsToHighlight) {
 		logWindow.showMessageResponse(response, title, stringsToHighlight);
-	}
-
-	public interface LogWindowInterface {
-		void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight);
 	}
 
 	public interface UpdateTimersTask {

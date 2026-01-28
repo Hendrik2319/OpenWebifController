@@ -10,15 +10,13 @@ import javax.swing.SwingUtilities;
 
 import net.schwarzbaer.java.lib.gui.GeneralIcons;
 import net.schwarzbaer.java.lib.gui.ProgressView;
-import net.schwarzbaer.java.lib.openwebif.OpenWebifTools.MessageResponse;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 
 public abstract class AbstractControlPanel<ValueStructType> extends SwitchablePanel {
 	private static final long serialVersionUID = 1376060978837360833L;
 	
-	public interface ExternCommands {
+	public interface ExternCommands extends OWCTools.LogWindowInterface {
 		String getBaseURL();
-		void showMessageResponse(MessageResponse response, String title, String... stringsToHighlight);
 	}
 	
 	protected final ExternCommands externCommands;

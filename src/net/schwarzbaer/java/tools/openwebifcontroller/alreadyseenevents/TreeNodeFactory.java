@@ -695,7 +695,7 @@ class TreeNodeFactory
 				return new Response(false, "A blank string (\"%s\") is not allowed as description text.".formatted(descText));
 			
 			if (descMap.containsKey(descText))
-				return new Response(false, "Anbother rule with same description text (\"%s\") already exists.".formatted(descText));
+				return new Response(false, "Another rule with same description text (\"%s\") already exists.".formatted(descText));
 			
 			descMap.remove( this.descText );
 			this.descText = descText;

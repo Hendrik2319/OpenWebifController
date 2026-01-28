@@ -556,16 +556,16 @@ public class AlreadySeenEvents
 			this.getData = Objects.requireNonNull( getData );
 			
 			parent.add(menuAdd = new JMenu("Mark as Already Seen"));
-			menuAdd.add(OWCTools.createMenuItem("Title"                      , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, false, false)));
-			menuAdd.add(OWCTools.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, true , false)));
-			menuAdd.add(OWCTools.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, false, false, true )));
-			menuAdd.add(OWCTools.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , false, false)));
-			menuAdd.add(OWCTools.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , true , false)));
-			menuAdd.add(OWCTools.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(getSource, getSources, getData, this, updateAfterMenuAction, true , false, true )));
+			menuAdd.add(OWCTools.createMenuItem("Title"                      , e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, false, false, false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, false, true , false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, false, false, true )));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, true , false, false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, true , true , false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, true , false, true )));
 			
 			miShowRule = parent.add(OWCTools.createMenuItem("##", e->{
 				if (singleSourceAlreadySeenRule != null)
-					TextAreaDialog.showText(window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule.toString());
+					TextAreaDialog.showText(this.window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule.toString());
 			}));
 		}
 		

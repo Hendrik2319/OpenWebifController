@@ -45,7 +45,7 @@ class ScreenShot extends JPanel {
 		resolution = OpenWebifTools.ScreenShotResolution.HighRes;
 		int updateInterval_s = 30;
 		
-		screenshotView = new ImageView(800,600,ImageView.InterpolationLevel.Level2_Better);
+		screenshotView = new ImageView(800,600,ImageView.InterpolationLevel.Level2_AreaSampling);
 		screenshotView.reset();
 		
 		screenShotUpdater = new ScreenShotUpdater(updateInterval_s, ()->{

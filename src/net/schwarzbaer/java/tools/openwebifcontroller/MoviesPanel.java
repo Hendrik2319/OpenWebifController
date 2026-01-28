@@ -5,31 +5,42 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.Point;
+import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.JTree;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
@@ -44,6 +55,7 @@ import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.ScrollPosition;
+import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.gui.Tables.GetValueTableModelOutputter.OutputType;
 import net.schwarzbaer.java.lib.gui.ValueListOutput;
@@ -90,9 +102,11 @@ class MoviesPanel extends JSplitPane {
 		locationsTree = new JTree(locationsTreeModel);
 		locationsTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		locationsTree.setCellRenderer(new LocationTreeCellRenderer());
-		
 		JScrollPane treeScrollPane = new JScrollPane(locationsTree);
 		treeScrollPane.setPreferredSize(new Dimension(300,500));
+		
+		TreeContextMenu treeContextMenu = new TreeContextMenu();
+		treeContextMenu.addTo(locationsTree);
 		
 		movieTable = new JTable(movieTableModel);
 		movieTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
@@ -100,8 +114,9 @@ class MoviesPanel extends JSplitPane {
 		JScrollPane tableScrollPane = new JScrollPane(movieTable);
 		tableScrollPane.setPreferredSize(new Dimension(600,500));
 		
-		new TableContextMenu().addTo(movieTable);
-		new TreeContextMenu().addTo(locationsTree);
+		TableContextMenu tableContextMenu = new TableContextMenu();
+		tableContextMenu.addTo(movieTable);
+		tableContextMenu.addTo(tableScrollPane);
 		
 		movieInfo1 = new ExtendedTextArea(false);
 		//movieInfo1.setLineWrap(true);
@@ -149,12 +164,14 @@ class MoviesPanel extends JSplitPane {
 		
 		movieTable.getSelectionModel().addListSelectionListener(e -> {
 			int[] rowsM = getSelectedRowsM();
-			showValues(rowsM.length == 1 ? movieTableModel.getRow(rowsM[0]) : null);
+			MovieList.Movie movie = rowsM.length==1 && movieTableModel!=null ? movieTableModel.getRow(rowsM[0]) : null;
+			NewTitleDesc newTitleDesc = movie!=null && movieTableModel!=null ? movieTableModel.changedTitleDesc.get(movie) : null;
+			showValues(movie, newTitleDesc);
 		});
 		
 		movieTable.addMouseListener(new MouseAdapter() {
 			@Override public void mouseClicked(MouseEvent e) {
-				if (e.getButton()==MouseEvent.BUTTON1) {
+				if (e.getButton()==MouseEvent.BUTTON1 && movieTableModel!=null) {
 					if (e.getClickCount()<2) return;
 					int rowV = movieTable.rowAtPoint(e.getPoint());
 					int rowM = movieTable.convertRowIndexToModel(rowV);
@@ -226,41 +243,49 @@ class MoviesPanel extends JSplitPane {
 			selectedMovies = null;
 			selectedMovieRowsM = null;
 			
-			JMenuItem miOpenVideoPlayer = add(OWCTools.createMenuItem("Show in VideoPlayer" , GrayCommandIcons.IconGroup.Image , e->showMovie(clickedMovie)));
-			JMenuItem miOpenBrowser     = add(OWCTools.createMenuItem("Show in Browser"     , GrayCommandIcons.IconGroup.Image , e->showMovieInBrowser(clickedMovie)));
-			JMenuItem miZapToMovie      = add(OWCTools.createMenuItem("Start Playing in STB", GrayCommandIcons.IconGroup.Play  , e->zapToMovie(clickedMovie)));
-			JMenuItem miDeleteMovie     = add(OWCTools.createMenuItem("Delete"              , GrayCommandIcons.IconGroup.Delete, e->{
-				deleteMovie(clickedMovie, ()->{
-					movieTableModel.deletedMovies.add(clickedMovie);
-					movieTableModel.fireTableRowUpdate(clickedMovieRowM);
-				});
-			}));
+			JMenuItem miOpenVideoPlayer = add(OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Image , e -> showMovie         (clickedMovie)));
+			JMenuItem miOpenBrowser     = add(OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Image , e -> showMovieInBrowser(clickedMovie)));
+			JMenuItem miZapToMovie      = add(OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Play  , e -> zapToMovie        (clickedMovie)));
+			JMenuItem miDeleteMovie     = add(OWCTools.createMenuItem("###", GrayCommandIcons.IconGroup.Delete, e -> deleteMovie       (clickedMovie, clickedMovieRowM)));
+			JMenuItem miRenameMovieFile = add(OWCTools.createMenuItem("###",                                    e -> renameMovieFile   (clickedMovie, clickedMovieRowM)));
+			JMenuItem miChangeMovieInfo = add(OWCTools.createMenuItem("###",                                    e -> changeMovieInfo   (clickedMovie, clickedMovieRowM)));
 			
 			JMenu clickedMovieMenu = new JMenu("Clicked Movie");
 			add(clickedMovieMenu);
-			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents.getInstance().createMenuForMovie(clickedMovieMenu, main.mainWindow, ()->clickedMovie, ()->{
-				movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
-			});
+			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents.getInstance().createMenuForMovie(
+					clickedMovieMenu, main.mainWindow,
+					() -> MovieTableModel.existsMovie(movieTableModel, clickedMovie) ? clickedMovie : null,
+					() -> {
+						if (movieTableModel==null) return;
+						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
+					}
+			);
 			
 			addSeparator();
 			
 			JMenu selectedMovieMenu = new JMenu("Selected Movie");
 			add(selectedMovieMenu);
-			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents.getInstance().createMenuForMovies(selectedMovieMenu, main.mainWindow, ()->selectedMovies, ()->{
-				movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
-			});
+			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents.getInstance().createMenuForMovies(
+					selectedMovieMenu, main.mainWindow,
+					() -> selectedMovies,
+					() -> {
+						if (movieTableModel==null) return;
+						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
+					}
+			);
 			
 			addSeparator();
 			
 			boolean showDescriptionInNameColumn = MovieTableModel.getShowDescriptionInNameColumn();
 			add(OWCTools.createCheckBoxMenuItem("Show description in name column", showDescriptionInNameColumn, b->{
-				if (movieTableModel!=null)
-					movieTableModel.setShowDescriptionInNameColumn(b);
+				if (movieTableModel==null) return;
+				movieTableModel.setShowDescriptionInNameColumn(b);
 			}));
 			
 			JMenuItem miReloadTable = add(OWCTools.createMenuItem("Reload Table", GrayCommandIcons.IconGroup.Reload, e->reloadTreeNode(selectedTreeNode)));
 			
 			add( OWCTools.createMenuItem("Copy table content to clipboard (tab separated)", GrayCommandIcons.IconGroup.Copy, e->{
+				if (movieTableModel==null) return;
 				ClipboardTools.copyToClipBoard(movieTableModel.getTableContentAsString(OutputType.TabSeparated, true, true));
 			}) );
 			
@@ -277,8 +302,8 @@ class MoviesPanel extends JSplitPane {
 			}));
 			
 			addContextMenuInvokeListener((comp, x, y) -> {
-				int rowV = movieTable.rowAtPoint(new Point(x,y));
-				int rowM = movieTable.convertRowIndexToModel(rowV);
+				int rowV = comp!=movieTable ? -1 : movieTable.rowAtPoint(new Point(x,y));
+				int rowM = rowV<0           ? -1 : movieTable.convertRowIndexToModel(rowV);
 				clickedMovieRowM = rowM;
 				selectedMovieRowsM = getSelectedRowsM();
 				
@@ -290,6 +315,7 @@ class MoviesPanel extends JSplitPane {
 					selectedMovies = Arrays
 							.stream(selectedMovieRowsM)
 							.mapToObj(movieTableModel::getRow)
+							.filter(movieTableModel::existsMovie)
 							.toArray(MovieList.Movie[]::new);
 				}
 				
@@ -298,16 +324,20 @@ class MoviesPanel extends JSplitPane {
 					rowName = rowName.substring(0,58) + "...";
 				
 				miReloadTable.setEnabled(selectedTreeNode!=null);
-				miOpenVideoPlayer.setEnabled(clickedMovie!=null);
-				miOpenBrowser    .setEnabled(clickedMovie!=null);
-				miZapToMovie     .setEnabled(clickedMovie!=null);
-				miDeleteMovie    .setEnabled(clickedMovie!=null);
-				miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer"  : String.format("Show \"%s\" in VideoPlayer" , rowName));
-				miOpenBrowser    .setText(clickedMovie==null ? "Show in Browser"      : String.format("Show \"%s\" in Browser"     , rowName));
-				miZapToMovie     .setText(clickedMovie==null ? "Start Playing in STB" : String.format("Start Playing \"%s\" in STB", rowName));
-				miDeleteMovie    .setText(clickedMovie==null ? "Delete"               : String.format("Delete \"%s\""              , rowName));
-				
-				clickedMovieMenu .setText(clickedMovie==null ? "Clicked Movie"        : String.format("Clicked Movie \"%s\""       , rowName));
+				boolean isClickedMovieOk = clickedMovie!=null && MovieTableModel.existsMovie(movieTableModel, clickedMovie);
+				miOpenVideoPlayer.setEnabled(isClickedMovieOk);
+				miOpenBrowser    .setEnabled(isClickedMovieOk);
+				miZapToMovie     .setEnabled(isClickedMovieOk);
+				miDeleteMovie    .setEnabled(isClickedMovieOk);
+				miRenameMovieFile.setEnabled(isClickedMovieOk);
+				miChangeMovieInfo.setEnabled(isClickedMovieOk);
+				miOpenVideoPlayer.setText(clickedMovie==null ? "Show in VideoPlayer"  : String.format("Show \"%s\" in VideoPlayer"    , rowName));
+				miOpenBrowser    .setText(clickedMovie==null ? "Show in Browser"      : String.format("Show \"%s\" in Browser"        , rowName));
+				miZapToMovie     .setText(clickedMovie==null ? "Start Playing in STB" : String.format("Start Playing \"%s\" in STB"   , rowName));
+				miDeleteMovie    .setText(clickedMovie==null ? "Delete"               : String.format("Delete \"%s\""                 , rowName));
+				miRenameMovieFile.setText(clickedMovie==null ? "Rename File"          : String.format("Rename File of \"%s\""         , rowName));
+				miChangeMovieInfo.setText(clickedMovie==null ? "Change Title & Desc." : String.format("Change Title & Desc. of \"%s\"", rowName));
+				clickedMovieMenu .setText(clickedMovie==null ? "Clicked Movie"        : String.format("Clicked Movie \"%s\""          , rowName));
 				
 				int n = selectedMovies==null ? 0 : selectedMovies.length;
 				selectedMovieMenu.setText(n == 1 ? "Selected Movie (1)" : "Selected Movies (%d)".formatted(n));
@@ -338,6 +368,8 @@ class MoviesPanel extends JSplitPane {
 	private void zapToMovie(MovieList.Movie movie) {
 		if (movie==null) return;
 		
+		if (!MovieTableModel.existsMovie(movieTableModel, movie)) return;
+		
 		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
 		
@@ -349,8 +381,10 @@ class MoviesPanel extends JSplitPane {
 		});
 	}
 	
-	private void deleteMovie(MovieList.Movie movie, Runnable wasDeleted) {
+	private void deleteMovie(MovieList.Movie movie, int rowM) {
 		if (movie==null) return;
+		
+		if (!MovieTableModel.existsMovie(movieTableModel, movie)) return;
 		
 		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
@@ -360,13 +394,97 @@ class MoviesPanel extends JSplitPane {
 				OWCTools.setIndeterminateProgressTask(pd, taskTitle);
 			});
 			main.showMessageResponse(response, "Delete Movie");
-			if (response.result && wasDeleted!=null)
-				wasDeleted.run();
+			if (response.result && movieTableModel!=null)
+			{
+				movieTableModel.deletedMovies.add(movie);
+				movieTableModel.fireTableRowUpdate(rowM);
+			}
 		});
+	}
+
+	private void renameMovieFile(MovieList.Movie movie, int rowM)
+	{
+		if (movie==null) return;
+		
+		if (!MovieTableModel.existsMovie(movieTableModel, movie)) return;
+		
+		String baseURL = main.getBaseURL();
+		if (baseURL==null) return;
+		
+		String title = "New Filename";
+		String msg = "Enter a new filename:";
+		String initialValue = getFileName(movie);
+		Object result = JOptionPane.showInputDialog(main.mainWindow, msg, title, JOptionPane.PLAIN_MESSAGE, null, null, initialValue);
+		if (result==null) return;
+		
+		String newName;
+		if (result instanceof String str)
+			newName = str;
+		else
+			return;
+		
+		main.runWithProgressDialog("Rename Movie File", pd->{
+			OpenWebifTools.MessageResponse response = OpenWebifTools.renameMovieFile(baseURL, movie, newName, taskTitle->{
+				OWCTools.setIndeterminateProgressTask(pd, taskTitle);
+			});
+			main.showMessageResponse(response, "Rename Movie File");
+			if (response.result && movieTableModel!=null)
+			{
+				movieTableModel.renamedMovies.add(movie);
+				movieTableModel.fireTableRowUpdate(rowM);
+			}
+		});
+	}
+
+	private void changeMovieInfo(MovieList.Movie movie, int rowM)
+	{
+		if (movie==null) return;
+		
+		if (!MovieTableModel.existsMovie(movieTableModel, movie)) return;
+		
+		String baseURL = main.getBaseURL();
+		if (baseURL==null) return;
+		
+		NewTitleDesc result = TitleDescDialog.showDialog(main.mainWindow, movie, movieTableModel==null ? null : movieTableModel.changedTitleDesc.get(movie));
+		if (result==null || (result.title()==null && result.desc()==null)) return;
+		
+		main.runWithProgressDialog("Change Movie Title & Description", pd->{
+			OpenWebifTools.MovieInfoResponse response = OpenWebifTools.setMovieTitleDesc(baseURL, movie, result.title(), result.desc(), taskTitle->{
+				OWCTools.setIndeterminateProgressTask(pd, taskTitle);
+			});
+			//main.showMessageResponse(response, "Change Movie Title & Description");
+			// TODO: main.showMessageResponse with OpenWebifTools.MovieInfoResponse
+			if (response.result && movieTableModel!=null)
+			{
+				NewTitleDesc changed = new NewTitleDesc(response.title, response.description);
+				movieTableModel.changedTitleDesc.put(movie, changed);
+				movieTableModel.fireTableRowUpdate(rowM);
+			}
+		});
+	}
+
+	private static String getFileName(MovieList.Movie movie)
+	{
+		String filename = movie.filename_stripped;
+		
+		if (filename==null && movie.filename!=null)
+		{
+			filename = movie.filename;
+			int pos = filename.lastIndexOf("/");
+			if (pos>=0)
+				filename = filename.substring(pos+1);
+		}
+		
+		if (filename!=null && filename.toLowerCase().endsWith(".ts"))
+			filename = filename.substring(0, filename.length()-3);
+			
+		return filename;
 	}
 
 	private void showMovie(MovieList.Movie movie) {
 		if (movie==null) return;
+		
+		if (!MovieTableModel.existsMovie(movieTableModel, movie)) return;
 		
 		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
@@ -398,6 +516,8 @@ class MoviesPanel extends JSplitPane {
 	private void showMovieInBrowser(MovieList.Movie movie) {
 		if (movie==null) return;
 		
+		if (!MovieTableModel.existsMovie(movieTableModel, movie)) return;
+		
 		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
 		
@@ -417,42 +537,51 @@ class MoviesPanel extends JSplitPane {
 		catch (IOException e) { System.err.printf("IOException while starting movie player: %s%n", e.getMessage()); }
 	}
 
-	private void showValues(MovieList.Movie movie) {
+	private void showValues(MovieList.Movie movie, NewTitleDesc changedTitleDesc) {
 		if (movie==null) {
 			movieInfo1.setText("");
 			movieInfo2.setText("");
 			return;
 		}
 		
-		ScrollPosition movieInfo1ScrollPos = ScrollPosition.getVertical(movieInfo1ScrollPane);
-		ScrollPosition movieInfo2ScrollPos = ScrollPosition.getVertical(movieInfo2ScrollPane);
-		
 		ValueListOutput out = new ValueListOutput();
-		out.add(0, "eventname          ", movie.eventname          );
-		out.add(0, "servicename        ", movie.servicename        );
-		out.add(0, "length             ", movie.lengthStr          );
+		out.add(0, "eventname"          , movie.eventname          );
+		if (changedTitleDesc!=null && changedTitleDesc.title()!=null)
+			out.add(0, "<changed>"      , changedTitleDesc.title());
+		out.add(0, "servicename"        , movie.servicename        );
+		out.add(0, "length"             , movie.lengthStr          );
 		out.add(0, null                 , movie.length_s           );
-		out.add(0, "begintime          ", movie.begintime          );
-		out.add(0, "recordingtime      ", movie.recordingtime      );
+		out.add(0, "begintime"          , movie.begintime          );
+		out.add(0, "recordingtime"      , movie.recordingtime      );
 		out.add(0, null                 , "%s", dtFormatter.getTimeStr(movie.recordingtime*1000, true, true, false, true, false) );
-		out.add(0, "lastseen           ", movie.lastseen           );
-		out.add(0, "filesize           ", movie.filesize           );
-		out.add(0, "filesize_readable  ", movie.filesize_readable  );
-		out.add(0, "tags               ", movie.tags               );
-		out.add(0, "filename           ", movie.filename           );
-		out.add(0, "filename_stripped  ", movie.filename_stripped  );
-		out.add(0, "fullname           ", movie.fullname           );
-		out.add(0, "serviceref         ", movie.serviceref         );
-		movieInfo1.setText(out.generateOutput());
-		if (movieInfo1ScrollPos!=null)
-			SwingUtilities.invokeLater(()->movieInfo1ScrollPos.setVertical(movieInfo1ScrollPane));
+		out.add(0, "lastseen"           , movie.lastseen           );
+		out.add(0, "filesize"           , movie.filesize           );
+		out.add(0, "filesize_readable"  , movie.filesize_readable  );
+		out.add(0, "tags"               , movie.tags               );
+		out.add(0, "filename"           , movie.filename           );
+		out.add(0, "filename_stripped"  , movie.filename_stripped  );
+		out.add(0, "fullname"           , movie.fullname           );
+		out.add(0, "serviceref"         , movie.serviceref         );
+		ScrollPosition.keepScrollPos(
+				movieInfo1ScrollPane,
+				ScrollPosition.ScrollBarType.Vertical,
+				()->movieInfo1.setText(out.generateOutput())
+		);
 		
 		StringBuilder sb = new StringBuilder();
-		sb.append("description:\r\n").append(movie.description.replace(""+((char)0x8a), "\r\n")).append("\r\n");
+		if (changedTitleDesc!=null && changedTitleDesc.desc()!=null)
+		{
+			sb.append("new description:\r\n").append(changedTitleDesc.desc()).append("\r\n");
+			sb.append("old description:\r\n").append(movie.description.replace(""+((char)0x8a), "\r\n")).append("\r\n");
+		}
+		else
+			sb.append("description:\r\n").append(movie.description.replace(""+((char)0x8a), "\r\n")).append("\r\n");
 		sb.append("\r\nextended description:\r\n").append(movie.descriptionExtended.replace(""+((char)0x8a), "\r\n")).append("\r\n");
-		movieInfo2.setText(sb.toString());
-		if (movieInfo2ScrollPos!=null)
-			SwingUtilities.invokeLater(()->movieInfo2ScrollPos.setVertical(movieInfo2ScrollPane));
+		ScrollPosition.keepScrollPos(
+				movieInfo2ScrollPane,
+				ScrollPosition.ScrollBarType.Vertical,
+				()->movieInfo2.setText(sb.toString())
+		);
 	}
 
 	private MovieList getMovieList(String dir) {
@@ -493,6 +622,93 @@ class MoviesPanel extends JSplitPane {
 			});
 	}
 	
+	private record NewTitleDesc(String title, String desc) {}
+	
+	private static class TitleDescDialog extends StandardDialog
+	{
+		private static final long serialVersionUID = 3741259146622392907L;
+		
+		private final JButton btnOk;
+		private final JTextField fldTitle;
+		private final JTextArea fldDesc;
+		private NewTitleDesc result;
+		private boolean useTitle;
+		private boolean useDesc;
+
+		private TitleDescDialog(Window window, MovieList.Movie movie, NewTitleDesc changedTitleDesc)
+		{
+			super(window, "New Title & Description", ModalityType.APPLICATION_MODAL, false);
+			result = null;
+			useTitle = true;
+			useDesc = true;
+			
+			String title       = changedTitleDesc!=null && changedTitleDesc.title!=null ? changedTitleDesc.title : movie.eventname;
+			String description = changedTitleDesc!=null && changedTitleDesc.desc !=null ? changedTitleDesc.desc  : movie.description;
+			
+			fldTitle = new JTextField(title, 30);
+			fldDesc = new JTextArea(description, 8, 30);
+			fldDesc.setLineWrap(true);
+			fldDesc.setWrapStyleWord(true);
+			JScrollPane fldDescScrollPane = new JScrollPane(fldDesc);
+			
+			btnOk = OWCTools.createButton("Ok", true, e->{
+				result = new NewTitleDesc(fldTitle.getText(), fldDesc.getText());
+				closeDialog();
+			});
+			
+			JCheckBox checkBoxTitle = OWCTools.createCheckBox("Title :  "      , useTitle, b -> { useTitle = b; updateGUI(); });
+			JCheckBox checkBoxDesc  = OWCTools.createCheckBox("Description :  ", useDesc , b -> { useDesc  = b; updateGUI(); });
+			
+			JPanel panel = new JPanel(new GridBagLayout());
+			GridBagConstraints c = new GridBagConstraints();
+			c.fill = GridBagConstraints.HORIZONTAL;
+			c.anchor = GridBagConstraints.NORTHWEST;
+			Insets defaultInsets = c.insets;
+			
+			c.insets = new Insets(0, 0, 5, 0);
+			c.weightx = 1;
+			c.weighty = 0;
+			c.gridwidth = GridBagConstraints.REMAINDER;
+			c.gridx = 0; c.gridy = 0;
+			panel.add(new JLabel("Enter new title and/or description :"), c);
+			
+			c.insets = defaultInsets;
+			c.weightx = 0;
+			c.gridwidth = 1;
+			c.gridx = 0; c.gridy = 0;
+			c.gridy++; panel.add(checkBoxTitle, c);
+			c.gridy++; panel.add(checkBoxDesc, c);
+			
+			c.weightx = 1;
+			c.gridx = 1; c.gridy = 0;
+			c.gridy++; c.weighty = 0; panel.add(fldTitle, c);
+			c.fill = GridBagConstraints.BOTH;
+			c.gridy++; c.weighty = 1; panel.add(fldDescScrollPane, c);
+			
+			createGUI(
+					panel,
+					btnOk,
+					OWCTools.createButton("Cancel", true, e->closeDialog())
+			);
+			
+			updateGUI();
+		}
+
+		private void updateGUI()
+		{
+			fldTitle.setEnabled(useTitle);
+			fldDesc .setEnabled(useDesc );
+			btnOk.setEnabled(useTitle|useDesc);
+		}
+
+		static NewTitleDesc showDialog(Window window, MovieList.Movie movie, NewTitleDesc changedTitleDesc)
+		{
+			TitleDescDialog dlg = new TitleDescDialog(window, movie, changedTitleDesc);
+			dlg.showDialog();
+			return dlg.result;
+		}
+	}
+
 	private static class LocationTreeCellRenderer extends DefaultTreeCellRenderer {
 		private static final long serialVersionUID = 5786063818778166574L;
 
@@ -645,10 +861,12 @@ class MoviesPanel extends JSplitPane {
 	static class MovieTableModel extends Tables.SimpleGetValueTableModel<MovieList.Movie, MovieTableModel.ColumnID> {
 		
 		private static final Color COLOR_DELETED = new Color(0xC0C0C0);
+		private static final Color COLOR_RENAMED = new Color(0xC085C0);
+		private static final Color COLOR_CHANGED = new Color(0x85C085);
 		
 		// Column Widths: [400, 60, 50, 60, 110, 76, 110, 450]
 		private enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<MovieList.Movie>, SwingConstants {
-			Name    (config("Name"    ,  String.class, 400,   null).setValFunc(MovieTableModel::getRowName)),
+			Name    (config("Name"    ,  String.class, 400,   null).setValFunc((model, m) -> model.getRowName(m))),
 			Progress(config("Progress",    Long.class,  60,   null).setValFunc(m->m.lastseen         )),
 			Length  (config("Length"  , Integer.class,  50,   null).setValFunc(m->m.length_s         ).setToStringR(m->m.lengthStr        )),
 			Size    (config("Size"    ,    Long.class,  60,   null).setValFunc(m->m.filesize         ).setToStringR(m->m.filesize_readable)),
@@ -680,22 +898,56 @@ class MoviesPanel extends JSplitPane {
 	
 		private boolean showDescriptionInNameColumn;
 		private final Set<MovieList.Movie> deletedMovies;
+		private final Set<MovieList.Movie> renamedMovies;
+		private final Map<MovieList.Movie, NewTitleDesc> changedTitleDesc;
 
 		private MovieTableModel(Vector<MovieList.Movie> movies)
 		{
 			super(ColumnID.values(), movies);
 			showDescriptionInNameColumn = getShowDescriptionInNameColumn();
 			deletedMovies = new HashSet<>();
+			renamedMovies = new HashSet<>();
+			changedTitleDesc = new HashMap<>();
 		}
 	
+		private static boolean existsMovie(MovieTableModel model, MovieList.Movie movie)
+		{
+			return model==null ? false : model.existsMovie(movie);
+		}
+
+		private boolean existsMovie(MovieList.Movie movie)
+		{
+			if (movie==null) return false;
+			if (deletedMovies.contains(movie)) return false;
+			if (renamedMovies.contains(movie)) return false;
+			return true;
+		}
+
 		private static String getRowName(MovieTableModel model, MovieList.Movie movie)
 		{
 			if (movie==null) return null;
 			if (model==null) return movie.eventname;
-			if (!model.showDescriptionInNameColumn) return movie.eventname;
-			if (movie.description == null  ) return movie.eventname;
-			if (movie.description.isBlank()) return movie.eventname;
-			return String.format("%s | %s", movie.eventname, movie.description);
+			return model.getRowName(movie);
+		}
+
+		private String getRowName(MovieList.Movie movie)
+		{
+			if (movie==null) return null;
+			
+			String title       = movie.eventname;
+			String description = movie.description;
+			
+			NewTitleDesc newTitleDesc = changedTitleDesc.get(movie);
+			if (newTitleDesc!=null)
+			{
+				if (newTitleDesc.title!=null) title       = newTitleDesc.title;
+				if (newTitleDesc.desc !=null) description = newTitleDesc.desc;
+			}
+			
+			if (!showDescriptionInNameColumn) return title;
+			if (description == null  ) return title;
+			if (description.isBlank()) return title;
+			return String.format("%s | %s", title, description);
 		}
 
 		public static boolean getShowDescriptionInNameColumn()
@@ -760,6 +1012,8 @@ class MoviesPanel extends JSplitPane {
 				int rowM = table.convertRowIndexToModel(rowV);
 				MovieList.Movie movie = getRow(rowM);
 				rendComp.wasDeleted = deletedMovies.contains(movie);
+				rendComp.wasRenamed = renamedMovies.contains(movie);
+				rendComp.wasChanged = changedTitleDesc.containsKey(movie);
 				
 				Color BGCOLOR_Movie_Seen = UserDefColors.BGCOLOR_Movie_Seen.getColor();
 				Supplier<Color> getCustomBackground = BGCOLOR_Movie_Seen!=null && AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(movie) ? ()->BGCOLOR_Movie_Seen : null;
@@ -780,6 +1034,8 @@ class MoviesPanel extends JSplitPane {
 				private JTable table = null;
 				private JList<?> list = null;
 				private boolean wasDeleted = false;
+				private boolean wasRenamed = false;
+				private boolean wasChanged = false;
 				
 				ScaleRC() { super(Long.class); }
 				
@@ -797,12 +1053,13 @@ class MoviesPanel extends JSplitPane {
 						return;
 					
 					Color color = null;
+					Color baseColor = isSelected ? getTableOrListSelectionForeground() : wasDeleted ? COLOR_DELETED : wasRenamed ? COLOR_RENAMED : wasChanged ? COLOR_CHANGED : getTableOrListForeground();
 					if (value < 30)
-						color = isSelected ? getTableOrListSelectionForeground() : wasDeleted ? COLOR_DELETED : getTableOrListForeground();
+						color = baseColor;
 					else if (value < 90)
-						color = !wasDeleted ? COLOR_PLAYING   : isSelected ? getTableOrListSelectionForeground() : COLOR_DELETED;
+						color = !wasDeleted && !wasRenamed && !wasChanged ? COLOR_PLAYING   : baseColor;
 					else
-						color = !wasDeleted ? COLOR_COMPLETED : isSelected ? getTableOrListSelectionForeground() : COLOR_DELETED;
+						color = !wasDeleted && !wasRenamed && !wasChanged ? COLOR_COMPLETED : baseColor;
 					
 					int scaleWidth = (width-2)*Math.min(value.intValue(), 100) / 100;
 					g.setColor(color);
@@ -846,8 +1103,17 @@ class MoviesPanel extends JSplitPane {
 				Supplier<Color> getCustomBackground = null;
 				Supplier<Color> getCustomForeground = null;
 				
-				if (!isSelected && deletedMovies.contains(movie))
-					getCustomForeground = ()->COLOR_DELETED;
+				if (!isSelected)
+				{
+					if (deletedMovies.contains(movie))
+						getCustomForeground = ()->COLOR_DELETED;
+						
+					else if (renamedMovies.contains(movie))
+						getCustomForeground = ()->COLOR_RENAMED;
+						
+					else if (changedTitleDesc.containsKey(movie))
+						getCustomForeground = ()->COLOR_CHANGED;
+				}
 				
 				Color BGCOLOR_Movie_Seen = UserDefColors.BGCOLOR_Movie_Seen.getColor();
 				if (BGCOLOR_Movie_Seen!=null && AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(movie))

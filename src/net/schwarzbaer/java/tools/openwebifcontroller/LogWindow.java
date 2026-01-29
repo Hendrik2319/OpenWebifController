@@ -53,7 +53,14 @@ public class LogWindow extends StandardDialog implements OWCTools.LogWindowInter
 		printToSystemOut(response, title);
 		
 		if (response!=null && (!response.getResult() || !(response instanceof MessageResponse) ) )
-			JOptionPane.showMessageDialog(getParent(), response.getDialogMessage(), title, JOptionPane.WARNING_MESSAGE);
+			SwingUtilities.invokeLater(()->{
+				JOptionPane.showMessageDialog(
+						parent,
+						response.getDialogMessage(),
+						title,
+						response.getResult() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE
+				);
+			});
 	}
 	
 	private record FoundStr(int pos, String str)

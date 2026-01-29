@@ -579,19 +579,21 @@ public class AlreadySeenEvents
 		public void updateBeforeShowingMenu()
 		{
 			V singleSource = null;
+			V[] sources = null;
 			
 			if (getSource!=null)
 				singleSource = getSource.get();
 			
 			else if (getSources!=null)
 			{
-				V[] sources = getSources.get();
+				sources = getSources.get();
 				if (sources!=null && sources.length==1)
 					singleSource = sources[0];
 			}
 			
 			singleSourceAlreadySeenRule = singleSource==null ? null : getRuleIfAlreadySeen(singleSource, getData);
 			miShowRule.setEnabled(singleSourceAlreadySeenRule != null);
+			menuAdd   .setEnabled(singleSource != null || (sources != null && sources.length > 0));
 			miShowRule.setText( "Show [Already Seen] Rule%s".formatted(singleSource==null ? "" : " for \"%s\"".formatted(getData.getTitle(singleSource))) );
 			menuAdd   .setText( "Mark%s as Already Seen"    .formatted(singleSource==null ? "" : " \"%s\""    .formatted(getData.getTitle(singleSource))) );
 		}

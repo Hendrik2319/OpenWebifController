@@ -251,7 +251,7 @@ class MoviesPanel extends JSplitPane {
 			add(clickedMovieMenu);
 			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents.getInstance().createMenuForMovie(
 					clickedMovieMenu, main.mainWindow,
-					() -> MovieTableModel.existsMovie(movieTableModel, clickedMovie) ? clickedMovie : null,
+					() -> isMovieOKForAlreadySeenEvents(clickedMovie) ? clickedMovie : null,
 					() -> {
 						if (movieTableModel==null) return;
 						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
@@ -264,7 +264,10 @@ class MoviesPanel extends JSplitPane {
 			add(selectedMovieMenu);
 			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents.getInstance().createMenuForMovies(
 					selectedMovieMenu, main.mainWindow,
-					() -> selectedMovies,
+					() -> Arrays
+							.stream(selectedMovies)
+							.filter(this::isMovieOKForAlreadySeenEvents)
+							.toArray(MovieList.Movie[]::new),
 					() -> {
 						if (movieTableModel==null) return;
 						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
@@ -342,6 +345,11 @@ class MoviesPanel extends JSplitPane {
 				aseMenuControlClicked .updateBeforeShowingMenu();
 				aseMenuControlSelected.updateBeforeShowingMenu();
 			});
+		}
+
+		private boolean isMovieOKForAlreadySeenEvents(MovieList.Movie movie)
+		{
+			return MovieTableModel.existsMovie(movieTableModel, movie) && !MovieTableModel.hasChangeTitleDesc(movieTableModel, movie);
 		}
 	}
 
@@ -938,6 +946,18 @@ class MoviesPanel extends JSplitPane {
 				if (data.renamedMovies.contains(movie)) return false;
 			}
 			return true;
+		}
+		
+		private static boolean hasChangeTitleDesc(MovieTableModel model, MovieList.Movie movie)
+		{
+			return model==null ? false : model.hasChangeTitleDesc(movie);
+		}
+
+		private boolean hasChangeTitleDesc(MovieList.Movie movie)
+		{
+			if (movie==null) return false;
+			if (data!=null && data.changedTitleDesc.containsKey(movie)) return true;
+			return false;
 		}
 
 		private static String getRowName(MovieTableModel model, MovieList.Movie movie)

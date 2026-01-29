@@ -145,27 +145,24 @@ class MoviesPanel extends JSplitPane {
 			selectedTreeNode = null;
 			if (selectedTreePath!=null) {
 				Object lastPathComponent = selectedTreePath.getLastPathComponent();
-				if (lastPathComponent instanceof LocationTreeNode)
-					selectedTreeNode = (LocationTreeNode) lastPathComponent;
+				if (lastPathComponent instanceof LocationTreeNode treeNode)
+					selectedTreeNode = treeNode;
 			}
 			if (selectedTreeNode!=null) {
-				Vector<MovieList.Movie> movies;
-				if (selectedTreeNode.movies != null)
-					movies = selectedTreeNode.movies;
-				else {
+				if (selectedTreeNode.data==null)
+				{
 					String path = selectedTreeNode.getDirPath();
 					MovieList movieList = getMovieList(path);
 					locationsRoot.addLocations(movieList,locationsTreeModel);
-					movies = movieList.movies;
 				}
-				updateMovieTableModel(movies);
+				updateMovieTableModel(selectedTreeNode.data);
 			}
 		});
 		
 		movieTable.getSelectionModel().addListSelectionListener(e -> {
 			int[] rowsM = getSelectedRowsM();
 			MovieList.Movie movie = rowsM.length==1 && movieTableModel!=null ? movieTableModel.getRow(rowsM[0]) : null;
-			NewTitleDesc newTitleDesc = movie!=null && movieTableModel!=null ? movieTableModel.changedTitleDesc.get(movie) : null;
+			NewTitleDesc newTitleDesc = movie!=null && movieTableModel!=null && movieTableModel.data!=null ? movieTableModel.data.changedTitleDesc.get(movie) : null;
 			showValues(movie, newTitleDesc);
 		});
 		
@@ -221,7 +218,7 @@ class MoviesPanel extends JSplitPane {
 						clickedTreeNode = (LocationTreeNode) obj;
 				}
 				miReloadTreeNode.setEnabled(clickedTreeNode!=null);
-				miReloadTreeNode.setText(String.format("%s Folder", clickedTreeNode!=null && clickedTreeNode.movies!=null ? "Reload" : "Load"));
+				miReloadTreeNode.setText(String.format("%s Folder", clickedTreeNode!=null && clickedTreeNode.data!=null ? "Reload" : "Load"));
 			});
 		}
 	}
@@ -348,8 +345,8 @@ class MoviesPanel extends JSplitPane {
 		}
 	}
 
-	private void updateMovieTableModel(Vector<MovieList.Movie> movies) {
-		movieTable.setModel(movieTableModel = new MovieTableModel(movies));
+	private void updateMovieTableModel(MovieFolderData data) {
+		movieTable.setModel(movieTableModel = new MovieTableModel(data));
 		movieTable.setRowSorter( new Tables.SimplifiedRowSorter(movieTableModel) );
 		movieTableModel.setTable(movieTable);
 		movieTableModel.setColumnWidths(movieTable);
@@ -362,7 +359,7 @@ class MoviesPanel extends JSplitPane {
 		locationsRoot.addLocations(movieList,locationsTreeModel);
 		locationsTreeModel.nodeChanged(treeNode);
 		if (treeNode==selectedTreeNode)
-			updateMovieTableModel(movieList.movies);
+			updateMovieTableModel(selectedTreeNode.data);
 	}
 	
 	private void zapToMovie(MovieList.Movie movie) {
@@ -396,7 +393,8 @@ class MoviesPanel extends JSplitPane {
 			main.showMessageResponse(response, "Delete Movie");
 			if (response.result && movieTableModel!=null)
 			{
-				movieTableModel.deletedMovies.add(movie);
+				if (movieTableModel.data!=null)
+					movieTableModel.data.deletedMovies.add(movie);
 				movieTableModel.fireTableRowUpdate(rowM);
 			}
 		});
@@ -430,7 +428,8 @@ class MoviesPanel extends JSplitPane {
 			main.showMessageResponse(response, "Rename Movie File");
 			if (response.result && movieTableModel!=null)
 			{
-				movieTableModel.renamedMovies.add(movie);
+				if (movieTableModel.data!=null)
+					movieTableModel.data.renamedMovies.add(movie);
 				movieTableModel.fireTableRowUpdate(rowM);
 			}
 		});
@@ -445,7 +444,8 @@ class MoviesPanel extends JSplitPane {
 		String baseURL = main.getBaseURL();
 		if (baseURL==null) return;
 		
-		NewTitleDesc result = TitleDescDialog.showDialog(main.mainWindow, movie, movieTableModel==null ? null : movieTableModel.changedTitleDesc.get(movie));
+		NewTitleDesc prevTitleDesc = movieTableModel==null || movieTableModel.data==null ? null : movieTableModel.data.changedTitleDesc.get(movie);
+		NewTitleDesc result = TitleDescDialog.showDialog(main.mainWindow, movie, prevTitleDesc);
 		if (result==null || (result.title()==null && result.desc()==null)) return;
 		
 		main.runWithProgressDialog("Change Movie Title & Description", pd->{
@@ -455,8 +455,8 @@ class MoviesPanel extends JSplitPane {
 			main.showMessageResponse(response, "Change Movie Title & Description");
 			if (response.result && movieTableModel!=null)
 			{
-				NewTitleDesc changed = new NewTitleDesc(response.title, response.description);
-				movieTableModel.changedTitleDesc.put(movie, changed);
+				if (movieTableModel.data!=null)
+					movieTableModel.data.changedTitleDesc.put(movie, new NewTitleDesc(response.title, response.description));
 				movieTableModel.fireTableRowUpdate(rowM);
 			}
 		});
@@ -618,11 +618,11 @@ class MoviesPanel extends JSplitPane {
 					locationsTree.expandPath(selectedTreePath);
 					if (selectedTreePath!=null) {
 						Object obj = selectedTreePath.getLastPathComponent();
-						if (obj instanceof LocationTreeNode)
-							selectedTreeNode = (LocationTreeNode) obj;
+						if (obj instanceof LocationTreeNode treeNode)
+							selectedTreeNode = treeNode;
 					}
 					//locationsTree.setSelectionPath(treePath);
-					updateMovieTableModel(movieList.movies);
+					updateMovieTableModel(selectedTreeNode==null ? null : selectedTreeNode.data);
 				}
 			});
 	}
@@ -720,15 +720,13 @@ class MoviesPanel extends JSplitPane {
 		@Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus) {
 			Component comp = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
 			
-			if (value instanceof LocationTreeNode) {
-				LocationTreeNode treeNode = (LocationTreeNode) value;
-				if (treeNode.movies==null) setIcon(TreeIcons.Folder     .getIcon());
-				else                       setIcon(TreeIcons.GreenFolder.getIcon());
+			if (value instanceof LocationTreeNode treeNode) {
+				if (treeNode.data==null) setIcon(TreeIcons.Folder     .getIcon());
+				else                     setIcon(TreeIcons.GreenFolder.getIcon());
 			}
 			
 			return comp;
 		}
-		
 	}
 
 	private static class LocationTreeNode implements TreeNode {
@@ -736,13 +734,13 @@ class MoviesPanel extends JSplitPane {
 		private final LocationTreeNode parent;
 		private final String name;
 		private final Vector<LocationTreeNode> children;
-		private Vector<MovieList.Movie> movies;
+		private MovieFolderData data;
 	
 		LocationTreeNode(LocationTreeNode parent, String name) {
 			this.parent = parent;
 			this.name = name;
 			this.children = new Vector<>();
-			this.movies = null;
+			this.data = null;
 		}
 
 		public static LocationTreeNode create(MovieList movieList) {
@@ -753,18 +751,19 @@ class MoviesPanel extends JSplitPane {
 			if (names==null) return null;
 			
 			LocationTreeNode root = new LocationTreeNode(null,names[0]);
-			LocationTreeNode p = root;
+			LocationTreeNode node = root;
 			for (int i=1; i<names.length; i++) {
-				LocationTreeNode newNode = new LocationTreeNode(p,names[i]);
-				p.addChild(newNode);
-				p = newNode;
+				LocationTreeNode newNode = new LocationTreeNode(node,names[i]);
+				node.addChild(newNode);
+				node = newNode;
 			}
 			
-			p.movies = movieList.movies;
+			node.data = new MovieFolderData( movieList.movies );
+			
 			if (movieList.bookmarks!=null)
 				for (String childName:movieList.bookmarks) {
-					LocationTreeNode newNode = new LocationTreeNode(p,childName);
-					p.addChild(newNode);
+					LocationTreeNode newNode = new LocationTreeNode(node,childName);
+					node.addChild(newNode);
 				}
 			
 			return root;
@@ -790,7 +789,7 @@ class MoviesPanel extends JSplitPane {
 				node = childNode;
 			}
 			
-			node.movies = movieList.movies;
+			node.data = new MovieFolderData( movieList.movies );
 			
 			if (movieList.bookmarks!=null) {
 				int[] newIndexes = new int[movieList.bookmarks.size()];
@@ -807,6 +806,7 @@ class MoviesPanel extends JSplitPane {
 					treeModel.nodesWereInserted(node, Arrays.copyOfRange(newIndexes,0,i));
 			}
 		}
+		
 		public String getDirPath() {
 			if (parent == null) return "/"+name;
 			return parent.getDirPath()+"/"+name;
@@ -854,16 +854,29 @@ class MoviesPanel extends JSplitPane {
 			return null;
 		}
 	
-		@Override public TreeNode getParent() { return parent; }
+		@Override public LocationTreeNode getParent() { return parent; }
 		@Override public int getChildCount() { return children.size(); }
-		@Override public TreeNode getChildAt(int childIndex) { return children.get(childIndex); }
+		@Override public LocationTreeNode getChildAt(int childIndex) { return children.get(childIndex); }
 		@Override public int getIndex(TreeNode node) { return children.indexOf(node); }
 		@Override public boolean getAllowsChildren() { return true; }
 		@Override public boolean isLeaf() { return children.isEmpty(); }
 		@Override public Enumeration<LocationTreeNode> children() { return children.elements(); }
 	}
 
-	static class MovieTableModel extends Tables.SimpleGetValueTableModel<MovieList.Movie, MovieTableModel.ColumnID> {
+	private static class MovieFolderData
+	{
+		final Set<MovieList.Movie> deletedMovies = new HashSet<>();
+		final Set<MovieList.Movie> renamedMovies = new HashSet<>();
+		final Map<MovieList.Movie, NewTitleDesc> changedTitleDesc = new HashMap<>();
+		final Vector<MovieList.Movie> movies;
+		
+		MovieFolderData(Vector<MovieList.Movie> movies)
+		{
+			this.movies = movies;
+		}
+	}
+
+	private static class MovieTableModel extends Tables.SimpleGetValueTableModel<MovieList.Movie, MovieTableModel.ColumnID> {
 		
 		private static final Color COLOR_DELETED = new Color(0xC0C0C0);
 		private static final Color COLOR_RENAMED = new Color(0xC085C0);
@@ -902,17 +915,13 @@ class MoviesPanel extends JSplitPane {
 		}
 	
 		private boolean showDescriptionInNameColumn;
-		private final Set<MovieList.Movie> deletedMovies;
-		private final Set<MovieList.Movie> renamedMovies;
-		private final Map<MovieList.Movie, NewTitleDesc> changedTitleDesc;
+		private final MovieFolderData data;
 
-		private MovieTableModel(Vector<MovieList.Movie> movies)
+		private MovieTableModel(MovieFolderData data)
 		{
-			super(ColumnID.values(), movies);
+			super(ColumnID.values(), data==null ? null : data.movies);
+			this.data = data;
 			showDescriptionInNameColumn = getShowDescriptionInNameColumn();
-			deletedMovies = new HashSet<>();
-			renamedMovies = new HashSet<>();
-			changedTitleDesc = new HashMap<>();
 		}
 	
 		private static boolean existsMovie(MovieTableModel model, MovieList.Movie movie)
@@ -923,8 +932,11 @@ class MoviesPanel extends JSplitPane {
 		private boolean existsMovie(MovieList.Movie movie)
 		{
 			if (movie==null) return false;
-			if (deletedMovies.contains(movie)) return false;
-			if (renamedMovies.contains(movie)) return false;
+			if (data!=null)
+			{
+				if (data.deletedMovies.contains(movie)) return false;
+				if (data.renamedMovies.contains(movie)) return false;
+			}
 			return true;
 		}
 
@@ -942,7 +954,7 @@ class MoviesPanel extends JSplitPane {
 			String title       = movie.eventname;
 			String description = movie.description;
 			
-			NewTitleDesc newTitleDesc = changedTitleDesc.get(movie);
+			NewTitleDesc newTitleDesc = data==null ? null : data.changedTitleDesc.get(movie);
 			if (newTitleDesc!=null)
 			{
 				if (newTitleDesc.title!=null) title       = newTitleDesc.title;
@@ -1016,9 +1028,9 @@ class MoviesPanel extends JSplitPane {
 			{
 				int rowM = table.convertRowIndexToModel(rowV);
 				MovieList.Movie movie = getRow(rowM);
-				rendComp.wasDeleted = deletedMovies.contains(movie);
-				rendComp.wasRenamed = renamedMovies.contains(movie);
-				rendComp.wasChanged = changedTitleDesc.containsKey(movie);
+				rendComp.wasDeleted = data==null ? false : data.deletedMovies.contains(movie);
+				rendComp.wasRenamed = data==null ? false : data.renamedMovies.contains(movie);
+				rendComp.wasChanged = data==null ? false : data.changedTitleDesc.containsKey(movie);
 				
 				Color BGCOLOR_Movie_Seen = UserDefColors.BGCOLOR_Movie_Seen.getColor();
 				Supplier<Color> getCustomBackground = BGCOLOR_Movie_Seen!=null && AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(movie) ? ()->BGCOLOR_Movie_Seen : null;
@@ -1108,15 +1120,15 @@ class MoviesPanel extends JSplitPane {
 				Supplier<Color> getCustomBackground = null;
 				Supplier<Color> getCustomForeground = null;
 				
-				if (!isSelected)
+				if (!isSelected && data!=null)
 				{
-					if (deletedMovies.contains(movie))
+					if (data.deletedMovies.contains(movie))
 						getCustomForeground = ()->COLOR_DELETED;
 						
-					else if (renamedMovies.contains(movie))
+					else if (data.renamedMovies.contains(movie))
 						getCustomForeground = ()->COLOR_RENAMED;
 						
-					else if (changedTitleDesc.containsKey(movie))
+					else if (data.changedTitleDesc.containsKey(movie))
 						getCustomForeground = ()->COLOR_CHANGED;
 				}
 				

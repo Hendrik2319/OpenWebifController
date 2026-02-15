@@ -34,6 +34,7 @@ import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import net.schwarzbaer.java.lib.globalsettings.GlobalSettings;
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
@@ -231,7 +232,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	
 	public static class AppSettings extends Settings.DefaultAppSettings<AppSettings.ValueGroup,AppSettings.ValueKey> {
 		public enum ValueKey {
-			VideoPlayer, BaseURL, Browser, JavaVM,
+			BaseURL,
 			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates, BouquetsNStations_UpdateCurrentStation,
 			EPGDialogWidth, EPGDialogHeight, EPGDialog_TimeScale, EPGDialog_RowHeight, EPGDialog_LeadTime, EPGDialog_RangeTime,
 			LogWindow_WindowX, LogWindow_WindowY, LogWindow_WindowWidth, LogWindow_WindowHeight,
@@ -887,44 +888,18 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		) == JOptionPane.OK_OPTION;
 	}
 	
-	static boolean hasJavaVM     () { return hasExecutable(AppSettings.ValueKey.JavaVM     ); }
-	static boolean hasVideoPlayer() { return hasExecutable(AppSettings.ValueKey.VideoPlayer); }
-	static boolean hasBrowser    () { return hasExecutable(AppSettings.ValueKey.Browser    ); }
-	static File getJavaVM_     () { return getExecutable(AppSettings.ValueKey.JavaVM     ); }
-	static File getVideoPlayer_() { return getExecutable(AppSettings.ValueKey.VideoPlayer); }
-	static File getBrowser_    () { return getExecutable(AppSettings.ValueKey.Browser    ); }
-	File getJavaVM     () { return getExecutable(AppSettings.ValueKey.JavaVM     , "Select Java VM"    ); }
-	File getVideoPlayer() { return getExecutable(AppSettings.ValueKey.VideoPlayer, "Select VideoPlayer"); }
-	File getBrowser    () { return getExecutable(AppSettings.ValueKey.Browser    , "Select Browser"    ); }
-	private File askUserForJavaVM     () { return askUserForExecutable(AppSettings.ValueKey.JavaVM     , "Select Java VM"    ); }
-	private File askUserForVideoPlayer() { return askUserForExecutable(AppSettings.ValueKey.VideoPlayer, "Select VideoPlayer"); }
-	private File askUserForBrowser    () { return askUserForExecutable(AppSettings.ValueKey.Browser    , "Select Browser"    ); }
-
-	private static boolean hasExecutable(AppSettings.ValueKey valueKey) {
-		if (!settings.contains(valueKey)) return false;
-		File executable = getExecutable(valueKey);
-		return executable.isFile();
-	}
-	
-	private File getExecutable(AppSettings.ValueKey valueKey, String dialogTitle) {
-		if (!settings.contains(valueKey))
-			return askUserForExecutable(valueKey, dialogTitle);
-		return getExecutable(valueKey);
-	}
-	static File getExecutable(AppSettings.ValueKey valueKey) {
-		return settings.getFile(valueKey, null);
-	}
-
-	private File askUserForExecutable(AppSettings.ValueKey valueKey, String dialogTitle) {
-		exeFileChooser.setDialogTitle(dialogTitle);
-	
-		File executable = null;
-		if (exeFileChooser.showOpenDialog(mainWindow)==JFileChooser.APPROVE_OPTION) {
-			executable = exeFileChooser.getSelectedFile();
-			settings.putFile(valueKey, executable);
-		}
-		return executable;
-	}
+	static boolean hasJavaVM     () { return GlobalSettings.getInstance().hasExecutable(GlobalSettings.Key.JavaVM     ); }
+	static boolean hasVideoPlayer() { return GlobalSettings.getInstance().hasExecutable(GlobalSettings.Key.VideoPlayer); }
+	static boolean hasBrowser    () { return GlobalSettings.getInstance().hasExecutable(GlobalSettings.Key.Browser    ); }
+	static File getJavaVM_     () { return GlobalSettings.getInstance().getExecutable(GlobalSettings.Key.JavaVM     ); }
+	static File getVideoPlayer_() { return GlobalSettings.getInstance().getExecutable(GlobalSettings.Key.VideoPlayer); }
+	static File getBrowser_    () { return GlobalSettings.getInstance().getExecutable(GlobalSettings.Key.Browser    ); }
+	File getJavaVM     () { return GlobalSettings.getInstance().getExecutableOrAskUser(mainWindow, "Select Java VM"    , GlobalSettings.Key.JavaVM     ); }
+	File getVideoPlayer() { return GlobalSettings.getInstance().getExecutableOrAskUser(mainWindow, "Select VideoPlayer", GlobalSettings.Key.VideoPlayer); }
+	File getBrowser    () { return GlobalSettings.getInstance().getExecutableOrAskUser(mainWindow, "Select Browser"    , GlobalSettings.Key.Browser    ); }
+	private File askUserForJavaVM     () { return GlobalSettings.getInstance().askUserForExecutable(mainWindow, "Select Java VM"    , GlobalSettings.Key.JavaVM     ); }
+	private File askUserForVideoPlayer() { return GlobalSettings.getInstance().askUserForExecutable(mainWindow, "Select VideoPlayer", GlobalSettings.Key.VideoPlayer); }
+	private File askUserForBrowser    () { return GlobalSettings.getInstance().askUserForExecutable(mainWindow, "Select Browser"    , GlobalSettings.Key.Browser    ); }
 	
 	private class SystemInfoPanel extends JSplitPane {
 		private static final long serialVersionUID = -8703742093758822234L;

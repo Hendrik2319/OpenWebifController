@@ -51,10 +51,10 @@ class EPGView extends Canvas {
 	private static final Color COLOR_TIMESCALE_LINES = Color.GRAY;
 	private static final Color COLOR_TIMESCALE_TEXT  = Color.BLACK;
 	
-	private static final Color COLOR_ITMER_HOVERED   = new Color(0x66B0FF);
-	private static final Color COLOR_ITMER_RECORDING = Color.RED;
-	private static final Color COLOR_ITMER_JUST_ZAP  = new Color(0x00B000);
-	private static final Color COLOR_ITMER_DISABLED  = Color.GRAY;
+	private static final Color COLOR_TIMER_HOVERED   = new Color(0x66B0FF);
+	private static final Color COLOR_TIMER_RECORDING = Color.RED;
+	private static final Color COLOR_TIMER_JUST_ZAP  = new Color(0x00B000);
+	private static final Color COLOR_TIMER_DISABLED_FINISHED  = Color.GRAY;
 	
 	private static final Color COLOR_NOWMARKER = Color.RED;
 	
@@ -508,9 +508,9 @@ class EPGView extends Canvas {
 		Rectangle clip = new Rectangle(xBegin, yBegin, xEnd-xBegin, rowHeight-1-2).intersection(eventViewClip);
 		if (!clip.isEmpty()) {
 			g2.setClip(clip);
-			boolean isDisabled  = timer.timer.state2 == Timers.Timer.State.Deactivated;
+			boolean isDisabledFinished  = timer.timer.state2 == Timers.Timer.State.Deactivated || timer.timer.state2 == Timers.Timer.State.Finished;
 			boolean isRecording = timer.timer.type   == Timers.Timer.Type.Record || timer.timer.type == Timers.Timer.Type.RecordNSwitch;
-			g2.setColor(isHovered ? COLOR_ITMER_HOVERED : isDisabled ? COLOR_ITMER_DISABLED : isRecording ? COLOR_ITMER_RECORDING : COLOR_ITMER_JUST_ZAP);
+			g2.setColor(isHovered ? COLOR_TIMER_HOVERED : isDisabledFinished ? COLOR_TIMER_DISABLED_FINISHED : isRecording ? COLOR_TIMER_RECORDING : COLOR_TIMER_JUST_ZAP);
 			if (center==null) {
 				g2.drawLine(xBegin, yBegin, xEnd-1, yBegin);
 				g2.drawLine(xBegin, yBegin, xBegin, yEnd);

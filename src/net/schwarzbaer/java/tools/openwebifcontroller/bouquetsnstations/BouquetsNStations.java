@@ -189,7 +189,7 @@ public class BouquetsNStations extends JPanel {
 	
 	private void updateEPGPanel(TreePath treePath)
 	{
-		Object obj = treePath.getLastPathComponent();
+		Object obj = treePath==null ? null : treePath.getLastPathComponent();
 		
 		if (obj instanceof BSTreeNode.StationNode stationNode && !stationNode.isMarker())
 			singleStationEPGPanel.readEPG( stationNode.subservice );

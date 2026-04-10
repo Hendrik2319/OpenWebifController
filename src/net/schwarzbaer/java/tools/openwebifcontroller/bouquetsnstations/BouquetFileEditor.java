@@ -8,11 +8,11 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -20,6 +20,8 @@ import java.util.Vector;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.IntUnaryOperator;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -47,10 +49,10 @@ import javax.swing.UnsupportedLookAndFeelException;
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.FileChooser;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
+import net.schwarzbaer.java.lib.gui.KeyShortCut;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ScrollPosition;
 import net.schwarzbaer.java.lib.gui.StandardMainWindow;
-import net.schwarzbaer.java.lib.gui.StandardMainWindow.DefaultCloseOperation;
 import net.schwarzbaer.java.lib.gui.Tables;
 import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.BouquetFile;
@@ -64,6 +66,8 @@ import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSet
 
 public class BouquetFileEditor
 {
+	// TODO: add optional display of picons to both tables 
+	
 	public static final String ProgressDialogTitle_ReadBouquetData = "Read Bouquet Data";
 
 	public static void main(String[] args)
@@ -94,12 +98,13 @@ public class BouquetFileEditor
 		contentPane = new ContentPane(main);
 		menuBar = new MenuBar();
 		
-		mainWindow = new StandardMainWindow("Bouquet File Editor", startedStandAlone ? DefaultCloseOperation.EXIT_ON_CLOSE : DefaultCloseOperation.DISPOSE_ON_CLOSE);
+		mainWindow = OpenWebifController.createMainWindow("Bouquet File Editor", !startedStandAlone);
 		mainWindow.startGUI(contentPane, menuBar);
 		
 		OpenWebifController.settings.registerExtraWindow(
 				mainWindow,
-				null, null,
+				AppSettings.ValueKey.BouquetFileEditor_WindowX,
+				AppSettings.ValueKey.BouquetFileEditor_WindowY,
 				AppSettings.ValueKey.BouquetFileEditor_WindowWidth,
 				AppSettings.ValueKey.BouquetFileEditor_WindowHeight
 		);
@@ -110,9 +115,8 @@ public class BouquetFileEditor
 				.add(contentPane.bouquetFilePanel.tableTextAreaPanel, AppSettings.ValueKey.SplitPaneDivider_BouquetFileEditor_BouquetFilePanel)
 		);
 		
-		contentPane.bouquetDataPanel.setData(this.bouquetData);
+		setData(this.bouquetData);
 		contentPane.bouquetFilePanel.setData(this.bouquetFileData);
-		contentPane.bouquetFilePanel.setStationNames(this.bouquetData==null ? null : this.bouquetData.names);
 	}
 	
 	private static void updateBouquetData(BouquetFileEditor editor)
@@ -247,13 +251,16 @@ public class BouquetFileEditor
 			setLeftComponent (bouquetDataPanel = new BouquetDataPanel(main));
 			setRightComponent(bouquetFilePanel = new BouquetFilePanel(main));
 			setResizeWeight(0.5);
+			bouquetDataPanel.setOtherPanel(bouquetFilePanel);
+			bouquetFilePanel.setOtherPanel(bouquetDataPanel);
 		}
 	}
 	
 	private static abstract class AbstractPanel<
 			RowType,
 			TableModelType extends Tables.SimpleGetValueTableModel<RowType, ColumnID> & ExtraData.Receiver & AbstractPanel.TableContextMenu.StationIDExtractor<RowType>,
-			ColumnID extends Tables.AbstractGetValueTableModel.ColumnIDTypeInt<RowType>
+			ColumnID extends Tables.AbstractGetValueTableModel.ColumnIDTypeInt<RowType>,
+			ThisType extends AbstractPanel<RowType, TableModelType, ColumnID, ThisType>
 	> extends JPanel
 	{
 		private static final long serialVersionUID = -5359258011833246051L;
@@ -275,15 +282,18 @@ public class BouquetFileEditor
 		final JScrollPane tableScrollPane;
 		final JTextArea textArea;
 		final JScrollPane textareaScrollPane;
-		protected OpenWebifController main;
+		OpenWebifController main;
+		int[] selectedRowIndexes;
+		RowType[] selectedRows;
 		
 		AbstractPanel(
 				OpenWebifController main,
 				String borderTitle,
 				SelectionMode tableSelectionMode,
 				Supplier<TableModelType> tableModelConstructor,
-				TableContextMenu.Constructor<RowType, TableModelType> tableContextMenuConstructor,
-				ColumnID contextMenuSurrogateColumn
+				TableContextMenu.Constructor<RowType, ThisType, TableModelType> tableContextMenuConstructor,
+				ColumnID contextMenuSurrogateColumn,
+				IntFunction<RowType[]> createRowArray
 		)
 		{
 			super(new BorderLayout(3, 3));
@@ -292,6 +302,10 @@ public class BouquetFileEditor
 			
 			Objects.requireNonNull( tableSelectionMode );
 			Objects.requireNonNull( tableModelConstructor );
+			Objects.requireNonNull( tableContextMenuConstructor );
+			Objects.requireNonNull( createRowArray );
+			selectedRowIndexes = new int[0];
+			selectedRows = createRowArray.apply(0);
 			
 			tableModel = tableModelConstructor.get();
 			table = new JTable(tableModel);
@@ -309,16 +323,18 @@ public class BouquetFileEditor
 			textareaScrollPane = new JScrollPane(textArea);
 			
 			table.getSelectionModel().addListSelectionListener(ev -> {
-				String text;
-				if (table.getSelectedRowCount()==1)
-				{
-					int rowV = table.getSelectedRow();
-					int rowM = rowV<0 ? -1 : table.convertRowIndexToModel(rowV);
-					RowType row = tableModel.getRow(rowM);
-					text = generateRowInfo(row);
-				}
-				else
-					text = "";
+				selectedRowIndexes = Arrays
+						.stream(this.table.getSelectedRows())
+						.map(rowV -> rowV<0 ? -1 : this.table.convertRowIndexToModel(rowV))
+						.filter(rowM -> rowM>=0)
+						.toArray();
+				selectedRows = Arrays
+						.stream(selectedRowIndexes)
+						.mapToObj(this.tableModel::getRow)
+						.filter(row->row!=null)
+						.toArray(createRowArray);
+				
+				String text = selectedRows.length==1 ? generateRowInfo(selectedRows[0]) : "";
 				ScrollPosition.keepScrollPos(textareaScrollPane, ScrollPosition.ScrollBarType.Vertical, ()->textArea.setText(text));
 			});
 			
@@ -331,24 +347,29 @@ public class BouquetFileEditor
 			add(northPanel, BorderLayout.NORTH);
 			add(tableTextAreaPanel, BorderLayout.CENTER);
 			
-			if (tableContextMenuConstructor == null)
-				tableContextMenuConstructor = TableContextMenu::new;
-			
-			TableContextMenu<RowType,TableModelType> contextMenu = tableContextMenuConstructor.create(this.main, table, tableModel);
+			TableContextMenu<?,?,?> contextMenu = tableContextMenuConstructor.create(this.main, getThis(), tableModel);
 			contextMenu.populateMenu();
 			contextMenu.addTo(table, () -> ContextMenu.computeSurrogateMousePos(table, tableScrollPane, tableModel.getColumn(contextMenuSurrogateColumn)));
 			contextMenu.addTo(tableScrollPane);
 		}
 		
+		protected abstract ThisType getThis();
 		protected abstract String generateRowInfo(RowType row);
 
-		protected static class TableContextMenu<RowType, TableModelType extends Tables.SimpleGetValueTableModel<RowType, ?> & TableContextMenu.StationIDExtractor<RowType>> extends ContextMenu
+		protected static class TableContextMenu<
+				RowType,
+				TablePanelType extends AbstractPanel<RowType,?,?,TablePanelType>,
+				TableModelType extends Tables.SimpleGetValueTableModel<RowType, ?> & TableContextMenu.StationIDExtractor<RowType>
+		> extends ContextMenu
 		{
 			private static final long serialVersionUID = 5456765972894773723L;
 			
-			interface Constructor<RowType, TableModelType extends Tables.SimpleGetValueTableModel<RowType, ?> & TableContextMenu.StationIDExtractor<RowType>>
-			{
-				TableContextMenu<RowType, TableModelType> create(OpenWebifController main, JTable table, TableModelType tableModel);
+			interface Constructor<
+					RowType,
+					TablePanelType extends AbstractPanel<RowType,?,?,TablePanelType>,
+					TableModelType extends Tables.SimpleGetValueTableModel<RowType, ?> & TableContextMenu.StationIDExtractor<RowType>
+			> {
+				TableContextMenu<RowType, TablePanelType, TableModelType> create(OpenWebifController main, TablePanelType tablePanel, TableModelType tableModel);
 			}
 			
 			interface StationIDExtractor<RowType>
@@ -357,20 +378,22 @@ public class BouquetFileEditor
 			}
 			
 			protected final JTable table;
+			protected final TablePanelType tablePanel;
 			protected final TableModelType tableModel;
 			private   final JMenuItem miSwitchToStation;
 			private   final JMenuItem miStreamStation;
 			private   final JMenuItem miShowColumnWidths;
 			private   final JMenuItem miResetRowOrder;
-			protected int clickedRowM;
+			protected int clickedRowIndex;
 			protected RowType clickedRow;
 			protected StationID clickedRowStationID;
 
-			TableContextMenu(OpenWebifController main, JTable table, TableModelType tableModel)
+			TableContextMenu(OpenWebifController main, TablePanelType tablePanel, TableModelType tableModel)
 			{
-				this.table = table;
+				this.tablePanel = tablePanel;
+				this.table      = tablePanel.table;
 				this.tableModel = tableModel;
-				clickedRowM = -1;
+				clickedRowIndex = -1;
 				clickedRow = null;
 				
 				miSwitchToStation = main==null ? null : OWCTools.createMenuItem("Switch To Station", e->{
@@ -401,8 +424,8 @@ public class BouquetFileEditor
 
 				addContextMenuInvokeListener((comp,x,y)->{
 					int clickedRowV = comp!=this.table ? -1 : this.table.rowAtPoint(new Point(x, y));
-					clickedRowM = clickedRowV<0 ? -1 : this.table.convertRowIndexToModel(clickedRowV);
-					clickedRow = this.tableModel.getRow(clickedRowM);
+					clickedRowIndex = clickedRowV<0 ? -1 : this.table.convertRowIndexToModel(clickedRowV);
+					clickedRow      = this.tableModel.getRow(clickedRowIndex);
 					clickedRowStationID = clickedRow==null ? null : this.tableModel.getStationIDFromRow(clickedRow);
 					
 					if (miSwitchToStation!=null)
@@ -427,16 +450,21 @@ public class BouquetFileEditor
 		extends AbstractPanel<
 				Bouquet.SubService,
 				BouquetDataPanel.BouquetTableModel,
-				BouquetDataPanel.BouquetTableModel.ColumnID
+				BouquetDataPanel.BouquetTableModel.ColumnID,
+				BouquetDataPanel
 		>
 	{
 		private static final long serialVersionUID = 8680831963757715709L;
 		private final JComboBox<Bouquet> bouquetSelector;
+		private final JLabel labBouquetSelector;
+		private BouquetFilePanel bouquetFilePanel;
 		
 		BouquetDataPanel(OpenWebifController main)
 		{
-			super(main,"Global Bouquet Data", SelectionMode.SINGLE_SELECTION, BouquetTableModel::new, TableContextMenu::new, BouquetTableModel.ColumnID.name);
+			super(main,"Global Bouquet Data", SelectionMode.SINGLE_SELECTION, BouquetTableModel::new, TableContextMenu::new, BouquetTableModel.ColumnID.name, Bouquet.SubService[]::new);
+			bouquetFilePanel = null;
 			
+			labBouquetSelector = new JLabel("Bouquet: ");
 			bouquetSelector = new JComboBox<>();
 			bouquetSelector.addActionListener(ev -> {
 				Bouquet bouquet = bouquetSelector.getItemAt(bouquetSelector.getSelectedIndex());
@@ -447,15 +475,40 @@ public class BouquetFileEditor
 			GridBagConstraints c = new GridBagConstraints();
 			c.fill = GridBagConstraints.BOTH;
 			
-			c.weightx = 0; northPanel.add(new JLabel("Bouquet: "),c);
+			c.weightx = 0; northPanel.add(labBouquetSelector,c);
 			c.weightx = 1; northPanel.add(bouquetSelector,c);
+			
+			labBouquetSelector.setEnabled(false);
+			bouquetSelector.setEnabled(false);
 		}
 
-		public void setData(BouquetData bouquetData)
+		@Override protected BouquetDataPanel getThis() { return this; }
+
+		void setOtherPanel(BouquetFilePanel bouquetFilePanel)
+		{
+			this.bouquetFilePanel = bouquetFilePanel;
+			tableModel.setOtherPanel(bouquetFilePanel);
+		}
+		
+		void notifyBouquetFileChange(BouquetFileChangeEvent ev)
+		{
+			switch (ev.eventType)
+			{
+			case FileChanged:
+			case StationsAdded:
+			case StationsRemoved:
+				tableModel.fireTableColumnUpdate(BouquetTableModel.ColumnID.isInFile);
+				break;
+			}
+		}
+
+		void setData(BouquetData bouquetData)
 		{
 			tableModel.setData((Tables.DataSource<Bouquet.SubService>) null);
 			bouquetSelector.setModel(bouquetData==null ? new DefaultComboBoxModel<>() : new DefaultComboBoxModel<>(bouquetData.bouquets));
 			bouquetSelector.setSelectedItem(null);
+			labBouquetSelector.setEnabled(bouquetData!=null);
+			bouquetSelector   .setEnabled(bouquetData!=null);
 		}
 
 		@Override
@@ -464,20 +517,72 @@ public class BouquetFileEditor
 			return "Bouquet.SubService";
 		}
 		
-		static class TableContextMenu extends AbstractPanel.TableContextMenu<Bouquet.SubService, BouquetTableModel>
+		static class TableContextMenu extends AbstractPanel.TableContextMenu<Bouquet.SubService, BouquetDataPanel, BouquetTableModel>
 		{
 			private static final long serialVersionUID = -5073780433391354857L;
+			
+			private final JMenuItem miCopyToFileBefore;
+			private final JMenuItem miCopyToFileAfter;
+			private final JMenuItem miCopyToFileEnd;
 
-			TableContextMenu(OpenWebifController main, JTable table, BouquetTableModel tableModel)
+			TableContextMenu(OpenWebifController main, BouquetDataPanel tablePanel, BouquetTableModel tableModel)
 			{
-				super(main, table, tableModel);
-				// TODO Auto-generated constructor stub
+				super(main, tablePanel, tableModel);
+				
+				miCopyToFileBefore = OWCTools.createMenuItem("Copy to File (before selected)", ev -> copyToFile(i -> i));
+				miCopyToFileAfter  = OWCTools.createMenuItem("Copy to File (after selected)" , ev -> copyToFile(i -> i+1));
+				miCopyToFileEnd    = OWCTools.createMenuItem("Copy to File (after selected)" , ev -> copyToFileAtEnd());
+				
+				addContextMenuInvokeListener((comp,x,y) -> {
+					boolean bfpHasFileData       = this.tablePanel.bouquetFilePanel!=null && this.tablePanel.bouquetFilePanel.bouquetFileData!=null;
+					boolean thisHasSelectedRows  = this.tablePanel.selectedRows.length>0;
+					boolean canAdd    = bfpHasFileData && thisHasSelectedRows;
+					boolean canInsert = canAdd && this.tablePanel.bouquetFilePanel.selectedRowIndexes.length==1;
+					miCopyToFileBefore.setEnabled(canInsert);
+					miCopyToFileAfter .setEnabled(canInsert);
+					miCopyToFileEnd   .setEnabled(canAdd);
+				});
+			}
+
+			private void copyToFileAtEnd()
+			{
+				if (this.tablePanel.bouquetFilePanel!=null && this.tablePanel.bouquetFilePanel.bouquetFileData!=null && this.tablePanel.selectedRows.length>0)
+				{
+					String[] srefArr = Arrays
+							.stream(this.tablePanel.selectedRows)
+							.map(row->row.servicereference)
+							.filter(sref->sref!=null)
+							.distinct()
+							.toArray(String[]::new);
+					
+					this.tablePanel.bouquetFilePanel.addStations(srefArr);
+				}
+			}
+
+			private void copyToFile(IntUnaryOperator getTargetIndexFromSelectedIndex)
+			{
+				if (this.tablePanel.bouquetFilePanel!=null && this.tablePanel.bouquetFilePanel.bouquetFileData!=null && this.tablePanel.bouquetFilePanel.selectedRowIndexes.length==1 && this.tablePanel.selectedRows.length>0)
+				{
+					int selectedIndex = this.tablePanel.bouquetFilePanel.selectedRowIndexes[0];
+					int targetIndex = getTargetIndexFromSelectedIndex.applyAsInt(selectedIndex);
+					
+					String[] srefArr = Arrays
+							.stream(this.tablePanel.selectedRows)
+							.map(row->row.servicereference)
+							.filter(sref->sref!=null)
+							.distinct()
+							.toArray(String[]::new);
+					
+					this.tablePanel.bouquetFilePanel.insertStations(srefArr, targetIndex);
+				}
 			}
 
 			@Override
 			void populateMenu()
 			{
-				// TODO Auto-generated constructor stub
+				add(miCopyToFileBefore);
+				add(miCopyToFileAfter);
+				addSeparator();
 				super.populateMenu();
 			}
 		}
@@ -488,7 +593,7 @@ public class BouquetFileEditor
 		{
 			enum ColumnID implements Tables.SimpleGetValueTableModel2.ColumnIDTypeInt2b<BouquetTableModel, Bouquet.SubService>, SwingConstants
 			{
-				// Column Widths: [30, 55, 55, 140, 140, 230, 230] in ModelOrder
+				// Column Widths: [30, 55, 55, 140, 230, 230, 50] in ModelOrder
 				pos               (config("Pos"              , Long   .class,  30,   null).setValFunc(s->s.pos)),
 				program           (config("Program"          , Long   .class,  55,   null).setValFunc(s->s.program)),
 				service_isMarker  (config("is Marker"        , Boolean.class,  55,   null).setValFunc(s->s.service, s->s.isMarker())),
@@ -497,6 +602,7 @@ public class BouquetFileEditor
 				servicereference  (config("Service Reference", String .class, 230,   null).setValFunc(s->s.servicereference)),
 			//	service_stationID (config("Station ID"       , String .class, 230,   null).setValFunc(s->s.service, s->s.stationID, stID->stID.toString())),
 				stationOccurences (config("Occurences"       , String .class, 230,   null).setValFunc((m,s)->getOccurences(m,s))),
+				isInFile          (config("is in File"       , Boolean.class,  50,   null).setValFunc((m,s)->isInFile(m,s))),
 				;
 				private final Tables.SimplifiedColumnConfig2<BouquetTableModel, Bouquet.SubService, ?> cfg;
 				ColumnID(Tables.SimplifiedColumnConfig2<BouquetTableModel, Bouquet.SubService, ?> cfg) { this.cfg = cfg; }
@@ -513,14 +619,27 @@ public class BouquetFileEditor
 				{
 					return model.extraData==null ? null : model.extraData.getOccurences(subService.servicereference);
 				}
+				
+				static Boolean isInFile(BouquetTableModel model, Bouquet.SubService subService)
+				{
+					if (model.bouquetFilePanel==null) return null;
+					return model.bouquetFilePanel.tableModel.isSrefInFile(subService.servicereference);
+				}
 			}
 
 			private ExtraData extraData;
+			private BouquetFilePanel bouquetFilePanel;
 
 			BouquetTableModel()
 			{
 				super(ColumnID.values());
 				extraData = null;
+				bouquetFilePanel = null;
+			}
+
+			void setOtherPanel(BouquetFilePanel bouquetFilePanel)
+			{
+				this.bouquetFilePanel = bouquetFilePanel;
 			}
 
 			@Override
@@ -544,7 +663,8 @@ public class BouquetFileEditor
 		extends AbstractPanel<
 				BouquetFileData.Entry,
 				BouquetFilePanel.BouquetFileTableModel,
-				BouquetFilePanel.BouquetFileTableModel.ColumnID
+				BouquetFilePanel.BouquetFileTableModel.ColumnID,
+				BouquetFilePanel
 		>
 	{
 		private static final long serialVersionUID = -8228511386678957142L;
@@ -555,11 +675,13 @@ public class BouquetFileEditor
 		private final JButton btnSetName;
 		private final JLabel labFile;
 		private final JLabel labName;
+		private BouquetDataPanel bouquetDataPanel;
 
 		BouquetFilePanel(OpenWebifController main)
 		{
-			super(main, "Bouquet File", SelectionMode.MULTIPLE_INTERVAL_SELECTION, BouquetFileTableModel::new, null, BouquetFileTableModel.ColumnID.label);
+			super(main, "Bouquet File", SelectionMode.SINGLE_SELECTION, BouquetFileTableModel::new, TableContextMenu::new, BouquetFileTableModel.ColumnID.label, BouquetFileData.Entry[]::new);
 			bouquetFileData = null;
+			bouquetDataPanel = null;
 			
 			labFile = new JLabel("File: ");
 			fldFile = new JTextField();
@@ -593,10 +715,60 @@ public class BouquetFileEditor
 				@Override public void keyReleased(KeyEvent e) { updateBtnSetName(); }
 			});
 			
+			this.table.addKeyListener(new TableKeyListener());
+			
 			updateFileField();
 			updateNameField();
 		}
 		
+		boolean addStations(String[] srefArr)
+		{
+			if (bouquetFileData==null)
+				return false;
+			
+			int startIndex = bouquetFileData.entries.size();
+			for (int i=0; i<srefArr.length; i++)
+				bouquetFileData.entries.add(BouquetFileData.Entry.createStation(srefArr[i]));
+			
+			if (srefArr.length>0)
+			{
+				this.tableModel.fireTableRowsAdded(startIndex, startIndex+srefArr.length-1);
+				if (bouquetDataPanel!=null)
+					bouquetDataPanel.notifyBouquetFileChange(BouquetFileChangeEvent.Type.StationsAdded.createEvent());
+			}
+			
+			return true;
+		}
+
+		boolean insertStations(String[] srefArr, int index)
+		{
+			if (bouquetFileData==null)
+				return false;
+			
+			if (index<0 || index>bouquetFileData.entries.size())
+				return false;
+			
+			for (int i=0; i<srefArr.length; i++)
+				bouquetFileData.entries.insertElementAt(BouquetFileData.Entry.createStation(srefArr[i]), index+i);
+			
+			if (srefArr.length>0)
+			{
+				this.tableModel.fireTableRowsAdded(index, index+srefArr.length-1);
+				if (bouquetDataPanel!=null)
+					bouquetDataPanel.notifyBouquetFileChange(BouquetFileChangeEvent.Type.StationsAdded.createEvent());
+			}
+			
+			return true;
+		}
+
+		@Override protected BouquetFilePanel getThis() { return this; }
+
+		void setOtherPanel(BouquetDataPanel bouquetDataPanel)
+		{
+			this.bouquetDataPanel = bouquetDataPanel;
+			tableModel.setOtherPanel(bouquetDataPanel);
+		}
+
 		void setStationNames(HashMap<String, String> names)
 		{
 			tableModel.setStationNames(names);
@@ -611,14 +783,18 @@ public class BouquetFileEditor
 
 		void updateFileField()
 		{
-			fldFile.setEnabled(bouquetFileData!=null && bouquetFileData.file!=null);
-			fldFile.setText   (bouquetFileData==null || bouquetFileData.file==null ? null : "%s (%s)".formatted(bouquetFileData.file.getName(), bouquetFileData.file.getParent()) );
+			boolean hasFile = bouquetFileData!=null && bouquetFileData.file!=null;
+			labFile.setEnabled(hasFile);
+			fldFile.setEnabled(hasFile);
+			fldFile.setText(!hasFile ? null : "%s (%s)".formatted(bouquetFileData.file.getName(), bouquetFileData.file.getParent()) );
 		}
 
 		private void updateNameField()
 		{
-			fldName.setEnabled(bouquetFileData!=null);
-			fldName.setText   (bouquetFileData==null ? "" : bouquetFileData.name);
+			boolean hasData = bouquetFileData!=null;
+			labName.setEnabled(hasData);
+			fldName.setEnabled(hasData);
+			fldName.setText(!hasData ? "" : bouquetFileData.name);
 			updateBtnSetName();
 		}
 
@@ -627,12 +803,13 @@ public class BouquetFileEditor
 			btnSetName.setEnabled(bouquetFileData==null ? false : !fldName.getText().equals(bouquetFileData.name));
 		}
 
-		public void setData(BouquetFileData bouquetFileData)
+		void setData(BouquetFileData bouquetFileData)
 		{
 			this.bouquetFileData = bouquetFileData;
 			tableModel.setData(this.bouquetFileData==null ? null : this.bouquetFileData.entries);
 			updateFileField();
 			updateNameField();
+			if (bouquetDataPanel!=null) bouquetDataPanel.notifyBouquetFileChange(new BouquetFileChangeEvent(BouquetFileChangeEvent.Type.FileChanged));
 		}
 
 		@Override
@@ -640,7 +817,85 @@ public class BouquetFileEditor
 		{
 			return "BouquetFileData.Entry";
 		}
+		
+		void moveRow(int inc)
+		{
+			if (selectedRowIndexes.length==1)
+			{
+				int selectedIndex = selectedRowIndexes[0];
+				boolean success = tableModel.swapRows(selectedIndex,selectedIndex+inc);
+				if (success)
+					table.setRowSelectionInterval(selectedIndex+inc, selectedIndex+inc);
+			}
+		}
+		
+		enum KeyFunction implements KeyShortCut.Container
+		{
+			MoveUp  (new KeyShortCut(KeyEvent.VK_UP  , false, false, true, false)),
+			MoveDown(new KeyShortCut(KeyEvent.VK_DOWN, false, false, true, false)),
+			;
+			final KeyShortCut keyShortCut;
+			KeyFunction(KeyShortCut keyShortCut)
+			{
+				this.keyShortCut = keyShortCut;
+			}
+			@Override public KeyShortCut getKeyShortCut()
+			{
+				return keyShortCut;
+			}
+			static KeyFunction getFrom(KeyEvent e)
+			{
+				return KeyShortCut.getFrom(e, values());
+			}
+		}
+		
+		class TableKeyListener implements KeyListener
+		{
+			@Override public void keyTyped   (KeyEvent e) {}
+			@Override public void keyReleased(KeyEvent e) {}
 
+			@Override public void keyPressed(KeyEvent e)
+			{
+				KeyFunction keyFunction = KeyFunction.getFrom(e);
+				if (keyFunction==null) return;
+				
+				switch (keyFunction)
+				{
+				case MoveUp  : moveRow(-1); break;
+				case MoveDown: moveRow(+1); break;
+				}
+			}
+		}
+		
+		static class TableContextMenu extends AbstractPanel.TableContextMenu<BouquetFileData.Entry, BouquetFilePanel, BouquetFileTableModel>
+		{
+			private static final long serialVersionUID = 288857167551760006L;
+			private JMenuItem miMoveUp;
+			private JMenuItem miMoveDown;
+
+			TableContextMenu(OpenWebifController main, BouquetFilePanel tablePanel, BouquetFileTableModel tableModel)
+			{
+				super(main, tablePanel, tableModel);
+				
+				miMoveUp   = OWCTools.createMenuItem(KeyFunction.MoveUp  .addKeyLabel("Move Up"  ), GrayCommandIcons.IconGroup.Up  , ev -> this.tablePanel.moveRow(-1));
+				miMoveDown = OWCTools.createMenuItem(KeyFunction.MoveDown.addKeyLabel("Move Down"), GrayCommandIcons.IconGroup.Down, ev -> this.tablePanel.moveRow(+1));
+				
+				addContextMenuInvokeListener((comp,x,y) -> {
+					miMoveUp  .setEnabled(this.tablePanel.selectedRowIndexes.length==1 && this.tablePanel.selectedRowIndexes[0]>0);
+					miMoveDown.setEnabled(this.tablePanel.selectedRowIndexes.length==1 && this.tablePanel.selectedRowIndexes[0]+1<this.tableModel.getRowCount());
+				});
+			}
+
+			@Override
+			void populateMenu()
+			{
+				add(miMoveUp  );
+				add(miMoveDown);
+				addSeparator();
+				super.populateMenu();
+			}
+		}
+		
 		static class BouquetFileTableModel
 				extends Tables.SimpleGetValueTableModel2<BouquetFileTableModel, BouquetFileData.Entry, BouquetFileTableModel.ColumnID>
 				implements ExtraData.Receiver, AbstractPanel.TableContextMenu.StationIDExtractor<BouquetFileData.Entry>
@@ -686,12 +941,40 @@ public class BouquetFileEditor
 
 			private HashMap<String, String> stationNames;
 			private ExtraData extraData;
+			@SuppressWarnings("unused")
+			private BouquetDataPanel bouquetDataPanel;
 
 			BouquetFileTableModel()
 			{
 				super(ColumnID.values());
 				stationNames = null;
 				extraData = null;
+				bouquetDataPanel = null;
+			}
+
+			boolean swapRows(int index1, int index2)
+			{
+				boolean swapped = dataSource.swapRows(index1, index2);
+				if (swapped)
+				{
+					fireTableRowUpdate(index1);
+					fireTableRowUpdate(index2);
+				}
+				return swapped;
+			}
+
+			boolean isSrefInFile(String sref)
+			{
+				if (sref!=null)
+					for (BouquetFileData.Entry entry : dataSource)
+						if (sref.equals(entry.stationSref))
+							return true;
+				return false;
+			}
+
+			void setOtherPanel(BouquetDataPanel bouquetDataPanel)
+			{
+				this.bouquetDataPanel = bouquetDataPanel;
 			}
 
 			void setStationNames(HashMap<String, String> stationNames)
@@ -713,6 +996,31 @@ public class BouquetFileEditor
 			{
 				return row==null ? null : row.stationID;
 			}
+
+			@Override
+			protected void fireTableRowsAdded(int firstRowIndex, int lastRowIndex)
+			{
+				super.fireTableRowsAdded(firstRowIndex, lastRowIndex);
+			}
+		}
+	}
+	
+	private static class BouquetFileChangeEvent
+	{
+		enum Type
+		{
+			FileChanged, StationsRemoved, StationsAdded;
+			BouquetFileChangeEvent createEvent()
+			{
+				return new BouquetFileChangeEvent(this);
+			}
+		}
+
+		final Type eventType;
+
+		BouquetFileChangeEvent(Type eventType)
+		{
+			this.eventType = eventType;
 		}
 	}
 	
@@ -720,7 +1028,7 @@ public class BouquetFileEditor
 	{
 		File file;
 		String name;
-		final List<Entry> entries;
+		final Vector<Entry> entries;
 		
 		BouquetFileData()
 		{
@@ -790,6 +1098,24 @@ public class BouquetFileEditor
 				}
 			}
 			
+			private Entry(String markerText, String stationSref)
+			{
+				this.markerText = markerText;
+				this.stationSref = stationSref;
+				isMarker = this.markerText!=null;
+				stationID = StationID.parseIDStr(this.stationSref);
+			}
+
+			static Entry createStation(String stationSref)
+			{
+				return new Entry(null, stationSref);
+			}
+
+			@SuppressWarnings("unused")
+			static Entry createMarker(String markerText)
+			{
+				return new Entry(markerText, null);
+			}
 		}
 	}
 	

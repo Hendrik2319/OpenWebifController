@@ -239,7 +239,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates, BouquetsNStations_UpdateCurrentStation,
 			EPGDialogWidth, EPGDialogHeight, EPGDialog_TimeScale, EPGDialog_RowHeight, EPGDialog_LeadTime, EPGDialog_RangeTime,
 			LogWindow_WindowX, LogWindow_WindowY, LogWindow_WindowWidth, LogWindow_WindowHeight,
-			BouquetFileEditor_WindowWidth, BouquetFileEditor_WindowHeight,
+			BouquetFileEditor_WindowX, BouquetFileEditor_WindowY, BouquetFileEditor_WindowWidth, BouquetFileEditor_WindowHeight,
 			MoviesPanel_ShowDescriptionInNameColumn, 
 			SplitPaneDivider_TimersPanel,
 			SplitPaneDivider_SystemInfoPanel,

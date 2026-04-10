@@ -8,7 +8,6 @@ import java.awt.Window;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.Comparator;
-import java.util.Objects;
 
 import javax.swing.Icon;
 import javax.swing.JOptionPane;
@@ -21,6 +20,7 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import net.schwarzbaer.java.lib.gui.IconSource;
+import net.schwarzbaer.java.lib.gui.KeyShortCut;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
@@ -167,70 +167,24 @@ public class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 	
-	enum KeyFunction
+	enum KeyFunction implements KeyShortCut.Container
 	{
-		EditEpisodeStr (KeyEvent.VK_F4),
-		ReorderSiblings(KeyEvent.VK_F5),
-		CopyNodeTitle(KeyEvent.VK_C, false, true, false, false, "Ctrl+C"),
+		EditEpisodeStr (new KeyShortCut(KeyEvent.VK_F4)),
+		ReorderSiblings(new KeyShortCut(KeyEvent.VK_F5)),
+		CopyNodeTitle  (new KeyShortCut(KeyEvent.VK_C, false, true, false, false)),
 		;
-		private final int keyCode;
-		private final boolean withShift;
-		private final boolean withCtrl;
-		private final boolean withAlt;
-		private final boolean withAltGr;
-		private final String keyLabel;
-		
-		KeyFunction(int keyCode) { this(keyCode, false, false, false, false, getKeyText(keyCode, false, false, false, false)); }
-		KeyFunction(
-				int keyCode,
-				boolean withShift,
-				boolean withCtrl ,
-				boolean withAlt  ,
-				boolean withAltGr,
-				String keyLabel
-		) {
-			this.keyCode   = keyCode;
-			this.withShift = withShift;
-			this.withCtrl  = withCtrl;
-			this.withAlt   = withAlt;
-			this.withAltGr = withAltGr;
-			this.keyLabel  = Objects.requireNonNull(keyLabel);
-		}
-		
-		static String getKeyText(
-				int keyCode,
-				boolean withShift,
-				boolean withCtrl ,
-				boolean withAlt  ,
-				boolean withAltGr
-		) {
-			StringBuilder sb = new StringBuilder();
-			if (withCtrl ) sb.append("Ctrl+");
-			if (withAlt  ) sb.append("Alt+");
-			if (withShift) sb.append("Shift+");
-			if (withAltGr) sb.append("AltGr+");
-			sb.append(KeyEvent.getKeyText(keyCode));
-			return sb.toString();
-		}
-		static KeyFunction getFrom(int keyCode, int modifiersEx)
+		final KeyShortCut keyShortCut;
+		KeyFunction(KeyShortCut keyShortCut)
 		{
-			boolean withShift = (modifiersEx & KeyEvent.SHIFT_DOWN_MASK    ) != 0;
-			boolean withCtrl  = (modifiersEx & KeyEvent.CTRL_DOWN_MASK     ) != 0;
-			boolean withAlt   = (modifiersEx & KeyEvent.ALT_DOWN_MASK      ) != 0;
-			boolean withAltGr = (modifiersEx & KeyEvent.ALT_GRAPH_DOWN_MASK) != 0;
-			for (KeyFunction val : values())
-				if ( (val.keyCode   == keyCode  ) &&
-					 (val.withShift == withShift) &&
-					 (val.withCtrl  == withCtrl ) &&
-					 (val.withAlt   == withAlt  ) &&
-					 (val.withAltGr == withAltGr) )
-					return val;
-			return null;
+			this.keyShortCut = keyShortCut;
 		}
-		
-		String addKeyLabel(String baseStr)
+		@Override public KeyShortCut getKeyShortCut()
 		{
-			return "%s (%s)".formatted(baseStr, keyLabel);
+			return keyShortCut;
+		}
+		static KeyFunction getFrom(KeyEvent e)
+		{
+			return KeyShortCut.getFrom(e, values());
 		}
 	}
 
@@ -243,7 +197,7 @@ public class AlreadySeenEventsViewer extends StandardDialog
 
 		@Override public void keyPressed(KeyEvent e)
 		{
-			KeyFunction keyFunction = KeyFunction.getFrom(e.getKeyCode(), e.getModifiersEx());
+			KeyFunction keyFunction = KeyFunction.getFrom(e);
 			if (keyFunction==null) return;
 			
 			switch (keyFunction)

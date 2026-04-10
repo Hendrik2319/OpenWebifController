@@ -403,11 +403,11 @@ class TreeContextMenu extends ContextMenu
 	{
 		String title = "New description";
 		String message = "Is new description an extended description or a standard description?";
-		String[] options = { "Extended", "Standard", "Cancel" };
+		String[] options = { "Standard", "Extended", "Cancel" };
 		int result = JOptionPane.showOptionDialog(window, message, title, JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
 		switch (result) {
-		case 0:  return true;
-		case 1:  return false;
+		case 0:  return false;
+		case 1:  return true;
 		default: return null;
 		}
 	}

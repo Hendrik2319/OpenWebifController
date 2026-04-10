@@ -337,6 +337,9 @@ public class OWCTools
 	public static void runWithProgressDialog(Window parent, String title, Consumer<ProgressDialog> action) {
 		ProgressDialog.runWithProgressDialog(parent, title, 400, action);
 	}
+	public static <ReturnValue> ReturnValue runWithProgressDialogRV(Window parent, String title, Function<ProgressDialog,ReturnValue> action) {
+		return ProgressDialog.runWithProgressDialogRV(parent, title, 400, action);
+	}
 	
 	public static Consumer<String> createProgressTaskFcn(ProgressView pd, String moduleTitle) {
 		return taskTitle -> setIndeterminateProgressTask(pd, moduleTitle+": "+taskTitle);

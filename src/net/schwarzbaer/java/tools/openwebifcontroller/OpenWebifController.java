@@ -17,7 +17,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
@@ -58,6 +60,7 @@ import net.schwarzbaer.java.lib.system.Settings;
 import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools.LogWindowInterface;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer;
+import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetFileEditor;
 import net.schwarzbaer.java.tools.openwebifcontroller.bouquetsnstations.BouquetsNStations;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.AbstractControlPanel;
 import net.schwarzbaer.java.tools.openwebifcontroller.controls.MessageControl;
@@ -236,6 +239,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			BouquetsNStations_UpdateEPGAlways, BouquetsNStations_TextViewLineWrap, BouquetsNStations_UpdatePlayableStates, BouquetsNStations_UpdateCurrentStation,
 			EPGDialogWidth, EPGDialogHeight, EPGDialog_TimeScale, EPGDialog_RowHeight, EPGDialog_LeadTime, EPGDialog_RangeTime,
 			LogWindow_WindowX, LogWindow_WindowY, LogWindow_WindowWidth, LogWindow_WindowHeight,
+			BouquetFileEditor_WindowWidth, BouquetFileEditor_WindowHeight,
 			MoviesPanel_ShowDescriptionInNameColumn, 
 			SplitPaneDivider_TimersPanel,
 			SplitPaneDivider_SystemInfoPanel,
@@ -243,6 +247,9 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			SplitPaneDivider_BouquetsNStations_CenterPanel,
 			SplitPaneDivider_BouquetsNStations_ValuePanel,
 			SplitPaneDivider_BouquetsNStations_SingleStationEPGPanel,
+			SplitPaneDivider_BouquetFileEditor_ContentPane,
+			SplitPaneDivider_BouquetFileEditor_BouquetDataPanel,
+			SplitPaneDivider_BouquetFileEditor_BouquetFilePanel,
 			AlreadySeenEventsViewer_EpisodeStringFirst,
 			AlreadySeenEventsViewer_RootSubNodeOrder,
 			LookAndFeel, UserDefColors,
@@ -404,6 +411,20 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		extrasMenu.add(OWCTools.createMenuItem("Remote Control Tool", e->{
 			new RemoteControlTool(true);
 		}));
+		extrasMenu.add(OWCTools.createMenuItem("Bouquet File Editor", e->{
+			BouquetFileEditor.startAsSubWindow(
+					this,
+					bouquetsNStations.getBouquetData(),
+					editor -> getBaseURLAndRunWithProgressDialog(
+							BouquetFileEditor.ProgressDialogTitle_ReadBouquetData,
+							(baseURL, pd) -> {
+									bouquetsNStations.readData(baseURL, pd, () -> {
+											editor.setData(bouquetsNStations.getBouquetData());
+									});
+							}
+					)
+			);
+		}));
 		
 		lookAndFeelSwitch.setUITreeRoot(mainWindow);
 		extrasMenu.add(lookAndFeelSwitch.createMenu("Look & Feel"));
@@ -556,8 +577,19 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 			runWithProgressDialog(dlgTitle, pd->action.accept(baseURL, pd));
 	}
 	
+	public <ReturnValue> ReturnValue getBaseURLAndRunWithProgressDialogRV(String dlgTitle, BiFunction<String,ProgressDialog,ReturnValue> action) {
+		String baseURL = getBaseURL();
+		if (baseURL == null)
+			return null;
+		return runWithProgressDialogRV(dlgTitle, pd->action.apply(baseURL, pd));
+	}
+	
 	public void runWithProgressDialog(String title, Consumer<ProgressDialog> action) {
 		OWCTools.runWithProgressDialog(mainWindow, title, action);
+	}
+
+	public <ReturnValue> ReturnValue runWithProgressDialogRV(String title, Function<ProgressDialog, ReturnValue> action) {
+		return OWCTools.runWithProgressDialogRV(mainWindow, title, action);
 	}
 
 	@Override

@@ -177,6 +177,11 @@ public class BouquetsNStations extends JPanel {
 			periodicUpdater10s.start();
 	}
 	
+	public BouquetData getBouquetData()
+	{
+		return bsTreeRoot==null ? null : bsTreeRoot.bouquetData;
+	}
+
 	private boolean isSameTransponder(StationID stationID)
 	{
 		return StationID.isSameTransponder(transponderListBaseStation, stationID);
@@ -544,6 +549,10 @@ public class BouquetsNStations extends JPanel {
 	}
 
 	public void readData(String baseURL, ProgressView pd) {
+		readData(baseURL, pd, null);
+	}
+
+	public void readData(String baseURL, ProgressView pd, Runnable update) {
 		if (baseURL==null) return;
 		
 		BouquetData bouquetData = OpenWebifTools.readBouquets(baseURL, taskTitle -> OWCTools.setIndeterminateProgressTask(pd, "Bouquets 'n' Stations: "+taskTitle));
@@ -556,6 +565,8 @@ public class BouquetsNStations extends JPanel {
 				bsTreeModel = new DefaultTreeModel(bsTreeRoot, true);
 				bsTree.setModel(bsTreeModel);
 				PICON_LOADER.setTreeModel(bsTreeModel,bsTreeRoot);
+				if (update!=null)
+					update.run();
 			});
 		}
 	}

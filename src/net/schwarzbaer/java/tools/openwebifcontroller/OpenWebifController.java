@@ -340,6 +340,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 	private final SystemInfoPanel systemInfoPanel;
 	private final RemoteControlPanel remoteControl;
 	private final LogWindow logWindow;
+	public  final ListenerController listenerController;
 
 	OpenWebifController(LookAndFeelSwitch<AppSettings.ValueKey> lookAndFeelSwitch, boolean asSubWindow) {
 		systemInfo = null;
@@ -351,6 +352,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		exeFileChooser.setFileFilter(new FileNameExtensionFilter("Executable (*.exe)","exe"));
 		
 		mainWindow = createMainWindow("OpenWebif Controller",asSubWindow);
+		listenerController = ListenerController.createFor(mainWindow);
 		
 		logWindow = new LogWindow(mainWindow, "Response Log");
 		

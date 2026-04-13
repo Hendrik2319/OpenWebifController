@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 
 import javax.swing.Icon;
@@ -69,9 +70,9 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 	@Override public boolean isLeaf() { return children.isEmpty(); }
 	@Override public Enumeration<ChildType> children() { return children.elements(); }
 	
-	static class StationList {
-		private final HashMap<String,Vector<StationNode>> stations;
-		StationList() { stations = new HashMap<>(); }
+	static class StationList
+	{
+		private final HashMap<String,Vector<StationNode>> stations = new HashMap<>();
 
 		StationNode add(StationNode stationNode) {
 			StationID stationID = stationNode.getStationID();
@@ -82,7 +83,7 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 			return stationNode;
 		}
 		
-		public boolean remove(StationNode stationNode)
+		boolean remove(StationNode stationNode)
 		{
 			StationID stationID = stationNode.getStationID();
 			Vector<StationNode> stationsWithID = get(stationID);
@@ -90,8 +91,13 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 			return stationsWithID.remove(stationNode);
 		}
 
-		public Vector<StationNode> get(StationID stationID) {
+		Vector<StationNode> get(StationID stationID) {
 			return stations.get(stationID.toIDStr());
+		}
+		
+		void forEach(BiConsumer<String,Vector<StationNode>> action)
+		{
+			stations.forEach(action);
 		}
 	}
 	
@@ -119,10 +125,19 @@ class BSTreeNode<ParentType extends TreeNode, ChildType extends TreeNode> implem
 				doWithStationNodes.accept(stations);
 			
 			if (treeModel!=null)
-				SwingUtilities.invokeLater(()->{
-					for (BSTreeNode.StationNode treeNode:stations)
-						treeModel.nodeChanged(treeNode);
-				});
+				SwingUtilities.invokeLater(() -> stations.forEach(treeModel::nodeChanged));
+		}
+
+		void updateAllStationNodes(DefaultTreeModel treeModel, BiPredicate<StationID, Vector<BSTreeNode.StationNode>> doWithStationNodes)
+		{
+			if (doWithStationNodes==null) return;
+			stations.forEach((stationIDStr,stations) -> {
+				if (stations.isEmpty()) return;
+				StationID stationID = stations.firstElement().getStationID();
+				boolean hasChanged = doWithStationNodes.test(stationID, stations);
+				if (hasChanged && treeModel!=null)
+					SwingUtilities.invokeLater(() -> stations.forEach(treeModel::nodeChanged));
+			});
 		}
 	}
 	

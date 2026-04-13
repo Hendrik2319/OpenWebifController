@@ -55,9 +55,9 @@ import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.AppSet
 import net.schwarzbaer.java.tools.openwebifcontroller.TimersPanel.TimerDataUpdateNotifier;
 import net.schwarzbaer.java.tools.openwebifcontroller.epg.SingleStationEPGPanel;
 
-public class BouquetsNStations extends JPanel {
+public class BouquetsNStations extends JPanel
+{
 	private static final long serialVersionUID = 1873358104402086477L;
-	static final PiconLoader PICON_LOADER = new PiconLoader();
 	
 	private final OpenWebifController main;
 	private final JTree bsTree;
@@ -77,7 +77,8 @@ public class BouquetsNStations extends JPanel {
 	private final Vector<BSTreeNode.StationNode> selectedStationNodes;
 	private StationID transponderListBaseStation;
 
-	public BouquetsNStations(OpenWebifController main, TimerDataUpdateNotifier timerDataUpdateNotifier) {
+	public BouquetsNStations(OpenWebifController main, TimerDataUpdateNotifier timerDataUpdateNotifier)
+	{
 		super(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		
@@ -91,7 +92,6 @@ public class BouquetsNStations extends JPanel {
 		};
 		bsTreeRoot = null;
 		bsTreeModel = null;
-		PICON_LOADER.clear();
 		selectedStationNodes = new Vector<>();
 		
 		m3uFileChooser = new FileChooser("Playlist", "m3u");
@@ -105,7 +105,6 @@ public class BouquetsNStations extends JPanel {
 		treeScrollPane.setPreferredSize(new Dimension(300,500));
 		
 		statusLine = new StatusOut();
-		PICON_LOADER.setStatusOutput(statusLine);
 		
 		valuePanel = new ValuePanel(this.main::getBaseURL);
 		singleStationEPGPanel = new SingleStationEPGPanel(
@@ -175,6 +174,15 @@ public class BouquetsNStations extends JPanel {
 		
 		if (shouldPeriodicUpdaterRun())
 			periodicUpdater10s.start();
+		
+		this.main.listenerController.addListener(PiconLoader.getInstance(), new PiconLoader.Listener() {
+			@Override public void updatePicon(StationID stationID, BufferedImage piconImage) {
+				updateTreeNodeIcons(stationID, piconImage);
+			}
+			@Override public void showMessage(String msg, int duration_ms) {
+				statusLine.showMessage(msg, duration_ms);
+			}
+		});
 	}
 	
 	public BouquetData getBouquetData()
@@ -185,6 +193,36 @@ public class BouquetsNStations extends JPanel {
 	private boolean isSameTransponder(StationID stationID)
 	{
 		return StationID.isSameTransponder(transponderListBaseStation, stationID);
+	}
+	
+	private void updateTreeNodeIcons(StationID stationID, BufferedImage piconImage)
+	{
+		if (bsTreeModel!=null && bsTreeRoot!=null)
+		{
+			Icon icon = BSTreeNode.StationNode.getIcon(piconImage);
+			bsTreeRoot.updateStationNodes(stationID, bsTreeModel, stations -> stations.forEach(treeNode -> treeNode.setPicon(piconImage, icon)));
+		}
+	}
+	
+	private void fetchAllTreeNodeIcons()
+	{
+		if (bsTreeModel!=null && bsTreeRoot!=null)
+		{
+			PiconLoader piconLoader = PiconLoader.getInstance();
+			bsTreeRoot.updateAllStationNodes(
+					bsTreeModel,
+					(stationID,stations) ->
+					{
+						BufferedImage piconImage = piconLoader.getPicon(stationID);
+						if (piconImage==null) return false;
+						
+						Icon icon = BSTreeNode.StationNode.getIcon(piconImage);
+						stations.forEach(treeNode -> treeNode.setPicon(piconImage, icon));
+						
+						return true;
+					}
+			);
+		}
 	}
 	
 	private void updateEPGPanel(TreePath treePath)
@@ -280,13 +318,13 @@ public class BouquetsNStations extends JPanel {
 			
 			addSeparator();
 			
-			JMenuItem miUpdatePlayableStatesBouquet = add(OWCTools.createMenuItem("Update 'Is Playable' States of Bouquet", GrayCommandIcons.IconGroup.Reload, e->{
+			JMenuItem miUpdatePlayableStatesBouquet = add(OWCTools.createMenuItem("##", GrayCommandIcons.IconGroup.Reload, e->{
 				String baseURL = main.getBaseURL();
 				if (baseURL==null) return;
 				periodicUpdater10s.runOnce( () -> updatePlayableStates(baseURL, clickedBouquetNode) );
 			}));
 			
-			JMenuItem miWriteBouquetStreamsToM3U = add(OWCTools.createMenuItem("Write Streams of Bouquet to M3U-File", GrayCommandIcons.IconGroup.Save, e->{
+			JMenuItem miWriteBouquetStreamsToM3U = add(OWCTools.createMenuItem("##", GrayCommandIcons.IconGroup.Save, e->{
 				if (clickedBouquetNode==null) return;
 				
 				String baseURL = main.getBaseURL();
@@ -299,12 +337,12 @@ public class BouquetsNStations extends JPanel {
 				main.openFileInVideoPlayer(m3uFile, String.format("Open Playlist of Bouquet: %s", clickedBouquetNode.bouquet.name));
 			}));
 			
-			JMenuItem miShowEPGforBouquet = add(OWCTools.createMenuItem("Show EPG for Bouquet", e->{
+			JMenuItem miShowEPGforBouquet = add(OWCTools.createMenuItem("##", e->{
 				if (clickedBouquetNode==null) return;
 				main.openEPGDialog(clickedBouquetNode.bouquet);
 			}));
 			
-			JCheckBoxMenuItem chkbxMiGroupStations = OWCTools.createCheckBoxMenuItem("Group stations of bouquet by transponder", false, checked -> {
+			JCheckBoxMenuItem chkbxMiGroupStations = OWCTools.createCheckBoxMenuItem("##", false, checked -> {
 				BSTreeNode.BouquetNode bouquetNode = clickedBouquetNode!=null ? clickedBouquetNode : parentBouquetNode;
 				if (bouquetNode==null) return;
 				bouquetNode.changeSubNodeStructure(
@@ -320,23 +358,27 @@ public class BouquetsNStations extends JPanel {
 			
 			addSeparator();
 			
-			JMenuItem miLoadPicons = add(OWCTools.createMenuItem("Load Picons", GrayCommandIcons.IconGroup.Image, e->{
-				if (clickedBouquetNode!=null) {
+			JMenuItem miLoadPicons = add(OWCTools.createMenuItem("##", GrayCommandIcons.IconGroup.Image, e->{
+				PiconLoader piconLoader = PiconLoader.getInstance();
+				if (clickedBouquetNode!=null)
+				{
 					String baseURL = main.getBaseURL();
 					if (baseURL==null) return;
-					PICON_LOADER.setBaseURL(baseURL);
-					clickedBouquetNode.forEachStation(stationNode -> PICON_LOADER.addTask(stationNode.getStationID()));
-				} else if (clickedStationNode!=null) {
+					piconLoader.setBaseURL(baseURL);
+					clickedBouquetNode.forEachStation(stationNode -> piconLoader.addTask(stationNode.getStationID()));
+				}
+				else if (clickedStationNode!=null)
+				{
 					String baseURL = main.getBaseURL();
 					if (baseURL==null) return;
-					PICON_LOADER.setBaseURL(baseURL);
-					PICON_LOADER.addTask(clickedStationNode.getStationID());
+					piconLoader.setBaseURL(baseURL);
+					piconLoader.addTask(clickedStationNode.getStationID());
 				}
 			}));
-			JMenuItem miSwitchToStation = add(OWCTools.createMenuItem("Switch To Station",                                   e->main. zapToStation(clickedStationNode.getStationID())));
-			JMenuItem miStreamStation   = add(OWCTools.createMenuItem("Stream Station"   , GrayCommandIcons.IconGroup.Image, e->main.streamStation(clickedStationNode.getStationID())));
+			JMenuItem miSwitchToStation = add(OWCTools.createMenuItem("##",                                   e->main. zapToStation(clickedStationNode.getStationID())));
+			JMenuItem miStreamStation   = add(OWCTools.createMenuItem("##", GrayCommandIcons.IconGroup.Image, e->main.streamStation(clickedStationNode.getStationID())));
 			
-			JMenuItem miShowSameTransponder = add(OWCTools.createMenuItem("Show Same Transponder", e->{
+			JMenuItem miShowSameTransponder = add(OWCTools.createMenuItem("##", e->{
 				if (isSameTransponder(clickedStationNode.getStationID()))
 					transponderListBaseStation = null;
 				else
@@ -383,11 +425,11 @@ public class BouquetsNStations extends JPanel {
 							: bouquetNode.isSubNodeStructureType( BSTreeNode.BouquetNode.SubNodeStructureType.GroupedByTransponder )
 				);
 				miLoadPicons.setText(
-						clickedBouquetNode!=null ?
-								String.format("Load Picons of Bouquet \"%s\"", clickedBouquetNode.bouquet.name) :
-								(clickedStationNode!=null && !clickedStationNode.subservice.isMarker()) ?
-										String.format("Load Picon of \"%s\"", clickedStationNode.subservice.name) :
-										"Load Picons"
+						clickedBouquetNode!=null
+							? String.format("Load Picons of Bouquet \"%s\"", clickedBouquetNode.bouquet.name)
+							: (clickedStationNode!=null && !clickedStationNode.subservice.isMarker())
+								? String.format("Load Picon of \"%s\"", clickedStationNode.subservice.name)
+								: "Load Picons"
 				);
 				miSwitchToStation.setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Switch To \"%s\"", clickedStationNode.subservice.name) : "Switch To Station");
 				miStreamStation  .setText(clickedStationNode!=null && !clickedStationNode.subservice.isMarker() ? String.format("Stream \"%s\""   , clickedStationNode.subservice.name) : "Stream Station"   );
@@ -559,20 +601,14 @@ public class BouquetsNStations extends JPanel {
 		
 		if (bouquetData!=null) {
 			OWCTools.callInGUIThread(() -> {
-				PICON_LOADER.clear();
-				PICON_LOADER.setBaseURL(baseURL);
 				bsTreeRoot = new BSTreeNode.RootNode(bouquetData);
 				bsTreeModel = new DefaultTreeModel(bsTreeRoot, true);
 				bsTree.setModel(bsTreeModel);
-				PICON_LOADER.setTreeModel(bsTreeModel,bsTreeRoot);
+				fetchAllTreeNodeIcons();
 				if (update!=null)
 					update.run();
 			});
 		}
-	}
-	
-	void clearPiconCache() {
-		PICON_LOADER.clearPiconCache();
 	}
 
 	private void writeStreamsToM3U(Vector<BSTreeNode.StationNode> stationNodes, String baseURL, File m3uFile) {

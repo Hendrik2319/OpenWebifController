@@ -4,7 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Graphics2D;
+import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -39,6 +39,7 @@ import javax.swing.tree.TreeSelectionModel;
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.FileChooser;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
+import net.schwarzbaer.java.lib.gui.ImageView;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.ProgressView;
 import net.schwarzbaer.java.lib.gui.TextAreaDialog;
@@ -204,7 +205,7 @@ public class BouquetsNStations extends JPanel
 		}
 	}
 	
-	private void fetchAllTreeNodeIcons()
+	private void fetchAllTreeNodeIcons(boolean overwrite)
 	{
 		if (bsTreeModel!=null && bsTreeRoot!=null)
 		{
@@ -214,9 +215,9 @@ public class BouquetsNStations extends JPanel
 					(stationID,stations) ->
 					{
 						BufferedImage piconImage = piconLoader.getPicon(stationID);
-						if (piconImage==null) return false;
+						if (piconImage==null && !overwrite) return false;
 						
-						Icon icon = BSTreeNode.StationNode.getIcon(piconImage);
+						Icon icon = piconImage==null ? null : BSTreeNode.StationNode.getIcon(piconImage);
 						stations.forEach(treeNode -> treeNode.setPicon(piconImage, icon));
 						
 						return true;
@@ -375,6 +376,13 @@ public class BouquetsNStations extends JPanel
 					piconLoader.addTask(clickedStationNode.getStationID());
 				}
 			}));
+			
+			add(OWCTools.createMenuItem("Clear Picon Cache", GrayCommandIcons.IconGroup.Delete, ev -> {
+				PiconLoader.getInstance().clearPiconCache();
+				fetchAllTreeNodeIcons(true);
+			}));
+			
+			
 			JMenuItem miSwitchToStation = add(OWCTools.createMenuItem("##",                                   e->main. zapToStation(clickedStationNode.getStationID())));
 			JMenuItem miStreamStation   = add(OWCTools.createMenuItem("##", GrayCommandIcons.IconGroup.Image, e->main.streamStation(clickedStationNode.getStationID())));
 			
@@ -604,7 +612,7 @@ public class BouquetsNStations extends JPanel
 				bsTreeRoot = new BSTreeNode.RootNode(bouquetData);
 				bsTreeModel = new DefaultTreeModel(bsTreeRoot, true);
 				bsTree.setModel(bsTreeModel);
-				fetchAllTreeNodeIcons();
+				fetchAllTreeNodeIcons(false);
 				if (update!=null)
 					update.run();
 			});
@@ -673,14 +681,23 @@ public class BouquetsNStations extends JPanel
 
 	public static BufferedImage scaleImage(BufferedImage img, int newHeight, Color bgColor) {
 		if (img==null) return null;
+		
+		BufferedImage img2;
+		if (bgColor==null)
+			img2 = img;
+		else
+		{
+			img2 = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+			Graphics g = img2.getGraphics();
+			g.drawImage(img, 0,0, bgColor, null);
+		}
+		
 		int h = img.getHeight();
 		int w = img.getWidth();
 		int newWidth = (int) Math.round(w*newHeight / (double)h);
-		BufferedImage newImg = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
-		Graphics2D g2 = newImg.createGraphics();
-		//g2.setRenderingHint(RenderingHints., hintValue);
-		g2.drawImage(img, 0,0, newWidth,newHeight, bgColor, null);
-		return newImg;
+		BufferedImage scaledImg = ImageView.computeScaledImageByAreaSampling(img2, newWidth, newHeight, true);
+		
+		return scaledImg;
 	}
 	
 	static class StatusOut {

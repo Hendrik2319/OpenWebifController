@@ -17,7 +17,6 @@ import javax.swing.JTree;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
-import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionMaps;
@@ -26,7 +25,6 @@ import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadyS
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.KeyFunction;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.SelectionInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.AbstractTreeNode;
-import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionChanger;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.ECSGroupTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.EventCriteriaSetTreeNode;
@@ -59,7 +57,7 @@ class TreeContextMenu extends ContextMenu
 		} ) );
 		
 		JMenuItem miEditEpisodeStr = add( OWCTools.createMenuItem( "##", e->{
-			this.viewer.editEpisodeStr(window, clicked);
+			this.viewer.editEpisodeStr(clicked);
 		} ) );
 		
 		add(OWCTools.createCheckBoxMenuItem("Show Episode Text before Title", this.factory.isEpisodeStringFirst(), val -> {
@@ -69,26 +67,8 @@ class TreeContextMenu extends ContextMenu
 		
 		addSeparator();
 		
-		JMenuItem miEditDesc = add(OWCTools.createMenuItem("Edit Description Text", e -> {
-			if (clicked.descriptionTreeNode==null) return;
-			String newDesc = TextAreaDialog.editText(window, "Edit Description Text", 400, 200, true, clicked.descriptionTreeNode.description.getText());
-			if (newDesc!=null)
-			{
-				DescriptionChanger.Response response = clicked.descriptionTreeNode.description.setText(newDesc);
-				if (response.success())
-				{
-					clicked.descriptionTreeNode.updateTitle();
-					this.getCurrentTreeModel.get().fireTreeNodeUpdate(clicked.descriptionTreeNode);
-					this.tree.repaint();
-					AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
-				}
-				else
-				{
-					String[] msg = { "Can't change description text:", response.reasonWhyNot() };
-					String title = "Can't change";
-					JOptionPane.showMessageDialog(window, msg, title, JOptionPane.WARNING_MESSAGE);
-				}
-			}
+		JMenuItem miEditDesc = add(OWCTools.createMenuItem( KeyFunction.EditDescText.addKeyLabel("Edit Description Text"), e -> {
+			this.viewer.editDescriptionText(clicked);
 		}));
 		
 		JMenu menuDescOperator = OWCTools.createMenu("##");

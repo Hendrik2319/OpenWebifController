@@ -22,10 +22,12 @@ import javax.swing.tree.TreeSelectionModel;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.KeyShortCut;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
+import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeInfo;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.AbstractTreeNode;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionChanger;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.ECSGroupTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.EventCriteriaSetTreeNode;
@@ -98,13 +100,13 @@ public class AlreadySeenEventsViewer extends StandardDialog
 		new AlreadySeenEventsViewer(parent, title).showDialog();
 	}
 	
-	void editEpisodeStr(Window window, SelectionInfo selected)
+	void editEpisodeStr(SelectionInfo selected)
 	{
 		if (selected.episodeInfo==null)
 			return;
 		
 		String episodeStr = !selected.episodeInfo.hasEpisodeStr() ? "" : selected.episodeInfo.episodeStr;
-		String result = JOptionPane.showInputDialog(window, "Episode Text", episodeStr);
+		String result = JOptionPane.showInputDialog(this, "Episode Text", episodeStr);
 		if (result!=null)
 		{
 			selected.episodeInfo.episodeStr = result;
@@ -112,6 +114,29 @@ public class AlreadySeenEventsViewer extends StandardDialog
 			treeModel.fireTreeNodeUpdate(selected.treeNode);
 			tree.repaint();
 			AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.EpisodeText);
+		}
+	}
+
+	void editDescriptionText(SelectionInfo selected)
+	{
+		if (selected.descriptionTreeNode==null) return;
+		String newDesc = TextAreaDialog.editText(this, "Edit Description Text", 400, 200, true, selected.descriptionTreeNode.description.getText());
+		if (newDesc!=null)
+		{
+			DescriptionChanger.Response response = selected.descriptionTreeNode.description.setText(newDesc);
+			if (response.success())
+			{
+				selected.descriptionTreeNode.updateTitle();
+				treeModel.fireTreeNodeUpdate(selected.descriptionTreeNode);
+				tree.repaint();
+				AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.RuleSet);
+			}
+			else
+			{
+				String[] msg = { "Can't change description text:", response.reasonWhyNot() };
+				String title = "Can't change";
+				JOptionPane.showMessageDialog(this, msg, title, JOptionPane.WARNING_MESSAGE);
+			}
 		}
 	}
 
@@ -170,6 +195,7 @@ public class AlreadySeenEventsViewer extends StandardDialog
 	enum KeyFunction implements KeyShortCut.Container
 	{
 		EditEpisodeStr (new KeyShortCut(KeyEvent.VK_F4)),
+		EditDescText   (new KeyShortCut(KeyEvent.VK_F2)),
 		ReorderSiblings(new KeyShortCut(KeyEvent.VK_F5)),
 		CopyNodeTitle  (new KeyShortCut(KeyEvent.VK_C, false, true, false, false)),
 		;
@@ -203,7 +229,11 @@ public class AlreadySeenEventsViewer extends StandardDialog
 			switch (keyFunction)
 			{
 			case EditEpisodeStr:
-				editEpisodeStr(AlreadySeenEventsViewer.this, selected);
+				editEpisodeStr(selected);
+				break;
+				
+			case EditDescText:
+				editDescriptionText(selected);
 				break;
 				
 			case ReorderSiblings:

@@ -823,7 +823,13 @@ public class AlreadySeenEvents
 		if (description == null)
 			return null; // no description defined in source
 		
-		for (String descStr : descriptions.keySet())
+		List<String> descStrs = descriptions
+			.keySet()
+			.stream()
+			.sorted(Comparator.comparing(String::length, Comparator.reverseOrder()))
+			.toList();
+		
+		for (String descStr : descStrs)
 		{
 			DescriptionData descriptionData = descriptions.get(descStr);
 			if (descMeetsCriteria(description, descStr, descriptionData.operator))

@@ -664,6 +664,11 @@ class MoviesPanel extends JSplitPane {
 			fldDesc.setWrapStyleWord(true);
 			JScrollPane fldDescScrollPane = new JScrollPane(fldDesc);
 			
+			AlreadySeenEvents.RuleOutput rule = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(movie);
+			String episodeStr = rule!=null ? rule.episodeStr : null;
+			JTextField fldEpisode = new JTextField(episodeStr, 30);
+			fldEpisode.setEditable(false);
+			
 			btnOk = OWCTools.createButton("Ok", true, e->{
 				result = new NewTitleDesc(fldTitle.getText(), fldDesc.getText());
 				closeDialog();
@@ -691,12 +696,14 @@ class MoviesPanel extends JSplitPane {
 			c.gridx = 0; c.gridy = 0;
 			c.gridy++; panel.add(checkBoxTitle, c);
 			c.gridy++; panel.add(checkBoxDesc, c);
+			c.gridy++; panel.add(new JLabel("Episode :  "), c);
 			
 			c.weightx = 1;
 			c.gridx = 1; c.gridy = 0;
 			c.gridy++; c.weighty = 0; panel.add(fldTitle, c);
 			c.fill = GridBagConstraints.BOTH;
 			c.gridy++; c.weighty = 1; panel.add(fldDescScrollPane, c);
+			c.gridy++; c.weighty = 0; panel.add(fldEpisode, c);
 			
 			createGUI(
 					panel,

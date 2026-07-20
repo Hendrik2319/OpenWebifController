@@ -69,8 +69,6 @@ import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadyS
 
 class MoviesPanel extends JSplitPane {
 	private static final long serialVersionUID = 3435419463730240276L;
-	
-	private static final DateTimeFormatter dtFormatter = new DateTimeFormatter();
 
 	private final OpenWebifController main;
 	
@@ -560,7 +558,7 @@ class MoviesPanel extends JSplitPane {
 		out.add(0, null                 , movie.length_s           );
 		out.add(0, "begintime"          , movie.begintime          );
 		out.add(0, "recordingtime"      , movie.recordingtime      );
-		out.add(0, null                 , "%s", dtFormatter.getTimeStr(movie.recordingtime*1000, true, true, false, true, false) );
+		out.add(0, null                 , "%s", DateTimeFormatter.getTimeStr(movie.recordingtime*1000, true, true, false, true, false) );
 		out.add(0, "lastseen"           , movie.lastseen           );
 		out.add(0, "filesize"           , movie.filesize           );
 		out.add(0, "filesize_readable"  , movie.filesize_readable  );
@@ -903,7 +901,7 @@ class MoviesPanel extends JSplitPane {
 			Progress(config("Progress",    Long.class,  60,   null).setValFunc(m->m.lastseen         )),
 			Length  (config("Length"  , Integer.class,  50,   null).setValFunc(m->m.length_s         ).setToStringR(m->m.lengthStr        )),
 			Size    (config("Size"    ,    Long.class,  60,   null).setValFunc(m->m.filesize         ).setToStringR(m->m.filesize_readable)),
-			Time    (config("Time"    ,    Long.class, 110,   null).setValFunc(m->m.recordingtime    ).setToStringR(m->dtFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false))),
+			Time    (config("Time"    ,    Long.class, 110,   null).setValFunc(m->m.recordingtime    ).setToStringR(m->DateTimeFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false))),
 			Seen    (config("Seen"    ,  String.class,  75, CENTER).setValFunc(m->toString(AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(m)))),
 			Station (config("Station" ,  String.class, 110,   null).setValFunc(m->m.servicename      )),
 			File    (config("File"    ,  String.class, 450,   null).setValFunc(m->m.filename_stripped)),

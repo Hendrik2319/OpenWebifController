@@ -41,6 +41,7 @@ import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.Timers;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.openwebif.Timers.Timer.Type;
+import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.LogWindow;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController;
@@ -102,7 +103,7 @@ public class StationSwitch {
 		
 		EPG epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
-				return OWCTools.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+				return DateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
 			}
 		});
 		

@@ -57,7 +57,6 @@ public class OWCTools
 			else               throw new IllegalStateException(message);
 		}
 	}
-	public static DateTimeFormatter dateTimeFormatter = new DateTimeFormatter();
 	
 //	private static final Color BGCOLOR_Type_Record        = new Color(0xD9D9FF);
 //	private static final Color BGCOLOR_Type_RecordNSwitch = new Color(0xD9FFFF);
@@ -297,8 +296,8 @@ public class OWCTools
 			else
 				end = begin;
 			
-			out.add(indentLevel+1, "Begin", "%s", OWCTools.dateTimeFormatter.getTimeStr(begin*1000, Locale.GERMANY, true, true, false, true, false));
-			out.add(indentLevel+1, "End"  , "%s", OWCTools.dateTimeFormatter.getTimeStr(end  *1000, Locale.GERMANY, true, true, false, true, false));
+			out.add(indentLevel+1, "Begin", "%s", DateTimeFormatter.getTimeStr(begin*1000, Locale.GERMANY, true, true, false, true, false));
+			out.add(indentLevel+1, "End"  , "%s", DateTimeFormatter.getTimeStr(end  *1000, Locale.GERMANY, true, true, false, true, false));
 		}
 		else
 		{
@@ -360,11 +359,11 @@ public class OWCTools
 	}
 
 	public static String getCurrentTimeStr() {
-		return dateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
+		return DateTimeFormatter.getTimeStr(System.currentTimeMillis(), false, false, false, true, false);
 	}
 	
 	public static String formatDate(long millis, boolean withTextDay, boolean withDate, boolean dateIsLong, boolean withTime, boolean withTimeZone) {
-		return dateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
+		return DateTimeFormatter.getTimeStr(millis, Locale.GERMANY,  withTextDay,  withDate, dateIsLong, withTime, withTimeZone);
 	}
 
 	public static JRadioButton createRadioButton(String text, ButtonGroup bg, boolean selected, Consumer<Boolean> setValue) {
@@ -565,13 +564,13 @@ public class OWCTools
 			if (event.begin!=null) out.add(level, "Begin", event.begin);
 			if (event.end  !=null) out.add(level, "End"  , event.end  );
 		}
-		out.add(level, "Begin"     , "%s", event.begin_timestamp==null ? "<null>" : dateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
+		out.add(level, "Begin"     , "%s", event.begin_timestamp==null ? "<null>" : DateTimeFormatter.getTimeStr(event.begin_timestamp*1000, true, true, false, true, false) );
 		if (event.isUpToDate)
 		{
 			if (event.now_timestamp==0)
 				out.add(level, "Now", "%s", event.now_timestamp);
 			else
-				out.add(level, "Now", "%s", dateTimeFormatter.getTimeStr(event.now_timestamp*1000, true, true, false, true, false) );
+				out.add(level, "Now", "%s", DateTimeFormatter.getTimeStr(event.now_timestamp*1000, true, true, false, true, false) );
 		}
 		if (event.duration_sec==null)
 			out.add(level, "Duration"  , "%s", "<null>");
@@ -638,16 +637,16 @@ public class OWCTools
 		out.add(indentLevel, "realbegin"          , timer.realbegin          );
 		out.add(indentLevel, "realend"            , timer.realend            );
 		out.add(indentLevel, "begin"              , timer.begin              );
-		out.add(indentLevel, ""                   , "%s", dateTimeFormatter.getTimeStr(           timer.begin       *1000 , Locale.GERMANY,  true,  true, false, true, false) );
+		out.add(indentLevel, ""                   , "%s", DateTimeFormatter.getTimeStr(           timer.begin       *1000 , Locale.GERMANY,  true,  true, false, true, false) );
 		out.add(indentLevel, "end"                , timer.end                );
-		out.add(indentLevel, ""                   , "%s", dateTimeFormatter.getTimeStr(           timer.end         *1000 , Locale.GERMANY,  true,  true, false, true, false) );
+		out.add(indentLevel, ""                   , "%s", DateTimeFormatter.getTimeStr(           timer.end         *1000 , Locale.GERMANY,  true,  true, false, true, false) );
 		out.add(indentLevel, "duration"           , timer.duration);
 		out.add(indentLevel, ""                   , "%s", DateTimeFormatter.getDurationStr(timer.duration));
 		out.add(indentLevel, "startprepare"       , timer.startprepare       );
-		out.add(indentLevel, ""                   , "%s", dateTimeFormatter.getTimeStr(Math.round(timer.startprepare*1000), Locale.GERMANY,  true,  true, false, true, false) );
+		out.add(indentLevel, ""                   , "%s", DateTimeFormatter.getTimeStr(Math.round(timer.startprepare*1000), Locale.GERMANY,  true,  true, false, true, false) );
 		out.add(indentLevel, "nextactivation"     , timer.nextactivation     );
 		if (timer.nextactivation!=null)
-			out.add(indentLevel, ""               , "%s", dateTimeFormatter.getTimeStr(timer.nextactivation.longValue()*1000, Locale.GERMANY,  true,  true, false, true, false) );
+			out.add(indentLevel, ""               , "%s", DateTimeFormatter.getTimeStr(timer.nextactivation.longValue()*1000, Locale.GERMANY,  true,  true, false, true, false) );
 		out.add(indentLevel, "eit"                , timer.eit                );
 		out.add(indentLevel, "justplay"           , "%s (%d)", timer.justplay  ==1, timer.justplay  );
 		out.add(indentLevel, "always_zap"         , "%s (%d)", timer.always_zap==1, timer.always_zap);
@@ -688,7 +687,7 @@ public class OWCTools
 			for (int i=0; i<timer.logentries.size(); i++)
 			{
 				LogEntry entry = timer.logentries.get(i);
-				String timeStr = dateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
+				String timeStr = DateTimeFormatter.getTimeStr(entry.when*1000L, Locale.GERMANY, false, true, false, true, false);
 				sb.append(String.format("%s    [%d] %s <Type:%d> \"%s\"%n", indent, i+1, timeStr, entry.type, entry.text));
 			}
 			sb.append(String.format("%n"));

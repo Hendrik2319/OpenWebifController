@@ -10,6 +10,7 @@ import net.schwarzbaer.java.lib.openwebif.Bouquet;
 import net.schwarzbaer.java.lib.openwebif.Bouquet.SubService;
 import net.schwarzbaer.java.lib.openwebif.EPG;
 import net.schwarzbaer.java.lib.openwebif.EPGevent;
+import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 
 abstract class LoadEPGThread {
@@ -95,8 +96,8 @@ abstract class LoadEPGThread {
 			System.out.printf("EPG for Bouquet \"%s\" (%5d min - %5d min) [%s - %s] %s%n",
 					bouquet.name,
 					blockStart_mins, blockEnd_mins,
-					OWCTools.dateTimeFormatter.getTimeStr(beginTime_UnixTS*1000, true, true, false, true, false),
-					OWCTools.dateTimeFormatter.getTimeStr((beginTime_UnixTS+endTime_Minutes*60)*1000, false, false, false, true, false),
+					DateTimeFormatter.getTimeStr(beginTime_UnixTS*1000, true, true, false, true, false),
+					DateTimeFormatter.getTimeStr((beginTime_UnixTS+endTime_Minutes*60)*1000, false, false, false, true, false),
 					isInterrupted ? " -> omitted" : ""
 			);
 			if (isInterrupted) continue;

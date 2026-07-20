@@ -56,6 +56,7 @@ import net.schwarzbaer.java.lib.openwebif.Power;
 import net.schwarzbaer.java.lib.openwebif.StationID;
 import net.schwarzbaer.java.lib.openwebif.SystemInfo;
 import net.schwarzbaer.java.lib.openwebif.Timers;
+import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.lib.system.Settings;
 import net.schwarzbaer.java.lib.system.Settings.DefaultAppSettings.SplitPaneDividersDefinition;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools.LogWindowInterface;
@@ -358,7 +359,7 @@ public class OpenWebifController implements EPGDialog.ExternCommands, AbstractCo
 		
 		epg = new EPG(new EPG.Tools() {
 			@Override public String getTimeStr(long millis) {
-				return OWCTools.dateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
+				return DateTimeFormatter.getTimeStr(millis, false, true, false, true, false);
 			}
 		});
 		

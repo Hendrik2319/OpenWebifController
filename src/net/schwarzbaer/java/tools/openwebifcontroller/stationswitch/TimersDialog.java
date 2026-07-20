@@ -281,8 +281,8 @@ class TimersDialog extends JDialog {
 			state      (config("State"       , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((model, timer) -> model.timerStateGuesser.getState(timer))),
 			servicename(config("Station"     , String     .class, 110, null  ).setValFunc(timer -> timer.servicename)),
 			name       (config("Name"        , String     .class, 220, null  ).setValFunc(timer -> timer.name       )),
-			begin_date (config("Begin"       , Long       .class, 170, RIGHT ).setValFunc(timer -> timer.begin      ).setToString(val -> OWCTools.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false,  true, false))),
-			end        (config("End"         , Long       .class,  55, RIGHT ).setValFunc(timer -> timer.end        ).setToString(val -> OWCTools.dateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false))),
+			begin_date (config("Begin"       , Long       .class, 170, RIGHT ).setValFunc(timer -> timer.begin      ).setToString(val -> DateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,   true,   true, false,  true, false))),
+			end        (config("End"         , Long       .class,  55, RIGHT ).setValFunc(timer -> timer.end        ).setToString(val -> DateTimeFormatter.getTimeStr( val*1000, Locale.GERMANY,  false,  false, false,  true, false))),
 			duration   (config("Duration"    , Double     .class,  60, RIGHT ).setValFunc(timer -> timer.duration   ).setToString(val -> DateTimeFormatter.getDurationStr(val))),
 			;
 			

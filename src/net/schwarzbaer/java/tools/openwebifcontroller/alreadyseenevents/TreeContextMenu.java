@@ -17,6 +17,7 @@ import javax.swing.JTree;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
 import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
+import net.schwarzbaer.java.lib.gui.LongMenuLayout;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionMaps;
@@ -93,6 +94,7 @@ class TreeContextMenu extends ContextMenu
 		addSeparator();
 		
 		add(menuMoveToGroup = OWCTools.createMenu("Move to group"));
+		LongMenuLayout.setForMenu(menuMoveToGroup);
 		updateMenuMoveToGroup();
 		
 		JMenuItem miRemoveFromGroup = add( OWCTools.createMenuItem( "##", e->{

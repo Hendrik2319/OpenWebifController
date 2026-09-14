@@ -33,7 +33,7 @@ public enum UserDefColors
 	BGCOLOR_Type_Switch       (Category.TimerType, "\"Switch\""         , false, false, 0xFFEDD9),
 	BGCOLOR_Type_Unknown      (Category.TimerType, "\"Unknown\""        , false, false, 0xFF5CFF),
 	
-	BGCOLOR_State_Running     (Category.TimerState, "\"Running\""       , false, false, 0xFFFFD9),
+	BGCOLOR_State_Running     (Category.TimerState, "\"Running\""       , false, false, 0xFFF889),
 	BGCOLOR_State_Waiting     (Category.TimerState, "\"Waiting\""       , false, false, 0xD9FFD9),
 	BGCOLOR_State_Finished    (Category.TimerState, "\"Finished\""      , false, false, 0xFFD9D9),
 	BGCOLOR_State_Deactivated (Category.TimerState, "\"Deactivated\""   , false, false, 0xD9D9D9),

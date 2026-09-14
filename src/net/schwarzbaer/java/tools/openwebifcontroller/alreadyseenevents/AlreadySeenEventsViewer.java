@@ -69,7 +69,7 @@ public class AlreadySeenEventsViewer extends StandardDialog
 				factory,
 				tree,
 				() -> treeModel
-		).addTo(tree);
+		).addTo(tree, () -> TreeContextMenu.computeSurrogateMousePos(tree,treeScrollPane));
 		
 		JToolBar toolBar = new JToolBar();
 		toolBar.setFloatable(false);

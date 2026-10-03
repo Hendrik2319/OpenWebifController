@@ -252,7 +252,8 @@ class MoviesPanel extends JSplitPane {
 					() -> isMovieOKForAlreadySeenEvents(clickedMovie) ? clickedMovie : null,
 					() -> {
 						if (movieTableModel==null) return;
-						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
+						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Episode);
+						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.EpState);
 					}
 			);
 			
@@ -268,7 +269,8 @@ class MoviesPanel extends JSplitPane {
 							.toArray(MovieList.Movie[]::new),
 					() -> {
 						if (movieTableModel==null) return;
-						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Seen);
+						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.Episode);
+						movieTableModel.fireTableColumnUpdate(MovieTableModel.ColumnID.EpState);
 					}
 			);
 			
@@ -902,7 +904,8 @@ class MoviesPanel extends JSplitPane {
 			Length  (config("Length"  , Integer.class,  50,   null).setValFunc(m->m.length_s         ).setToStringR(m->m.lengthStr        )),
 			Size    (config("Size"    ,    Long.class,  60,   null).setValFunc(m->m.filesize         ).setToStringR(m->m.filesize_readable)),
 			Time    (config("Time"    ,    Long.class, 110,   null).setValFunc(m->m.recordingtime    ).setToStringR(m->DateTimeFormatter.getTimeStr(m.recordingtime*1000, false, true, false, true, false))),
-			Seen    (config("Seen"    ,  String.class,  75, CENTER).setValFunc(m->toString(AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(m)))),
+			Episode (config("Episode" ,  String                        .class, 75, CENTER).setValFunc(AlreadySeenEvents.getInstance()::getRuleIfAlreadySeen, r->r.getEpisodeStr("-----"))),
+			EpState (config("State"   ,  AlreadySeenEvents.EpisodeState.class, 75, CENTER).setValFunc(AlreadySeenEvents.getInstance()::getRuleIfAlreadySeen, r->r.state)),
 			Station (config("Station" ,  String.class, 110,   null).setValFunc(m->m.servicename      )),
 			File    (config("File"    ,  String.class, 450,   null).setValFunc(m->m.filename_stripped)),
 			;
@@ -911,15 +914,6 @@ class MoviesPanel extends JSplitPane {
 			ColumnID(Tables.SimplifiedColumnConfig2<MovieTableModel, MovieList.Movie, ?> cfg) { this.cfg = cfg; }
 			@Override public Tables.SimplifiedColumnConfig getColumnConfig() { return this.cfg; }
 			@Override public Function<MovieList.Movie, ?> getGetValue() { return cfg.getValue; }
-			
-			private static String toString(AlreadySeenEvents.RuleOutput ruleOutput)
-			{
-				if (ruleOutput == null)
-					return null;
-				if (ruleOutput.episodeStr == null)
-					return "Seen";
-				return "[%s]".formatted(ruleOutput.episodeStr);
-			}
 			
 			private static <T> Tables.SimplifiedColumnConfig2<MovieTableModel, MovieList.Movie, T> config(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment)
 			{

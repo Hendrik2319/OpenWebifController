@@ -40,12 +40,12 @@ public enum UserDefColors
 	BGCOLOR_State_Unknown     (Category.TimerState, "\"Unknown\""       , false, false, 0xFF5CFF),
 	BGCOLOR_State_Deleted     (Category.TimerState, "\"Deleted\""       , false, false, 0xFF5CFF),
 	
-	BGCOLOR_State_Running_Seen    (Category.TimerState, "\"Running\""    +" (Seen)", false, true, null),
-	BGCOLOR_State_Waiting_Seen    (Category.TimerState, "\"Waiting\""    +" (Seen)", false, true, 0xFAFFD9),
-	BGCOLOR_State_Finished_Seen   (Category.TimerState, "\"Finished\""   +" (Seen)", false, true, null),
-	BGCOLOR_State_Deactivated_Seen(Category.TimerState, "\"Deactivated\""+" (Seen)", false, true, null),
-	BGCOLOR_State_Unknown_Seen    (Category.TimerState, "\"Unknown\""    +" (Seen)", false, true, null),
-	BGCOLOR_State_Deleted_Seen    (Category.TimerState, "\"Deleted\""    +" (Seen)", false, true, null),
+	BGCOLOR_State_Running_Seen    (Category.TimerState, "\"Running\""    +" (Seen/Stored)", false, true, null),
+	BGCOLOR_State_Waiting_Seen    (Category.TimerState, "\"Waiting\""    +" (Seen/Stored)", false, true, 0xFAFFD9),
+	BGCOLOR_State_Finished_Seen   (Category.TimerState, "\"Finished\""   +" (Seen/Stored)", false, true, null),
+	BGCOLOR_State_Deactivated_Seen(Category.TimerState, "\"Deactivated\""+" (Seen/Stored)", false, true, null),
+	BGCOLOR_State_Unknown_Seen    (Category.TimerState, "\"Unknown\""    +" (Seen/Stored)", false, true, null),
+	BGCOLOR_State_Deleted_Seen    (Category.TimerState, "\"Deleted\""    +" (Seen/Stored)", false, true, null),
 	
 	TXTCOLOR_Event_Seen(Category.TimerEvent, "Timer \"Seen\"", true, true, 0x00619B),
 	

@@ -28,6 +28,7 @@ import javax.swing.JComboBox;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JRadioButton;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
@@ -474,6 +475,13 @@ public class OWCTools
 
 	public static JCheckBoxMenuItem createCheckBoxMenuItem(String title, boolean isChecked, Consumer<Boolean> setValue) {
 		JCheckBoxMenuItem comp = new JCheckBoxMenuItem(title,isChecked);
+		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
+		return comp;
+	}
+
+	public static JRadioButtonMenuItem createRadioButtonMenuItem(String title, boolean isChecked, ButtonGroup bg, Consumer<Boolean> setValue) {
+		JRadioButtonMenuItem comp = new JRadioButtonMenuItem(title,isChecked);
+		if (bg!=null) bg.add(comp);
 		if (setValue!=null) comp.addActionListener(e->setValue.accept(comp.isSelected()));
 		return comp;
 	}

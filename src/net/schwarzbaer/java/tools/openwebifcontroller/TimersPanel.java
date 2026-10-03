@@ -36,6 +36,8 @@ import net.schwarzbaer.java.lib.openwebif.Timers.Timer;
 import net.schwarzbaer.java.lib.system.DateTimeFormatter;
 import net.schwarzbaer.java.tools.openwebifcontroller.OpenWebifController.ExtendedTextArea;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeState;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.RuleOutput;
 
 public class TimersPanel extends JSplitPane {
 	private static final long serialVersionUID = -2563250955373710618L;
@@ -89,7 +91,8 @@ public class TimersPanel extends JSplitPane {
 		AlreadySeenEvents.getInstance().addChangeListener(changeType -> {
 			if (changeType == AlreadySeenEvents.ChangeListener.ChangeType.RuleSet)
 			{
-				tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
+				tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.episode);
+				tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.episodeState);
 				table.repaint();
 			}
 		});
@@ -180,7 +183,8 @@ public class TimersPanel extends JSplitPane {
 			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents
 					.getInstance()
 					.createMenuForTimer(menuClickedTimer, main.mainWindow, ()->clickedTimer, () -> {
-						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
+						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.episode);
+						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.episodeState);
 					});
 			
 			JMenu menuSelectedTimers;
@@ -211,7 +215,8 @@ public class TimersPanel extends JSplitPane {
 			AlreadySeenEvents.MenuControl aseMenuControlSelected = AlreadySeenEvents
 					.getInstance()
 					.createMenuForTimers(menuSelectedTimers, main.mainWindow, ()->selectedTimers, () -> {
-						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.seen);
+						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.episode);
+						tableModel.fireTableColumnUpdate(TimersTableModel.ColumnID.episodeState);
 					});
 			
 			addSeparator();
@@ -484,13 +489,15 @@ public class TimersPanel extends JSplitPane {
 			Component rendererComp = labRenderer;
 			
 			if (columnID!=null) {
-				boolean markedAsAlreadySeen = AlreadySeenEvents.getInstance().isMarkedAsAlreadySeen(timer);
+				RuleOutput rule = AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(timer);
+				boolean isMarked              = rule!=null;
+				boolean isMarked_SeenOrStored = rule!=null && (rule.state==null || rule.state==EpisodeState.Seen || rule.state==EpisodeState.Stored);
 				
 				Supplier<Color> bgCol = ()->timer==null ? null : OWCTools.getBgColor(
 						tableModel.timerStateGuesser.getState(timer),
-						markedAsAlreadySeen
+						isMarked_SeenOrStored
 				);
-				Supplier<Color> fgCol = ()->markedAsAlreadySeen ? UserDefColors.TXTCOLOR_Event_Seen.getColor() : null;
+				Supplier<Color> fgCol = ()->isMarked ? UserDefColors.TXTCOLOR_Event_Seen.getColor() : null;
 				
 				if (columnID.cfg.columnClass==Boolean.class) {
 					if (value instanceof Boolean boolVal) {
@@ -522,12 +529,12 @@ public class TimersPanel extends JSplitPane {
 	
 	private static class TimersTableModel extends Tables.SimpleGetValueTableModel<Timer, TimersTableModel.ColumnID>
 	{
-		// Column Widths: [90, 70, 50, 170, 60, 60, 220, 110, 220, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
-		// Column Widths: [90, 70, 75, 170, 60, 60, 220, 110, 220, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
+		// Column Widths: [90, 70, 75, 55, 170, 60, 60, 220, 110, 220, 70, 190, 120, 350, 100, 100, 170, 170, 60, 55, 65, 85, 65, 70, 95, 115, 80, 100, 60, 80, 65, 75, 100, 60, 70, 120, 125, 100] in ModelOrder
 		enum ColumnID implements Tables.SimplifiedColumnIDInterface, Tables.AbstractGetValueTableModel.ColumnIDTypeInt<Timer>, SwingConstants {
 			type               (config("Type"                 , Timer.Type .class,  90, CENTER).setValFunc(t->t.type               )),
-			state_             (config("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((m,t)->m.timerStateGuesser.getState(t))),
-			seen               (config("Seen"                 , String     .class,  75, CENTER).setValFunc(t->toString(AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(t)))),
+			state              (config("State"                , TimerStateGuesser.ExtTimerState.class, 70, CENTER).setValFunc((m,t)->m.timerStateGuesser.getState(t))),
+			episode            (config("Episode"              , String                         .class, 75, CENTER).setValFunc(AlreadySeenEvents.getInstance()::getRuleIfAlreadySeen, r->r.getEpisodeStr("-----"))),
+			episodeState       (config("Ep.State"             , AlreadySeenEvents.EpisodeState .class, 55, CENTER).setValFunc(AlreadySeenEvents.getInstance()::getRuleIfAlreadySeen, r->r.state)),
 			begin_date         (config("Begin"                , Long       .class, 170, null  ).setValFunc(t->t.begin              ).setToString(t->OWCTools.formatDate(t*1000,  true,  true, false,  true, false))),
 			end                (config("End"                  , Long       .class,  60, null  ).setValFunc(t->t.end                ).setToString(t->OWCTools.formatDate(t*1000, false, false, false,  true, false))),
 			duration           (config("Duration"             , Double     .class,  60, null  ).setValFunc(t->t.duration           ).setToString(DateTimeFormatter::getDurationStr)),
@@ -539,46 +546,37 @@ public class TimersPanel extends JSplitPane {
 			dirname            (config("Dir Name"             , String     .class, 120, null  ).setValFunc(t->t.dirname            )),
 			filename           (config("File Name"            , String     .class, 350, null  ).setValFunc(t->t.filename           )),
 			
-			realbegin          (config("<realbegin>"          , String     .class, 100, null  ).setValFunc(t->t.realbegin          )),
-			realend            (config("<realend>"            , String     .class, 100, null  ).setValFunc(t->t.realend            )),
-			startprepare       (config("<startprepare>"       , Double     .class, 170, null  ).setValFunc(t->t.startprepare       ).setToString(d->OWCTools.formatDate(Math.round(d*1000), true, true, false, true, false))),
-			nextactivation     (config("<nextactivation>"     , Long       .class, 170, null  ).setValFunc(t->t.nextactivation     ).setToString(t->OWCTools.formatDate(           t*1000 , true, true, false, true, false))),
-			eit                (config("<eit>"                , Long       .class,  60, null  ).setValFunc(t->t.eit                )),
-			state              (config("<state>"              , Long       .class,  55, CENTER).setValFunc(t->t.state              )),
-			justplay           (config("<justplay>"           , Long       .class,  65, CENTER).setValFunc(t->t.justplay           )),
-			always_zap         (config("<always_zap>"         , Long       .class,  85, CENTER).setValFunc(t->t.always_zap         )),
-			disabled           (config("<disabled>"           , Long       .class,  65, CENTER).setValFunc(t->t.disabled           )),
-			cancelled          (config("<cancelled>"          , Boolean    .class,  70, CENTER).setValFunc(t->t.cancelled          )),
-			toggledisabled     (config("<toggledisabled>"     , Long       .class,  95, CENTER).setValFunc(t->t.toggledisabled     )),
-			toggledisabledimg  (config("<toggledisabledimg>"  , String     .class, 115, CENTER).setValFunc(t->t.toggledisabledimg  )),
+			_realbegin          (config("<realbegin>"          , String     .class, 100, null  ).setValFunc(t->t.realbegin          )),
+			_realend            (config("<realend>"            , String     .class, 100, null  ).setValFunc(t->t.realend            )),
+			_startprepare       (config("<startprepare>"       , Double     .class, 170, null  ).setValFunc(t->t.startprepare       ).setToString(d->OWCTools.formatDate(Math.round(d*1000), true, true, false, true, false))),
+			_nextactivation     (config("<nextactivation>"     , Long       .class, 170, null  ).setValFunc(t->t.nextactivation     ).setToString(t->OWCTools.formatDate(           t*1000 , true, true, false, true, false))),
+			_eit                (config("<eit>"                , Long       .class,  60, null  ).setValFunc(t->t.eit                )),
+			_state              (config("<state>"              , Long       .class,  55, CENTER).setValFunc(t->t.state              )),
+			_justplay           (config("<justplay>"           , Long       .class,  65, CENTER).setValFunc(t->t.justplay           )),
+			_always_zap         (config("<always_zap>"         , Long       .class,  85, CENTER).setValFunc(t->t.always_zap         )),
+			_disabled           (config("<disabled>"           , Long       .class,  65, CENTER).setValFunc(t->t.disabled           )),
+			_cancelled          (config("<cancelled>"          , Boolean    .class,  70, CENTER).setValFunc(t->t.cancelled          )),
+			_toggledisabled     (config("<toggledisabled>"     , Long       .class,  95, CENTER).setValFunc(t->t.toggledisabled     )),
+			_toggledisabledimg  (config("<toggledisabledimg>"  , String     .class, 115, CENTER).setValFunc(t->t.toggledisabledimg  )),
 			                   
-			afterevent         (config("<afterevent>"         , Long       .class,  80, CENTER).setValFunc(t->t.afterevent         )),
-			allow_duplicate    (config("<allow_duplicate>"    , Long       .class, 100, CENTER).setValFunc(t->t.allow_duplicate    )),
-			asrefs             (config("<asrefs>"             , String     .class,  60, CENTER).setValFunc(t->t.asrefs             )),
-			autoadjust         (config("<autoadjust>"         , Long       .class,  80, CENTER).setValFunc(t->t.autoadjust         )),
-			backoff            (config("<backoff>"            , Long       .class,  65, CENTER).setValFunc(t->t.backoff            )),
-			dontsave           (config("<dontsave>"           , Long       .class,  75, CENTER).setValFunc(t->t.dontsave           )),
-			firsttryprepare    (config("<firsttryprepare>"    , Long       .class, 100, CENTER).setValFunc(t->t.firsttryprepare    )),
-			pipzap             (config("<pipzap>"             , Long       .class,  60, CENTER).setValFunc(t->t.pipzap             )),
-			repeated           (config("<repeated>"           , Long       .class,  70, CENTER).setValFunc(t->t.repeated           )),
-			vpsplugin_enabled  (config("<vpsplugin_enabled>"  , Boolean    .class, 120, CENTER).setValFunc(t->t.vpsplugin_enabled  )),
-			vpsplugin_overwrite(config("<vpsplugin_overwrite>", Boolean    .class, 125, CENTER).setValFunc(t->t.vpsplugin_overwrite)),
-			vpsplugin_time     (config("<vpsplugin_time>"     , Long       .class, 100, CENTER).setValFunc(t->t.vpsplugin_time     )),
+			_afterevent         (config("<afterevent>"         , Long       .class,  80, CENTER).setValFunc(t->t.afterevent         )),
+			_allow_duplicate    (config("<allow_duplicate>"    , Long       .class, 100, CENTER).setValFunc(t->t.allow_duplicate    )),
+			_asrefs             (config("<asrefs>"             , String     .class,  60, CENTER).setValFunc(t->t.asrefs             )),
+			_autoadjust         (config("<autoadjust>"         , Long       .class,  80, CENTER).setValFunc(t->t.autoadjust         )),
+			_backoff            (config("<backoff>"            , Long       .class,  65, CENTER).setValFunc(t->t.backoff            )),
+			_dontsave           (config("<dontsave>"           , Long       .class,  75, CENTER).setValFunc(t->t.dontsave           )),
+			_firsttryprepare    (config("<firsttryprepare>"    , Long       .class, 100, CENTER).setValFunc(t->t.firsttryprepare    )),
+			_pipzap             (config("<pipzap>"             , Long       .class,  60, CENTER).setValFunc(t->t.pipzap             )),
+			_repeated           (config("<repeated>"           , Long       .class,  70, CENTER).setValFunc(t->t.repeated           )),
+			_vpsplugin_enabled  (config("<vpsplugin_enabled>"  , Boolean    .class, 120, CENTER).setValFunc(t->t.vpsplugin_enabled  )),
+			_vpsplugin_overwrite(config("<vpsplugin_overwrite>", Boolean    .class, 125, CENTER).setValFunc(t->t.vpsplugin_overwrite)),
+			_vpsplugin_time     (config("<vpsplugin_time>"     , Long       .class, 100, CENTER).setValFunc(t->t.vpsplugin_time     )),
 			;
 			
 			private final Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, ?> cfg;
 			ColumnID(Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, ?> cfg) { this.cfg = cfg; }
 			@Override public Tables.SimplifiedColumnConfig getColumnConfig() { return this.cfg; }
 			@Override public Function<Timer, ?> getGetValue() { return cfg.getValue; }
-			
-			private static String toString(AlreadySeenEvents.RuleOutput ruleOutput)
-			{
-				if (ruleOutput == null)
-					return null;
-				if (ruleOutput.episodeStr == null)
-					return "Seen";
-				return "[%s]".formatted(ruleOutput.episodeStr);
-			}
 			
 			private static <T> Tables.SimplifiedColumnConfig2<TimersTableModel, Timer, T> config(String name, Class<T> columnClass, int prefWidth, Integer horizontalAlignment)
 			{

@@ -21,11 +21,13 @@ import net.schwarzbaer.java.tools.openwebifcontroller.UserDefColors;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionMaps;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeInfo;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeState;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EventCriteriaSet;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.StationData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.TextOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.VariableECSData;
-import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeIcons;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeIcon;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeIconsGroup;
 
 class TreeNodeFactory
 {
@@ -81,12 +83,19 @@ class TreeNodeFactory
 	
 	private String generateTitle(String title, EpisodeInfo episode)
 	{
-		if (episode == null || !episode.hasEpisodeStr())
+		if (episode == null)
 			return title;
-		if (isEpisodeStringFirst())
-			return String.format("(%s) %s", episode.episodeStr, title);
-		else
-			return String.format("%s (%s)", title, episode.episodeStr);
+		
+		String result = !episode.hasEpisodeStr()
+				? title
+				: isEpisodeStringFirst()
+					? String.format("(%s) %s", episode.episodeStr, title)
+					: String.format("%s (%s)", title, episode.episodeStr);
+		
+		if (episode.state!=null && episode.state!=EpisodeState.Seen)
+			result = "%s [%s]".formatted(result, episode.state.toString());
+		
+		return result;
 	}
 	
 	private List<DescriptionTreeNode> createDescriptionTreeNodes(AbstractTreeNode parent, Map<String, DescriptionData> descriptions, boolean isExtDesc)
@@ -219,7 +228,7 @@ class TreeNodeFactory
 		}
 		
 		protected abstract void determineChildren();
-		protected abstract TreeIcons getIcon();
+		protected abstract TreeIcon getIcon();
 		protected Color getTextColor() { return null; }
 		protected void updateTitle() {}
 		
@@ -343,7 +352,7 @@ class TreeNodeFactory
 		}
 
 		@Override
-		protected TreeIcons getIcon()
+		protected TreeIcon getIcon()
 		{
 			return null;
 		}
@@ -415,7 +424,7 @@ class TreeNodeFactory
 		}
 
 		@Override
-		protected TreeIcons getIcon()
+		protected TreeIcon getIcon()
 		{
 			return null;
 		}
@@ -484,12 +493,9 @@ class TreeNodeFactory
 		}
 		
 		@Override
-		protected TreeIcons getIcon()
+		protected TreeIcon getIcon()
 		{
-			EpisodeInfo episode = ecs.variableData();
-			if (episode!=null && episode.hasEpisodeStr())
-				return TreeIcons.TitleEp;
-			return TreeIcons.Title;
+			return TreeIconsGroup.Title.getIcon(ecs.variableData());
 		}
 		
 		@Override
@@ -546,7 +552,7 @@ class TreeNodeFactory
 		}
 		
 		@Override
-		protected TreeIcons getIcon()
+		protected TreeIcon getIcon()
 		{
 			DescriptionData data = description.getData();
 			if (data != null)
@@ -554,12 +560,12 @@ class TreeNodeFactory
 				TextOperator operator = data.operator!=null ? data.operator : TextOperator.Equals;
 				switch (operator)
 				{
-				case Equals    : return data.hasEpisodeStr() ? TreeIcons.DescEp         : TreeIcons.Desc;
-				case StartsWith: return data.hasEpisodeStr() ? TreeIcons.DescStartEp    : TreeIcons.DescStart;
-				case Contains  : return data.hasEpisodeStr() ? TreeIcons.DescContainsEp : TreeIcons.DescContains;
+				case Equals    : return TreeIconsGroup.Desc        .getIcon(data);
+				case StartsWith: return TreeIconsGroup.DescStart   .getIcon(data);
+				case Contains  : return TreeIconsGroup.DescContains.getIcon(data);
 				}
 			}
-			return TreeIcons.Desc;
+			return TreeIcon.Desc;
 		}
 		
 		@Override
@@ -621,9 +627,9 @@ class TreeNodeFactory
 		}
 		
 		@Override
-		protected TreeIcons getIcon()
+		protected TreeIcon getIcon()
 		{
-			return TreeIcons.Station;
+			return TreeIcon.Station;
 		}
 		
 		@Override

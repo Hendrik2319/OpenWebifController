@@ -26,6 +26,7 @@ import net.schwarzbaer.java.lib.gui.TextAreaDialog;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeInfo;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeState;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.AbstractTreeNode;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionChanger;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.TreeNodeFactory.DescriptionTreeNode;
@@ -39,11 +40,73 @@ public class AlreadySeenEventsViewer extends StandardDialog
 	private static final long serialVersionUID = 6089627717117385916L;
 	static final Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());
 	
-	static enum TreeIcons {
-		Title, TitleEp, Station, Desc, DescEp, DescContains, DescContainsEp, DescStart, DescStartEp
+	static enum TreeIcon {
+		Title  , TitleEp  , Station  , Desc  , DescEp  , DescContains  , DescContainsEp  , DescStart  , DescStartEp  ,
+		Title_L, TitleEp_L, Station_L, Desc_L, DescEp_L, DescContains_L, DescContainsEp_L, DescStart_L, DescStartEp_L,
+		Title_S, TitleEp_S, Station_S, Desc_S, DescEp_S, DescContains_S, DescContainsEp_S, DescStart_S, DescStartEp_S,
 		;
 		public Icon getIcon() { return IS.getCachedIcon(this); }
-		private static IconSource.CachedIcons<TreeIcons> IS = IconSource.createCachedIcons(16, 16, "/images/AlreadySeenEventsViewerTreeIcons.png", TreeIcons.values());
+		private static IconSource.CachedIcons<TreeIcon> IS = IconSource.createCachedIcons(16, 16, 9, "/images/AlreadySeenEventsViewerTreeIcons.png", TreeIcon.values());
+	}
+	
+	static enum TreeIconsGroup {
+		Title(
+				TreeIcon.Title  , TreeIcon.TitleEp  ,
+				TreeIcon.Title_L, TreeIcon.TitleEp_L,
+				TreeIcon.Title_S, TreeIcon.TitleEp_S
+		),
+		Desc(
+				TreeIcon.Desc  , TreeIcon.DescEp  ,
+				TreeIcon.Desc_L, TreeIcon.DescEp_L,
+				TreeIcon.Desc_S, TreeIcon.DescEp_S
+		),
+		DescContains(
+				TreeIcon.DescContains  , TreeIcon.DescContainsEp  ,
+				TreeIcon.DescContains_L, TreeIcon.DescContainsEp_L,
+				TreeIcon.DescContains_S, TreeIcon.DescContainsEp_S
+		),
+		DescStart(
+				TreeIcon.DescStart  , TreeIcon.DescStartEp  ,
+				TreeIcon.DescStart_L, TreeIcon.DescStartEp_L,
+				TreeIcon.DescStart_S, TreeIcon.DescStartEp_S
+		),
+		;
+		private final TreeIcon base;
+		private final TreeIcon baseEp;
+		private final TreeIcon base_L;
+		private final TreeIcon baseEp_L;
+		private final TreeIcon base_S;
+		private final TreeIcon baseEp_S;
+
+		TreeIconsGroup(
+				TreeIcon base  , TreeIcon baseEp  ,
+				TreeIcon base_L, TreeIcon baseEp_L,
+				TreeIcon base_S, TreeIcon baseEp_S
+		) {
+			this.base = base;
+			this.baseEp = baseEp;
+			this.base_L = base_L;
+			this.baseEp_L = baseEp_L;
+			this.base_S = base_S;
+			this.baseEp_S = baseEp_S;
+		}
+
+		TreeIcon getIcon(EpisodeInfo episode)
+		{
+			if (episode!=null)
+			{
+				if (episode.state==null)
+					return episode.hasEpisodeStr() ? baseEp : base;
+				
+				switch (episode.state)
+				{
+				case Seen  : return episode.hasEpisodeStr() ? baseEp   : base  ;
+				case Listed: return episode.hasEpisodeStr() ? baseEp_L : base_L;
+				case Stored: return episode.hasEpisodeStr() ? baseEp_S : base_S;
+				}
+			}
+			return base;
+		}
 	}
 	
 	private final JTree tree;
@@ -115,6 +178,18 @@ public class AlreadySeenEventsViewer extends StandardDialog
 			tree.repaint();
 			AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.EpisodeText);
 		}
+	}
+
+	void setEpisodeState(SelectionInfo selected, EpisodeState state)
+	{
+		if (selected.episodeInfo==null)
+			return;
+		
+		selected.episodeInfo.state = state;
+		selected.treeNode.updateTitle();
+		treeModel.fireTreeNodeUpdate(selected.treeNode);
+		tree.repaint();
+		AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.EpisodeState);
 	}
 
 	void editDescriptionText(SelectionInfo selected)
@@ -258,7 +333,7 @@ public class AlreadySeenEventsViewer extends StandardDialog
 			
 			if (value instanceof AbstractTreeNode treeNode)
 			{
-				TreeIcons icon = treeNode.getIcon();
+				TreeIcon icon = treeNode.getIcon();
 				if (icon!=null)
 					setIcon(icon.getIcon());
 				

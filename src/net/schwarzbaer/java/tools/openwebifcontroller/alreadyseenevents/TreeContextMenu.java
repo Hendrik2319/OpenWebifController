@@ -9,10 +9,12 @@ import java.util.Vector;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import javax.swing.ButtonGroup;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JTree;
 
 import net.schwarzbaer.java.lib.gui.ContextMenu;
@@ -21,6 +23,7 @@ import net.schwarzbaer.java.lib.gui.LongMenuLayout;
 import net.schwarzbaer.java.tools.openwebifcontroller.OWCTools;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.DescriptionMaps;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.EpisodeState;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.StationData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.TextOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.KeyFunction;
@@ -42,6 +45,7 @@ class TreeContextMenu extends ContextMenu
 	private final JTree tree;
 	private final Supplier<ViewerTreeModel> getCurrentTreeModel;
 	private final JMenu menuMoveToGroup;
+	private final EpisodeStateMenu menuEpisodeState;
 	private SelectionInfo clicked;
 	
 	TreeContextMenu(AlreadySeenEventsViewer viewer, TreeNodeFactory factory, JTree tree, Supplier<ViewerTreeModel> getCurrentTreeModel)
@@ -60,6 +64,8 @@ class TreeContextMenu extends ContextMenu
 		JMenuItem miEditEpisodeStr = add( OWCTools.createMenuItem( "##", e->{
 			this.viewer.editEpisodeStr(clicked);
 		} ) );
+		
+		add( menuEpisodeState = new EpisodeStateMenu() );
 		
 		add(OWCTools.createCheckBoxMenuItem("Show Episode Text before Title", this.factory.isEpisodeStringFirst(), val -> {
 			this.factory.setEpisodeStringFirst(val);
@@ -237,6 +243,8 @@ class TreeContextMenu extends ContextMenu
 						?    "Add Episode Text"
 						: "Change Episode Text"
 			) );
+			
+			menuEpisodeState.updateMenu( clicked );
 			
 			miCopyStr.setEnabled(
 					clicked.groupTreeNode!=null ||
@@ -478,5 +486,43 @@ class TreeContextMenu extends ContextMenu
 			
 			AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.Grouping);
 		} ) );
+	}
+	
+	private class EpisodeStateMenu extends JMenu
+	{
+		private static final long serialVersionUID = -6256127195470128515L;
+		private final EnumMap<EpisodeState, JRadioButtonMenuItem> menuItems;
+		private SelectionInfo selection;
+
+		EpisodeStateMenu()
+		{
+			super("Set Episode State");
+			selection = null;
+			menuItems = new EnumMap<>(EpisodeState.class);
+			
+			ButtonGroup bg = new ButtonGroup();
+			for (EpisodeState state : EpisodeState.values())
+			{
+				JRadioButtonMenuItem menuItem = OWCTools.createRadioButtonMenuItem(state.toString(), false, bg, checked -> {
+					if (checked && selection!=null)
+						viewer.setEpisodeState(selection, state);
+				});
+				add(menuItem);
+				menuItems.put(state, menuItem);
+			}
+		}
+
+		void updateMenu(SelectionInfo selection)
+		{
+			this.selection = selection;
+			updateMenu();
+		}
+
+		private void updateMenu()
+		{
+			setEnabled(selection!=null && selection.episodeInfo!=null);
+			if (selection!=null && selection.episodeInfo!=null && selection.episodeInfo.state!=null)
+				menuItems.get(selection.episodeInfo.state).setSelected(true);
+		}
 	}
 }

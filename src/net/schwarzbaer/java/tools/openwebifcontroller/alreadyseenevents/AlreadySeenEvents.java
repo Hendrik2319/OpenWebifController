@@ -41,12 +41,27 @@ public class AlreadySeenEvents
 	private static final AlreadySeenEvents instance = new AlreadySeenEvents();
 	public static AlreadySeenEvents getInstance() { return instance; }
 	
+	public enum EpisodeState
+	{
+		Listed, Stored, Seen;
+		static EpisodeState get(String str)
+		{
+			try { return valueOf(str); }
+			catch (Exception e) { return null; }
+		}
+	}
+	
 	static class EpisodeInfo
 	{
 		String episodeStr;
+		EpisodeState state;
 		
-		EpisodeInfo()                  { this(null); }
-		EpisodeInfo(EpisodeInfo other) { this.episodeStr = other==null ? null : other.episodeStr; }
+		EpisodeInfo() { this(null); }
+		EpisodeInfo(EpisodeInfo other)
+		{
+			this.episodeStr = other==null ? null : other.episodeStr;
+			this.state = other==null || other.state==null ? EpisodeState.Seen : other.state;
+		}
 		
 		boolean hasEpisodeStr() { return episodeStr!=null && !episodeStr.isBlank(); }
 		String  getEpisodeStr() { return hasEpisodeStr() ? episodeStr : null; }
@@ -203,7 +218,7 @@ public class AlreadySeenEvents
 	
 	public interface ChangeListener
 	{
-		enum ChangeType { RuleSet, EpisodeText, Grouping }
+		enum ChangeType { RuleSet, EpisodeText, EpisodeState, Grouping }
 		void somethingHasChanged(ChangeType changeType);
 	}
 	
@@ -317,14 +332,23 @@ public class AlreadySeenEvents
 							episodeInfo = setDescription(ecs, stationData, value, op, true);
 					}
 					
-					if ( (value=getValue(line, "group = "))!=null)
+					if ( (value=getValue(line, "group = "))!=null )
 						ecs.group = value;
 					
-					if ( (value=getValue(line, "episodeT = "))!=null)
+					if ( (value=getValue(line, "episodeT = "))!=null )
 						ecs.episode.episodeStr = value;
 					
-					if ( (value=getValue(line, "episodeD = "))!=null && episodeInfo!=null )
-						episodeInfo.episodeStr = value;
+					if ( (value=getValue(line, "stateT = "))!=null )
+						ecs.episode.state = EpisodeState.get( value );
+					
+					if ( episodeInfo!=null )
+					{
+						if ( (value=getValue(line, "episodeD = "))!=null )
+							episodeInfo.episodeStr = value;
+						
+						if ( (value=getValue(line, "stateD = "))!=null )
+							episodeInfo.state = EpisodeState.get( value );
+					}
 				}
 			}
 			
@@ -410,7 +434,9 @@ public class AlreadySeenEvents
 						if (variableData.group!=null && !variableData.group.isBlank())
 							out.printf("group = %s%n", variableData.group);
 						if (variableData.hasEpisodeStr())
-							out.printf("episodeT = %s%n", ecs.variableData.episodeStr);
+							out.printf("episodeT = %s%n", variableData.episodeStr);
+						if (variableData.state!=null)
+							out.printf("stateT = %s%n", variableData.state.name());
 					}
 					
 					writeDescriptionsMaps(out, ecs.descriptions);
@@ -463,6 +489,8 @@ public class AlreadySeenEvents
 			
 			if (descriptionData.hasEpisodeStr())
 				out.printf("episodeD = %s%n", descriptionData.episodeStr);
+			if (descriptionData.state!=null)
+				out.printf("stateD = %s%n", descriptionData.state.name());
 		}
 	}
 	
@@ -542,10 +570,12 @@ public class AlreadySeenEvents
 	{
 		private final Window window;
 		private final JMenu menuAdd;
+		private final JMenu menuEpisodeState;
 		private final JMenuItem miShowRule;
 		private final Supplier<V> getSource;
 		private final Supplier<V[]> getSources;
 		private final GetData<V> getData;
+		private final Runnable updateAfterMenuAction;
 		private RuleOutput singleSourceAlreadySeenRule;
 
 		SubMenu(ParentMenu parent, Window window, Supplier<V> getSource, Supplier<V[]> getSources, GetData<V> getData, Runnable updateAfterMenuAction)
@@ -554,19 +584,44 @@ public class AlreadySeenEvents
 			this.getSource = getSource;
 			this.getSources = getSources;
 			this.getData = Objects.requireNonNull( getData );
+			this.updateAfterMenuAction = updateAfterMenuAction;
 			
 			parent.add(menuAdd = new JMenu("Mark as Already Seen"));
-			menuAdd.add(OWCTools.createMenuItem("Title"                      , e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, false, false, false)));
-			menuAdd.add(OWCTools.createMenuItem("Title, Description"         , e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, false, true , false)));
-			menuAdd.add(OWCTools.createMenuItem("Title, Extended Description", e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, false, false, true )));
-			menuAdd.add(OWCTools.createMenuItem("Title, Station"             , e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, true , false, false)));
-			menuAdd.add(OWCTools.createMenuItem("Title, Station, Description", e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, true , true , false)));
-			menuAdd.add(OWCTools.createMenuItem("Title, Station, Ext. Desc." , e -> markAsAlreadySeen(this.getSource, this.getSources, this.getData, this, updateAfterMenuAction, true , false, true )));
+			menuAdd.add(OWCTools.createMenuItem("Title"                      , ev -> markAsAlreadySeen(false, false, false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Description"         , ev -> markAsAlreadySeen(false, true , false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Extended Description", ev -> markAsAlreadySeen(false, false, true )));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station"             , ev -> markAsAlreadySeen(true , false, false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station, Description", ev -> markAsAlreadySeen(true , true , false)));
+			menuAdd.add(OWCTools.createMenuItem("Title, Station, Ext. Desc." , ev -> markAsAlreadySeen(true , false, true )));
+			
+			parent.add(menuEpisodeState = new JMenu("Set Episode State"));
+			for (EpisodeState state : EpisodeState.values())
+				menuEpisodeState.add(OWCTools.createMenuItem(state.toString(), ev -> setEpisodeState(state) ));
 			
 			miShowRule = parent.add(OWCTools.createMenuItem("##", e->{
 				if (singleSourceAlreadySeenRule != null)
 					TextAreaDialog.showText(this.window, "[Already Seen] Rule", 400, 300, true, singleSourceAlreadySeenRule.toString());
 			}));
+		}
+		
+		private void markAsAlreadySeen(boolean useStation, boolean useDescription, boolean useExtDescription)
+		{
+			AlreadySeenEvents.this.markAsAlreadySeen(
+					getSource, getSources,
+					getData, this,
+					updateAfterMenuAction,
+					useStation, useDescription, useExtDescription
+			);
+		}
+
+		private void setEpisodeState(EpisodeState state)
+		{
+			AlreadySeenEvents.this.setEpisodeState(
+					getSource, getSources,
+					getData,
+					updateAfterMenuAction,
+					state
+			);
 		}
 		
 		@Override
@@ -599,6 +654,51 @@ public class AlreadySeenEvents
 		}
 	}
 
+	private <V> void doWithSources(
+			Supplier<V> getSource,
+			Supplier<V[]> getSources,
+			Runnable updateAfterMenuAction,
+			Consumer<V> action
+	) {
+		if (getSource != null)
+			action.accept(getSource.get());
+		
+		if (getSources != null)
+		{
+			V[] sources = getSources.get();
+			if (sources!=null)
+				for (V source : sources)
+					action.accept(source);
+		}
+		
+		if (updateAfterMenuAction!=null)
+			updateAfterMenuAction.run();
+		
+		writeToFileAndNotify(ChangeListener.ChangeType.RuleSet);
+	}
+
+	private <V> void setEpisodeState(
+			Supplier<V> getSource,
+			Supplier<V[]> getSources,
+			GetData<V> getData,
+			Runnable updateAfterMenuAction,
+			EpisodeState state
+	) {
+		doWithSources(
+				getSource, getSources, updateAfterMenuAction,
+				value -> {
+					RuleOutput rule = getRuleIfAlreadySeen(value, getData);
+					if (rule != null)
+						rule.setEpisodeStateInSource(state);
+				}
+		);
+	}
+
+	private interface UserInteraction
+	{
+		void showMessage(String title, String... msgLines);
+	}
+
 	private <V> void markAsAlreadySeen(
 			Supplier<V> getSource,
 			Supplier<V[]> getSources,
@@ -607,34 +707,16 @@ public class AlreadySeenEvents
 			Runnable updateAfterMenuAction,
 			boolean useStation, boolean useDescription, boolean useExtDescription
 	) {
-		doWithSources(getSource, getSources, t1 -> markAsAlreadySeen(t1, getData, userInteraction, useStation, useDescription, useExtDescription) );
-		if (updateAfterMenuAction!=null)
-			updateAfterMenuAction.run();
-		writeToFileAndNotify(ChangeListener.ChangeType.RuleSet);
+		doWithSources(
+				getSource, getSources, updateAfterMenuAction,
+				value -> markAsAlreadySeen(
+						value, getData, userInteraction,
+						useStation, useDescription, useExtDescription
+				)
+		);
 	}
 
-	private <V> void doWithSources(
-			Supplier<V> getSource,
-			Supplier<V[]> getSources,
-			Consumer<V> action
-	) {
-		if (getSource != null)
-			action.accept(getSource.get());
-		if (getSources != null)
-		{
-			V[] sources = getSources.get();
-			if (sources!=null)
-				for (V source : sources)
-					action.accept(source);
-		}
-	}
-	
-	private interface UserInteraction
-	{
-		void showMessage(String title, String... msgLines);
-	}
-
-	private <V>void markAsAlreadySeen(
+	private <V> void markAsAlreadySeen(
 			final V source,
 			final GetData<V> getData,
 			final UserInteraction userInteraction,
@@ -785,7 +867,7 @@ public class AlreadySeenEvents
 		
 		
 		if (ecs.stations == null && ecs.descriptions == null)
-			return new RuleOutput(title, null, null, false, null, ecs.variableData.getEpisodeStr());
+			return new RuleOutput(title, null, null, false, null, ecs.variableData);
 		
 		
 		DescriptionMaps descriptions = null;
@@ -833,7 +915,7 @@ public class AlreadySeenEvents
 		{
 			DescriptionData descriptionData = descriptions.get(descStr);
 			if (descMeetsCriteria(description, descStr, descriptionData.operator))
-				return new RuleOutput(title, station, descStr, isExtDesc, descriptionData.operator, descriptionData.getEpisodeStr());
+				return new RuleOutput(title, station, descStr, isExtDesc, descriptionData.operator, descriptionData);
 		}
 		return null;
 	}
@@ -859,16 +941,20 @@ public class AlreadySeenEvents
 		public  final String descStr;
 		public  final boolean isExtDesc;
 		public  final TextOperator operator;
+		private final EpisodeInfo episodeInfo;
 		public  final String episodeStr;
+		public  final EpisodeState state;
 		
-		private RuleOutput(String title, String station, String descStr, boolean isExtDesc, TextOperator operator, String episodeStr)
+		private RuleOutput(String title, String station, String descStr, boolean isExtDesc, TextOperator operator, EpisodeInfo episodeInfo)
 		{
 			this.title = Objects.requireNonNull(title);
 			this.station = station;
 			this.descStr = descStr;
 			this.isExtDesc = isExtDesc;
 			this.operator = operator;
-			this.episodeStr = episodeStr;
+			this.episodeInfo = episodeInfo;
+			this.episodeStr = this.episodeInfo==null ? null : this.episodeInfo.episodeStr;
+			this.state      = this.episodeInfo==null ? null : this.episodeInfo.state;
 			
 			addOutput("Title equals", title);
 			
@@ -880,6 +966,15 @@ public class AlreadySeenEvents
 			
 			if (episodeStr!=null)
 				addOutput("Is Episode", episodeStr);
+			
+			if (state!=null)
+				addOutput("State", state.toString());
+		}
+		
+		void setEpisodeStateInSource(EpisodeState state)
+		{
+			if (episodeInfo!=null)
+				episodeInfo.state = state;
 		}
 		
 		private void addOutput(String label, String value)
@@ -898,7 +993,6 @@ public class AlreadySeenEvents
 
 		public String toString(String indent)
 		{
-			
 			return output
 					.stream()
 					.map(pair -> "%s%s:%n%s    \"%s\"".formatted(indent, pair.label, indent, pair.value))
@@ -909,6 +1003,11 @@ public class AlreadySeenEvents
 		{
 			for (Pair pair : output)
 				out.add(indentLevel, pair.label, pair.value);
+		}
+
+		public String getEpisodeStr(String defaultValue)
+		{
+			return episodeStr==null || episodeStr.isBlank() ? defaultValue : episodeStr;
 		}
 	}
 }

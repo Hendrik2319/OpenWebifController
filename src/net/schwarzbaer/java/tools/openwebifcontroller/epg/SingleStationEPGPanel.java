@@ -348,7 +348,8 @@ public class SingleStationEPGPanel extends JSplitPane
 			AlreadySeenEvents.MenuControl aseMenuControlClicked = AlreadySeenEvents
 					.getInstance()
 					.createMenuForEPGevent(this, window, ()->clickedEvent, () -> {
-						epgTableModel.fireTableColumnUpdate(EPGTableModel.ColumnID.Seen);
+						epgTableModel.fireTableColumnUpdate(EPGTableModel.ColumnID.Episode);
+						epgTableModel.fireTableColumnUpdate(EPGTableModel.ColumnID.EpisodeState);
 						if (clickedEvent == selectedEvent)
 							showEPGOutput();
 					});
@@ -460,7 +461,8 @@ public class SingleStationEPGPanel extends JSplitPane
 			End          (config("End"              , Long      .class,  60,   null).setValFunc(   EPGTableModel::getEnd     ).setToStringR(EPGTableModel::getEndDisplayStr  )),
 			Duration     (config("Duration"         , Long      .class,  60,   null).setValFunc(   ev  -> ev.duration_sec    ).setToStringR(ev -> ev.duration_sec==null ? "" : DateTimeFormatter.getDurationStr(ev.duration_sec))),
 			Timer        (config("Timer"            , Timer.Type.class,  90, CENTER).setValFunc((m,ev) -> getTimerType(m,ev) )),
-			Seen         (config("Seen"             , String    .class,  75, CENTER).setValFunc(   ev  -> toString(AlreadySeenEvents.getInstance().getRuleIfAlreadySeen(ev)))),
+			Episode      (config("Episode"          , String                        .class, 75, CENTER).setValFunc(AlreadySeenEvents.getInstance()::getRuleIfAlreadySeen, r->r.getEpisodeStr("-----"))),
+			EpisodeState (config("State"            , AlreadySeenEvents.EpisodeState.class, 75, CENTER).setValFunc(AlreadySeenEvents.getInstance()::getRuleIfAlreadySeen, r->r.state)),
 			Genre        (config("Genre"            , Long      .class, 350,   LEFT).setValFunc(   ev  -> ev.genreid         ).setToStringR(ev -> " [%03d] %s".formatted(ev.genreid, ev.genre))),
 			ShortDesc    (config("Short Description", String    .class, 250,   null).setValFunc(   ev  -> ev.shortdesc       )),
 			LongDesc     (config("Long Description" , String    .class, 250,   null).setValFunc(   ev  -> ev.longdesc        )),
@@ -494,15 +496,6 @@ public class SingleStationEPGPanel extends JSplitPane
 			{
 				Timer timer = model.getEventTimer(event);
 				return timer==null ? null : timer.type;
-			}
-			
-			private static String toString(AlreadySeenEvents.RuleOutput ruleOutput)
-			{
-				if (ruleOutput == null)
-					return null;
-				if (ruleOutput.episodeStr == null)
-					return "Seen";
-				return "[%s]".formatted(ruleOutput.episodeStr);
 			}
 		}
 		

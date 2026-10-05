@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Vector;
 import java.util.function.Consumer;
 
+import javax.swing.Icon;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 
@@ -26,8 +27,7 @@ import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadyS
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.StationData;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.TextOperator;
 import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEvents.VariableECSData;
-import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeIcon;
-import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.TreeIconsGroup;
+import net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents.AlreadySeenEventsViewer.CombinedTreeIcon;
 
 class TreeNodeFactory
 {
@@ -228,7 +228,7 @@ class TreeNodeFactory
 		}
 		
 		protected abstract void determineChildren();
-		protected abstract TreeIcon getIcon();
+		protected abstract Icon getIcon();
 		protected Color getTextColor() { return null; }
 		protected void updateTitle() {}
 		
@@ -352,7 +352,7 @@ class TreeNodeFactory
 		}
 
 		@Override
-		protected TreeIcon getIcon()
+		protected Icon getIcon()
 		{
 			return null;
 		}
@@ -424,7 +424,7 @@ class TreeNodeFactory
 		}
 
 		@Override
-		protected TreeIcon getIcon()
+		protected Icon getIcon()
 		{
 			return null;
 		}
@@ -493,9 +493,9 @@ class TreeNodeFactory
 		}
 		
 		@Override
-		protected TreeIcon getIcon()
+		protected Icon getIcon()
 		{
-			return TreeIconsGroup.Title.getIcon(ecs.variableData());
+			return new CombinedTreeIcon(CombinedTreeIcon.BaseType.Title, ecs.variableData()).getIcon();
 		}
 		
 		@Override
@@ -552,7 +552,12 @@ class TreeNodeFactory
 		}
 		
 		@Override
-		protected TreeIcon getIcon()
+		protected Icon getIcon()
+		{
+			return new CombinedTreeIcon(getBaseType(), description.getData()).getIcon();
+		}
+		
+		private CombinedTreeIcon.BaseType getBaseType()
 		{
 			DescriptionData data = description.getData();
 			if (data != null)
@@ -560,12 +565,12 @@ class TreeNodeFactory
 				TextOperator operator = data.operator!=null ? data.operator : TextOperator.Equals;
 				switch (operator)
 				{
-				case Equals    : return TreeIconsGroup.Desc        .getIcon(data);
-				case StartsWith: return TreeIconsGroup.DescStart   .getIcon(data);
-				case Contains  : return TreeIconsGroup.DescContains.getIcon(data);
+				case Equals    : return CombinedTreeIcon.BaseType.Desc        ;
+				case StartsWith: return CombinedTreeIcon.BaseType.DescStart   ;
+				case Contains  : return CombinedTreeIcon.BaseType.DescContains;
 				}
 			}
-			return TreeIcon.Desc;
+			return CombinedTreeIcon.BaseType.Desc;
 		}
 		
 		@Override
@@ -627,9 +632,9 @@ class TreeNodeFactory
 		}
 		
 		@Override
-		protected TreeIcon getIcon()
+		protected Icon getIcon()
 		{
-			return TreeIcon.Station;
+			return new CombinedTreeIcon(CombinedTreeIcon.BaseType.Station).getIcon();
 		}
 		
 		@Override

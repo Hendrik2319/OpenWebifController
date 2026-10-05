@@ -4,12 +4,18 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Graphics2D;
 import java.awt.Window;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.image.BufferedImage;
 import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.function.Supplier;
 
 import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -19,6 +25,7 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
+import net.schwarzbaer.java.lib.gui.GeneralIcons.GrayCommandIcons;
 import net.schwarzbaer.java.lib.gui.IconSource;
 import net.schwarzbaer.java.lib.gui.KeyShortCut;
 import net.schwarzbaer.java.lib.gui.StandardDialog;
@@ -40,72 +47,112 @@ public class AlreadySeenEventsViewer extends StandardDialog
 	private static final long serialVersionUID = 6089627717117385916L;
 	static final Comparator<String> stringComparator = Comparator.<String,String>comparing(String::toLowerCase).thenComparing(Comparator.naturalOrder());
 	
-	static enum TreeIcon {
-		Title  , TitleEp  , Station  , Desc  , DescEp  , DescContains  , DescContainsEp  , DescStart  , DescStartEp  ,
-		Title_L, TitleEp_L, Station_L, Desc_L, DescEp_L, DescContains_L, DescContainsEp_L, DescStart_L, DescStartEp_L,
-		Title_S, TitleEp_S, Station_S, Desc_S, DescEp_S, DescContains_S, DescContainsEp_S, DescStart_S, DescStartEp_S,
-		;
-		public Icon getIcon() { return IS.getCachedIcon(this); }
-		private static IconSource.CachedIcons<TreeIcon> IS = IconSource.createCachedIcons(16, 16, 9, "/images/AlreadySeenEventsViewerTreeIcons.png", TreeIcon.values());
+	private static class BoolMap<V>
+	{
+		private final V forTrue;
+		private final V forFalse;
+		
+		BoolMap(Supplier<V> constructor)
+		{
+			forTrue  = constructor.get();
+			forFalse = constructor.get();
+		}
+		
+		V get(boolean index)
+		{
+			return index ? forTrue : forFalse;
+		}
 	}
 	
-	static enum TreeIconsGroup {
-		Title(
-				TreeIcon.Title  , TreeIcon.TitleEp  ,
-				TreeIcon.Title_L, TreeIcon.TitleEp_L,
-				TreeIcon.Title_S, TreeIcon.TitleEp_S
-		),
-		Desc(
-				TreeIcon.Desc  , TreeIcon.DescEp  ,
-				TreeIcon.Desc_L, TreeIcon.DescEp_L,
-				TreeIcon.Desc_S, TreeIcon.DescEp_S
-		),
-		DescContains(
-				TreeIcon.DescContains  , TreeIcon.DescContainsEp  ,
-				TreeIcon.DescContains_L, TreeIcon.DescContainsEp_L,
-				TreeIcon.DescContains_S, TreeIcon.DescContainsEp_S
-		),
-		DescStart(
-				TreeIcon.DescStart  , TreeIcon.DescStartEp  ,
-				TreeIcon.DescStart_L, TreeIcon.DescStartEp_L,
-				TreeIcon.DescStart_S, TreeIcon.DescStartEp_S
-		),
-		;
-		private final TreeIcon base;
-		private final TreeIcon baseEp;
-		private final TreeIcon base_L;
-		private final TreeIcon baseEp_L;
-		private final TreeIcon base_S;
-		private final TreeIcon baseEp_S;
-
-		TreeIconsGroup(
-				TreeIcon base  , TreeIcon baseEp  ,
-				TreeIcon base_L, TreeIcon baseEp_L,
-				TreeIcon base_S, TreeIcon baseEp_S
-		) {
-			this.base = base;
-			this.baseEp = baseEp;
-			this.base_L = base_L;
-			this.baseEp_L = baseEp_L;
-			this.base_S = base_S;
-			this.baseEp_S = baseEp_S;
+	record CombinedTreeIcon(BaseType base, boolean hasEpisodeStr, EpisodeState episodeState)
+	{
+		private static Map<BaseType,BoolMap<Map<EpisodeState,Icon>>> cachedIcons = new EnumMap<>(BaseType.class);
+		
+		enum BaseType {
+			Title, Station, Desc, DescContains, DescStart
+		}
+		
+		enum TreeIcon {
+			Title, TitleEp, Station, Desc, DescEp, DescContains, DescContainsEp, DescStart, DescStartEp
+			;
+			public Icon          getIcon () { return IS.getCachedIcon     (this); }
+			public BufferedImage getImage() { return IS.getImageFromSource(this); }
+			private static IconSource.CachedIcons<TreeIcon> IS = IconSource.createCachedIcons(16, 16, "/images/AlreadySeenEventsViewerTreeIcons.png", TreeIcon.values());
+		}
+		
+		public CombinedTreeIcon(BaseType base)
+		{
+			this(base, null);
+		}
+		
+		public CombinedTreeIcon(BaseType base, EpisodeInfo episode)
+		{
+			this(
+					base,
+					episode==null ? false : episode.hasEpisodeStr(),
+					episode==null || episode.state==null ? EpisodeState.Seen : episode.state
+			);
+		}
+		
+		public Icon getIcon()
+		{
+			return cachedIcons
+				.computeIfAbsent(base        ==null ? BaseType.Title    : base        , x->new BoolMap<>(()->new EnumMap<>(EpisodeState.class)))
+				.get(hasEpisodeStr)
+				.computeIfAbsent(episodeState==null ? EpisodeState.Seen : episodeState, x->new ImageIcon( createImage() ));
+		}
+		
+		private BufferedImage createImage()
+		{
+			if (base==BaseType.Station)
+				return TreeIcon.Station.getImage();
+				
+			BufferedImage baseImage  = createImage(base, hasEpisodeStr);
+			BufferedImage stateImage = createImage(episodeState);
+			
+			BufferedImage image = new BufferedImage(32, 16, BufferedImage.TYPE_INT_ARGB);
+			Graphics2D g2 = image.createGraphics();
+			g2.drawImage(baseImage ,  0, 0, null);
+			g2.drawImage(stateImage, 16, 0, null);
+			
+			return image;
 		}
 
-		TreeIcon getIcon(EpisodeInfo episode)
+		private static BufferedImage createImage(BaseType base, boolean hasEpisodeStr)
 		{
-			if (episode!=null)
+			return getTreeIcon(base, hasEpisodeStr).getImage();
+		}
+
+		private static TreeIcon getTreeIcon(BaseType base, boolean hasEpisodeStr)
+		{
+			
+			if (base==null) base = BaseType.Title;
+			switch (base)
 			{
-				if (episode.state==null)
-					return episode.hasEpisodeStr() ? baseEp : base;
-				
-				switch (episode.state)
-				{
-				case Seen  : return episode.hasEpisodeStr() ? baseEp   : base  ;
-				case Listed: return episode.hasEpisodeStr() ? baseEp_L : base_L;
-				case Stored: return episode.hasEpisodeStr() ? baseEp_S : base_S;
-				}
+			case Title       : return hasEpisodeStr ? TreeIcon.TitleEp : TreeIcon.Title;
+			case Station     : return TreeIcon.Station;
+			case Desc        : return hasEpisodeStr ? TreeIcon.DescEp         : TreeIcon.Desc;
+			case DescContains: return hasEpisodeStr ? TreeIcon.DescContainsEp : TreeIcon.DescContains;
+			case DescStart   : return hasEpisodeStr ? TreeIcon.DescStartEp    : TreeIcon.DescStart;
 			}
-			return base;
+			throw new IllegalArgumentException("createTreeIcon( base:%s, hasEpisodeStr:%s)".formatted(base, hasEpisodeStr));
+		}
+
+		private static BufferedImage createImage(EpisodeState episodeState)
+		{
+			return getGrayCommandIcon(episodeState).getImageFromSource();
+		}
+
+		private static GrayCommandIcons getGrayCommandIcon(EpisodeState episodeState)
+		{
+			if (episodeState!=null)
+				switch (episodeState)
+				{
+				case Listed: return GrayCommandIcons.List;
+				case Stored: return GrayCommandIcons.Save;
+				case Seen  : return GrayCommandIcons.Visible;
+				}
+			return GrayCommandIcons.Visible;
 		}
 	}
 	
@@ -333,9 +380,9 @@ public class AlreadySeenEventsViewer extends StandardDialog
 			
 			if (value instanceof AbstractTreeNode treeNode)
 			{
-				TreeIcon icon = treeNode.getIcon();
+				Icon icon = treeNode.getIcon();
 				if (icon!=null)
-					setIcon(icon.getIcon());
+					setIcon(icon);
 				
 				Color textColor = treeNode.getTextColor();
 				textColor = isSelected ? getTextSelectionColor() : textColor==null ? getTextNonSelectionColor() : textColor;

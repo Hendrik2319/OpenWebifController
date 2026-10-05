@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -64,7 +65,7 @@ public class AlreadySeenEventsViewer extends StandardDialog
 		}
 	}
 	
-	record CombinedTreeIcon(BaseType base, boolean hasEpisodeStr, EpisodeState episodeState)
+	public record CombinedTreeIcon(BaseType base, boolean hasEpisodeStr, EpisodeState episodeState)
 	{
 		private static Map<BaseType,BoolMap<Map<EpisodeState,Icon>>> cachedIcons = new EnumMap<>(BaseType.class);
 		
@@ -153,6 +154,15 @@ public class AlreadySeenEventsViewer extends StandardDialog
 				case Seen  : return GrayCommandIcons.Visible;
 				}
 			return GrayCommandIcons.Visible;
+		}
+		
+		public static Map<EpisodeState,BufferedImage> getEpisodeStateImages(UnaryOperator<BufferedImage> modify)
+		{
+			if (modify==null) modify = img -> img;
+			EnumMap<EpisodeState, BufferedImage> map = new EnumMap<>(EpisodeState.class);
+			for (EpisodeState state : EpisodeState.values())
+				map.put(state, modify.apply( createImage(state) ) );
+			return map;
 		}
 	}
 	

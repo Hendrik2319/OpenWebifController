@@ -222,19 +222,11 @@ public class AlreadySeenEventsViewer extends StandardDialog
 	
 	void editEpisodeStr(SelectionInfo selected)
 	{
-		if (selected.episodeInfo==null)
-			return;
-		
-		String episodeStr = !selected.episodeInfo.hasEpisodeStr() ? "" : selected.episodeInfo.episodeStr;
-		String result = JOptionPane.showInputDialog(this, "Episode Text", episodeStr);
-		if (result!=null)
-		{
-			selected.episodeInfo.episodeStr = result;
+		AlreadySeenEvents.editEpisodeStr(this, selected.episodeInfo, ()-> {
 			selected.treeNode.updateTitle();
 			treeModel.fireTreeNodeUpdate(selected.treeNode);
 			tree.repaint();
-			AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.EpisodeText);
-		}
+		});
 	}
 
 	void setEpisodeState(SelectionInfo selected, EpisodeState state)

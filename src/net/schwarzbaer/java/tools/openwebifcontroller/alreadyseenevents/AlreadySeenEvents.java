@@ -1,5 +1,6 @@
 package net.schwarzbaer.java.tools.openwebifcontroller.alreadyseenevents;
 
+import java.awt.Component;
 import java.awt.Window;
 import java.io.BufferedReader;
 import java.io.File;
@@ -265,6 +266,22 @@ public class AlreadySeenEvents
 		DescriptionData descData = new DescriptionData();
 		descMap.put(description, descData);
 		return descData;
+	}
+
+	static void editEpisodeStr(Component parentComponent, EpisodeInfo episodeInfo, Runnable updateAfterChange)
+	{
+		if (episodeInfo==null)
+			return;
+		
+		String episodeStr = !episodeInfo.hasEpisodeStr() ? "" : episodeInfo.episodeStr;
+		String result = JOptionPane.showInputDialog(parentComponent, "Episode Text", episodeStr);
+		if (result!=null)
+		{
+			episodeInfo.episodeStr = result;
+			if (updateAfterChange!=null)
+				updateAfterChange.run();
+			AlreadySeenEvents.getInstance().writeToFileAndNotify(AlreadySeenEvents.ChangeListener.ChangeType.EpisodeText);
+		}
 	}
 
 	public void    addChangeListener(ChangeListener l) { changeListeners.   add(l); }
@@ -572,6 +589,7 @@ public class AlreadySeenEvents
 		private final JMenu menuAdd;
 		private final JMenu menuEpisodeState;
 		private final JMenuItem miShowRule;
+		private final JMenuItem miSetEpisodeText;
 		private final Supplier<V> getSource;
 		private final Supplier<V[]> getSources;
 		private final GetData<V> getData;
@@ -586,6 +604,9 @@ public class AlreadySeenEvents
 			this.getData = Objects.requireNonNull( getData );
 			this.updateAfterMenuAction = updateAfterMenuAction;
 			
+			if ((this.getSource!=null) == (this.getSources!=null))
+				throw new IllegalArgumentException();
+			
 			parent.add(menuAdd = new JMenu("Mark as Already Seen"));
 			menuAdd.add(OWCTools.createMenuItem("Title"                      , ev -> markAsAlreadySeen(false, false, false)));
 			menuAdd.add(OWCTools.createMenuItem("Title, Description"         , ev -> markAsAlreadySeen(false, true , false)));
@@ -597,6 +618,16 @@ public class AlreadySeenEvents
 			parent.add(menuEpisodeState = new JMenu("Set Episode State"));
 			for (EpisodeState state : EpisodeState.values())
 				menuEpisodeState.add(OWCTools.createMenuItem(state.toString(), ev -> setEpisodeState(state) ));
+			
+			if (this.getSource!=null)
+				parent.add(miSetEpisodeText = OWCTools.createMenuItem("##", ev -> {
+					V source = this.getSource.get();
+					RuleOutput ruleOutput = source==null ? null : getRuleIfAlreadySeen(source, this.getData);
+					if (ruleOutput!=null)
+						editEpisodeStr(this.window, ruleOutput.episodeInfo, this.updateAfterMenuAction);
+				}));
+			else
+				miSetEpisodeText = null;
 			
 			miShowRule = parent.add(OWCTools.createMenuItem("##", e->{
 				if (singleSourceAlreadySeenRule != null)
@@ -651,6 +682,21 @@ public class AlreadySeenEvents
 			menuAdd   .setEnabled(singleSource != null || (sources != null && sources.length > 0));
 			miShowRule.setText( "Show [Already Seen] Rule%s".formatted(singleSource==null ? "" : " for \"%s\"".formatted(getData.getTitle(singleSource))) );
 			menuAdd   .setText( "Mark%s as Already Seen"    .formatted(singleSource==null ? "" : " \"%s\""    .formatted(getData.getTitle(singleSource))) );
+			
+			menuEpisodeState.setEnabled( singleSourceAlreadySeenRule!=null || (getSources!=null && singleSource==null) );
+			
+			if (miSetEpisodeText!=null)
+			{
+				miSetEpisodeText.setEnabled(singleSourceAlreadySeenRule!=null);
+				miSetEpisodeText.setText("%s Episode Text%s".formatted(
+						singleSourceAlreadySeenRule==null || singleSourceAlreadySeenRule.episodeInfo==null || !singleSourceAlreadySeenRule.episodeInfo.hasEpisodeStr()
+							? "Set"
+							: "Change",
+						singleSource==null
+							? ""
+							: " of \"%s\"".formatted(getData.getTitle(singleSource))
+				));
+			}
 		}
 	}
 
